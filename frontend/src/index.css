@@ -1,0 +1,108 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================
+   THEME SYSTEM - CSS Custom Properties
+   Matching Eldaved-BMS Premium Aesthetic
+   ============================================ */
+
+:root {
+  /* Light Theme (Default) */
+  --color-bg-primary: #F0F2F5;
+  --color-bg-secondary: #FFFFFF;
+  --color-bg-tertiary: #F8FAFC;
+  --color-text-primary: #1F2937;
+  --color-text-secondary: #6B7280;
+  --color-text-muted: #9CA3AF;
+  --color-border: #E5E7EB;
+  --color-border-light: #F3F4F6;
+  --color-accent: #3B82F6; /* Keeping General-BMS Blue as base, but using variable logic */
+  --color-accent-light: #EFF6FF;
+  --color-accent-dark: #2563EB;
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-danger: #EF4444;
+  --color-info: #3B82F6;
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1);
+  
+  /* Sidebar Specifics */
+  --sidebar-width: 260px;
+}
+
+/* Midnight Theme - Deep Blue-Black */
+.theme-midnight {
+  --color-bg-primary: #0F172A;
+  --color-bg-secondary: #1E293B;
+  --color-bg-tertiary: #334155;
+  --color-text-primary: #F8FAFC;
+  --color-text-secondary: #CBD5E1;
+  --color-text-muted: #94A3B8;
+  --color-border: #334155;
+  --color-border-light: #475569;
+  --color-accent: #3B82F6;
+  --color-accent-light: #1E40AF;
+  --color-accent-dark: #60A5FA;
+  --shadow-sm: 0 1px 2px 0 rgb(0 0 0 / 0.4);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.5);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.6);
+}
+
+body {
+  font-family: 'Outfit', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* ============================================
+   THEME UTILITY CLASSES
+   ============================================ */
+
+/* Backgrounds */
+.bg-theme-primary { background-color: var(--color-bg-primary); }
+.bg-theme-secondary { background-color: var(--color-bg-secondary); }
+.bg-theme-tertiary { background-color: var(--color-bg-tertiary); }
+
+/* Text Colors */
+.text-theme-primary { color: var(--color-text-primary); }
+.text-theme-secondary { color: var(--color-text-secondary); }
+.text-theme-muted { color: var(--color-text-muted); }
+.text-theme-accent { color: var(--color-accent); }
+
+/* Borders */
+.border-theme { border-color: var(--color-border); }
+.border-theme-light { border-color: var(--color-border-light); }
+
+/* Glassmorphism utility */
+.glass {
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-border);
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted);
+}
