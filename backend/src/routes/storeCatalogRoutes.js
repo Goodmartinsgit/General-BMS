@@ -14,4 +14,8 @@ router.get('/categories', ctrl.getCategories);
 // Bank channels for payment
 router.get('/bank-channels', ctrl.getBankChannels);
 
+// Custom pages (website builder)
+router.get('/pages', ctrl.listPages);
+router.get('/pages/:pageSlug', ctrl.getPageBySlug);
+
 module.exports = router;

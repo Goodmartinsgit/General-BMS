@@ -298,4 +298,72 @@ function formatProductDetail(row) {
   };
 }
 
-module.exports = { getProducts, getFeaturedProducts, getProductBySlug, getCategories, getProductsByCategory, getBankChannels, trackOrder };
+// GET /api/store/:slug/pages/:pageSlug
+// Returns a published custom page with its sections for the storefront.
+const getPageBySlug = async (req, res) => {
+  try {
+    const { slug, pageSlug } = req.params;
+
+    // Resolve org from store_config
+    const cfgRes = await query(
+      `SELECT organization_id FROM store_config WHERE store_slug = $1 AND is_active = true LIMIT 1`,
+      [slug]
+    );
+    if (!cfgRes.rows.length) return res.status(404).json({ message: 'Store not found' });
+    const orgId = cfgRes.rows[0].organization_id;
+    if (!orgId) return res.status(404).json({ message: 'Store not configured' });
+
+    // Fetch the page
+    const pageRes = await query(
+      `SELECT id, title, slug, meta_title, meta_description, og_image
+       FROM website_pages
+       WHERE org_id = $1 AND slug = $2 AND is_active = true`,
+      [orgId, pageSlug]
+    );
+    if (!pageRes.rows.length) return res.status(404).json({ message: 'Page not found' });
+    const page = pageRes.rows[0];
+
+    // Fetch its visible sections in order
+    const sectionsRes = await query(
+      `SELECT section_type, label, content, settings
+       FROM website_sections
+       WHERE page_id = $1 AND is_visible = true
+       ORDER BY sort_order, id`,
+      [page.id]
+    );
+
+    res.json({ ...page, sections: sectionsRes.rows });
+  } catch (err) {
+    console.error('getPageBySlug', err);
+    res.status(500).json({ message: 'Failed to load page' });
+  }
+};
+
+// GET /api/store/:slug/pages
+// Returns all active custom pages (for nav/sitemap use).
+const listPages = async (req, res) => {
+  try {
+    const { slug } = req.params;
+    const cfgRes = await query(
+      `SELECT organization_id FROM store_config WHERE store_slug = $1 AND is_active = true LIMIT 1`,
+      [slug]
+    );
+    if (!cfgRes.rows.length) return res.status(404).json({ message: 'Store not found' });
+    const orgId = cfgRes.rows[0].organization_id;
+    if (!orgId) return res.json([]);
+
+    const { rows } = await query(
+      `SELECT id, title, slug, nav_label, show_in_nav, nav_order
+       FROM website_pages
+       WHERE org_id = $1 AND is_active = true
+       ORDER BY nav_order, created_at`,
+      [orgId]
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error('listPages (public)', err);
+    res.status(500).json({ message: 'Failed to load pages' });
+  }
+};
+
+module.exports = { getProducts, getFeaturedProducts, getProductBySlug, getCategories, getProductsByCategory, getBankChannels, trackOrder, getPageBySlug, listPages };
