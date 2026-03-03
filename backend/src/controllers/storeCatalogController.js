@@ -302,7 +302,9 @@ function formatProductDetail(row) {
 // Returns a published custom page with its sections for the storefront.
 const getPageBySlug = async (req, res) => {
   try {
-    const { slug, pageSlug } = req.params;
+    const { slug } = req.params;
+    // Strip any leading slash the user may have saved in the DB
+    const pageSlug = req.params.pageSlug.replace(/^\/+/, '');
 
     // Resolve org from store_config
     const cfgRes = await query(

@@ -26,11 +26,13 @@ exports.listPages = async (req, res) => {
 exports.createPage = async (req, res) => {
   const orgId = req.user.org_id;
   const {
-    title, slug, page_type = 'custom',
+    title, page_type = 'custom',
     is_active = true, show_in_nav = true,
     nav_label, nav_order = 0,
     meta_title, meta_description, og_image,
   } = req.body;
+  // Normalize slug: strip leading/trailing slashes and whitespace
+  const slug = (req.body.slug || '').trim().replace(/^\/+|\/+$/g, '');
 
   if (!title || !slug) return res.status(400).json({ message: 'title and slug are required' });
 
@@ -54,10 +56,14 @@ exports.updatePage = async (req, res) => {
   const orgId = req.user.org_id;
   const { id } = req.params;
   const {
-    title, slug, is_active, show_in_nav,
+    title, is_active, show_in_nav,
     nav_label, nav_order,
     meta_title, meta_description, og_image,
   } = req.body;
+  // Normalize slug if provided
+  const slug = req.body.slug != null
+    ? req.body.slug.trim().replace(/^\/+|\/+$/g, '')
+    : undefined;
 
   try {
     const { rows } = await db.query(
