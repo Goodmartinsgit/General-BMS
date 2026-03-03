@@ -23,6 +23,16 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Logs
+logs/
+*.log
+
+# Temp / debug files
+tmpclaude-*
+backend/output.txt
+backend/seed-dashboard-data.js
+backend/test-dashboard.js
+
 # Editor directories and files
 .idea
 .vscode

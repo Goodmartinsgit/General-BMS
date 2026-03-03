@@ -1,127 +1,208 @@
 import React, { useState } from 'react';
-import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { Package, Lock, Mail, ArrowRight, Loader2 } from 'lucide-react';
+import { useForm } from 'react-hook-form';
+import { toast } from 'react-toastify';
+import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import { useBranding } from '../context/BrandingContext';
 
 const Login = () => {
+    const [showPassword, setShowPassword] = useState(false);
+    const [loading, setLoading] = useState(false);
     const { login } = useAuth();
     const navigate = useNavigate();
-    const [email, setEmail] = useState('');
-    const [password, setPassword] = useState('');
-    const [error, setError] = useState('');
-    const [loading, setLoading] = useState(false);
+    const { config } = useBranding();
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        setError('');
+    // Branding values with safe fallbacks
+    const accent = config.accent_color || '#D4AF37';
+    const hover = config.hover_color || '#C5A353';
+    const companyName = config.company_name || 'General BMS';
+    const logoUrl = config.logo_url;
+    const logoIconText = config.logo_icon_text || 'BMS';
+    const activeText = config.active_text_color || '#FFFFFF';
+
+    const {
+        register,
+        handleSubmit,
+        formState: { errors },
+    } = useForm();
+
+    const onSubmit = async (data) => {
         setLoading(true);
         try {
-            await login(email, password);
+            await login(data.email, data.password);
+            toast.success('Login successful!');
             navigate('/');
-        } catch (err) {
-            setError('Invalid credentials. Please try again.');
+        } catch (error) {
+            console.error('Login error:', error);
+            toast.error(
+                error.response?.data?.message || 'Login failed. Please check your credentials.'
+            );
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-theme-primary transition-colors duration-300 relative overflow-hidden">
-            {/* Background Decor */}
-            <div className="absolute top-[-20%] right-[-10%] w-[600px] h-[600px] bg-blue-600/10 rounded-full blur-[120px] pointer-events-none"></div>
-            <div className="absolute bottom-[-20%] left-[-10%] w-[600px] h-[600px] bg-purple-600/10 rounded-full blur-[120px] pointer-events-none"></div>
-
-            <div className="w-full max-w-md p-8 relative z-10">
-                <div className="bg-theme-secondary border border-theme rounded-3xl shadow-2xl p-8 md:p-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                    
-                    {/* Header */}
-                    <div className="text-center mb-10">
-                        <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-blue-600/10 mb-6">
-                            <Package className="w-8 h-8 text-blue-600" />
-                        </div>
-                        <h1 className="text-2xl md:text-3xl font-bold text-theme-primary tracking-tight mb-2">
-                            Welcome Back
-                        </h1>
-                        <p className="text-theme-muted">
-                            Sign in to access your General BMS dashboard
-                        </p>
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-900 via-gray-800 to-gray-700 px-3 sm:px-4">
+            <div className="w-full max-w-md">
+                <div className="bg-white rounded-lg sm:rounded-xl shadow-2xl p-6 sm:p-8 animate-fadeIn">
+                    <div className="text-center mb-6 sm:mb-8">
+                        {logoUrl ? (
+                            <img
+                                src={logoUrl}
+                                alt={companyName}
+                                className="h-14 sm:h-16 mx-auto mb-3 object-contain"
+                            />
+                        ) : (
+                            <div
+                                className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl mx-auto mb-3 flex items-center justify-center text-xl sm:text-2xl font-bold"
+                                style={{ backgroundColor: accent, color: activeText }}
+                            >
+                                {logoIconText}
+                            </div>
+                        )}
+                        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 tracking-tight">{companyName}</h1>
+                        <p className="text-gray-600 mt-1 sm:mt-2 text-sm sm:text-base">Sign in to your account</p>
                     </div>
 
-                    {/* Error Message */}
-                    {error && (
-                        <div className="mb-6 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/50 text-red-600 dark:text-red-400 text-sm font-medium animate-in fade-in slide-in-from-top-2">
-                            {error}
+                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 sm:space-y-6">
+                        <div>
+                            <label htmlFor="email" className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
+                                Email address
+                            </label>
+                            <input
+                                id="email"
+                                type="email"
+                                autoComplete="email"
+                                className={`block w-full px-3 sm:px-4 py-2.5 sm:py-3 bg-gray-50 border ${errors.email ? 'border-red-500' : 'border-gray-200'} rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all text-sm sm:text-base`}
+                                style={{
+                                    '--tw-ring-color': `${accent}4D`,
+                                    borderColor: errors.email ? undefined : undefined,
+                                }}
+                                onFocus={e => {
+                                    if (!errors.email) {
+                                        e.target.style.borderColor = accent;
+                                        e.target.style.boxShadow = `0 0 0 2px ${accent}30`;
+                                    }
+                                }}
+                                onBlur={e => {
+                                    e.target.style.borderColor = '';
+                                    e.target.style.boxShadow = '';
+                                }}
+                                placeholder="name@company.com"
+                                {...register('email', {
+                                    required: 'Email is required',
+                                    pattern: {
+                                        value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                                        message: 'Invalid email address',
+                                    },
+                                })}
+                            />
+                            {errors.email && (
+                                <p className="mt-1 text-xs sm:text-sm text-red-600">{errors.email.message}</p>
+                            )}
                         </div>
-                    )}
 
-                    <form onSubmit={handleSubmit} className="space-y-6">
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold text-theme-muted uppercase tracking-wider ml-1">Email Address</label>
-                            <div className="relative group">
-                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                    <Mail className="h-5 w-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
-                                </div>
-                                <input
-                                    type="email"
-                                    className="block w-full pl-11 pr-4 py-3.5 bg-theme-primary border border-theme rounded-xl text-theme-primary placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
-                                    placeholder="Enter your email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    required
-                                />
+                        <div>
+                            <div className="flex items-center justify-between mb-1">
+                                <label htmlFor="password" className="block text-xs sm:text-sm font-medium text-gray-700">
+                                    Password
+                                </label>
+                                <a
+                                    href="/forgot-password"
+                                    className="text-xs sm:text-sm font-medium transition-colors"
+                                    style={{ color: accent }}
+                                    onMouseOver={e => (e.target.style.color = hover)}
+                                    onMouseOut={e => (e.target.style.color = accent)}
+                                >
+                                    Forgot password?
+                                </a>
                             </div>
-                        </div>
-
-                        <div className="space-y-2">
-                            <div className="flex items-center justify-between ml-1">
-                                <label className="text-xs font-bold text-theme-muted uppercase tracking-wider">Password</label>
-                                <a href="#" className="text-xs font-medium text-blue-600 hover:text-blue-500 transition-colors">Forgot password?</a>
-                            </div>
-                            <div className="relative group">
-                                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                    <Lock className="h-5 w-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
-                                </div>
+                            <div className="relative">
                                 <input
-                                    type="password"
-                                    className="block w-full pl-11 pr-4 py-3.5 bg-theme-primary border border-theme rounded-xl text-theme-primary placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all"
+                                    id="password"
+                                    type={showPassword ? 'text' : 'password'}
+                                    autoComplete="current-password"
+                                    className={`block w-full px-3 sm:px-4 py-2.5 sm:py-3 pr-10 bg-gray-50 border ${errors.password ? 'border-red-500' : 'border-gray-200'} rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 transition-all text-sm sm:text-base`}
+                                    onFocus={e => {
+                                        if (!errors.password) {
+                                            e.target.style.borderColor = accent;
+                                            e.target.style.boxShadow = `0 0 0 2px ${accent}30`;
+                                        }
+                                    }}
+                                    onBlur={e => {
+                                        e.target.style.borderColor = '';
+                                        e.target.style.boxShadow = '';
+                                    }}
                                     placeholder="Enter your password"
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    required
+                                    {...register('password', {
+                                        required: 'Password is required',
+                                        minLength: {
+                                            value: 6,
+                                            message: 'Password must be at least 6 characters',
+                                        },
+                                    })}
                                 />
+                                <button
+                                    type="button"
+                                    className="absolute inset-y-0 right-0 flex items-center pr-3"
+                                    onClick={() => setShowPassword(!showPassword)}
+                                >
+                                    {showPassword ? (
+                                        <EyeOff className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 hover:text-gray-600 transition-colors" />
+                                    ) : (
+                                        <Eye className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400 hover:text-gray-600 transition-colors" />
+                                    )}
+                                </button>
                             </div>
+                            {errors.password && (
+                                <p className="mt-1 text-xs sm:text-sm text-red-600">
+                                    {errors.password.message}
+                                </p>
+                            )}
                         </div>
 
                         <button
                             type="submit"
                             disabled={loading}
-                            className={`w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl shadow-lg shadow-blue-600/20 transition-all active:scale-[0.98] ${loading ? 'opacity-80 cursor-not-allowed' : ''}`}
+                            className="w-full flex items-center justify-center gap-2 font-semibold py-2.5 sm:py-3 rounded-lg transition-all transform active:scale-[0.98] disabled:opacity-70 disabled:cursor-not-allowed shadow-lg hover:shadow-xl text-sm sm:text-base"
+                            style={{
+                                backgroundColor: accent,
+                                color: activeText,
+                            }}
+                            onMouseOver={e => (e.target.style.backgroundColor = hover)}
+                            onMouseOut={e => (e.target.style.backgroundColor = accent)}
                         >
                             {loading ? (
-                                <Loader2 className="w-5 h-5 animate-spin" />
-                            ) : (
                                 <>
-                                    Sign In <ArrowRight className="w-5 h-5" />
+                                    <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" />
+                                    Signing in...
                                 </>
+                            ) : (
+                                'Sign in'
                             )}
                         </button>
                     </form>
-                    
-                    <div className="mt-8 text-center">
-                        <p className="text-theme-muted text-sm">
+
+                    <div className="mt-6 sm:mt-8 text-center border-t border-gray-100 pt-4 sm:pt-6">
+                        <p className="text-gray-500 text-xs sm:text-sm">
                             Don't have an account?{' '}
-                            <a href="#" className="font-bold text-blue-600 hover:text-blue-500 transition-colors">
+                            <a
+                                href="#"
+                                className="font-medium transition-colors"
+                                style={{ color: accent }}
+                                onMouseOver={e => (e.target.style.color = hover)}
+                                onMouseOut={e => (e.target.style.color = accent)}
+                            >
                                 Contact Admin
                             </a>
                         </p>
                     </div>
                 </div>
-                
-                {/* Footer */}
-                <div className="text-center mt-8">
-                    <p className="text-xs text-theme-muted opacity-60">
-                        &copy; {new Date().getFullYear()} General BMS. All rights reserved.
-                    </p>
+
+                <div className="text-center mt-4 sm:mt-6 text-gray-400 text-[10px] sm:text-xs">
+                    &copy; {new Date().getFullYear()} {companyName}. All rights reserved.
                 </div>
             </div>
         </div>

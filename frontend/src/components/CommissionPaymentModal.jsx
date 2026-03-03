@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { X, DollarSign, CreditCard, Banknote, FileText } from 'lucide-react';
+import { useCurrency } from '../context/CurrencyContext';
 
 const CommissionPaymentModal = ({ isOpen, onClose, onSubmit, referrer }) => {
+    const { formatCurrency, symbol } = useCurrency();
     const [formData, setFormData] = useState({
         referrer_id: '',
         amount: '',
@@ -44,13 +46,13 @@ const CommissionPaymentModal = ({ isOpen, onClose, onSubmit, referrer }) => {
                     <div className="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-center justify-between">
                         <div className="text-sm text-slate-500 font-medium">Available Balance</div>
                         <div className="text-xl font-black text-slate-900 text-right">
-                            ₦{parseFloat(referrer.commission_balance || 0).toLocaleString()}
+                            {formatCurrency(referrer.commission_balance || 0)}
                         </div>
                     </div>
 
                     <div className="space-y-4">
                         <div>
-                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 block">Payment Amount (₦)</label>
+                            <label className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5 block">Payment Amount ({symbol})</label>
                             <div className="relative">
                                 <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
                                 <input

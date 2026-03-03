@@ -1,47 +1,58 @@
 import React, { useState, useEffect } from 'react';
-import { X, DollarSign, Calendar, FileText, Tag } from 'lucide-react';
-import axios from 'axios';
+import { X } from 'lucide-react';
+import api from '../api/axios';
+import { useCurrency } from '../context/CurrencyContext';
 
-const ExpenseFormModal = ({ isOpen, onClose, onSuccess }) => {
+const ExpenseFormModal = ({ isOpen, onClose, onSubmit, expense }) => {
+    const { symbol } = useCurrency();
     const [branches, setBranches] = useState([]);
+    const [categories, setCategories] = useState([]);
     const [formData, setFormData] = useState({
         branch_id: '',
-        category: 'Utilities',
+        category_id: '',
         amount: '',
         description: '',
         expense_date: new Date().toISOString().split('T')[0],
-        channel_id: ''
+        status: 'pending',
+        receipt_url: ''
     });
-    const [channels, setChannels] = useState([]);
-
-
-    const API_URL = 'http://localhost:5000/api';
 
     useEffect(() => {
         if (isOpen) {
             fetchBranches();
-            fetchChannels();
+            fetchCategories();
         }
     }, [isOpen]);
 
-    const fetchChannels = async () => {
-        try {
-            const response = await axios.get(`${API_URL}/banks/channels`);
-            setChannels(response.data);
-            if (response.data.length > 0) {
-                setFormData(prev => ({ ...prev, channel_id: response.data[0].id }));
-            }
-        } catch (error) {
-            console.error('Error fetching channels:', error);
+    useEffect(() => {
+        if (expense) {
+            setFormData({
+                branch_id: expense.branch_id || '',
+                category_id: expense.category_id || '',
+                amount: expense.amount || '',
+                description: expense.description || '',
+                expense_date: expense.expense_date ? new Date(expense.expense_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+                status: expense.status || 'pending',
+                receipt_url: expense.receipt_url || ''
+            });
+        } else {
+            setFormData({
+                branch_id: branches[0]?.id || '',
+                category_id: categories[0]?.id || '',
+                amount: '',
+                description: '',
+                expense_date: new Date().toISOString().split('T')[0],
+                status: 'pending',
+                receipt_url: ''
+            });
         }
-    };
-
+    }, [expense, isOpen]);
 
     const fetchBranches = async () => {
         try {
-            const response = await axios.get(`${API_URL}/branches`);
+            const response = await api.get('/branches');
             setBranches(response.data);
-            if (response.data.length > 0) {
+            if (response.data.length > 0 && !expense) {
                 setFormData(prev => ({ ...prev, branch_id: response.data[0].id }));
             }
         } catch (error) {
@@ -49,129 +60,155 @@ const ExpenseFormModal = ({ isOpen, onClose, onSuccess }) => {
         }
     };
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
+    const fetchCategories = async () => {
         try {
-            await axios.post(`${API_URL}/expenses`, formData);
-            onSuccess();
-            onClose();
-            setFormData({
-                branch_id: branches[0]?.id || '',
-                category: 'Utilities',
-                amount: '',
-                description: '',
-                expense_date: new Date().toISOString().split('T')[0],
-                channel_id: channels[0]?.id || ''
-            });
-
+            const response = await api.get('/expense-categories');
+            setCategories(response.data);
+            if (response.data.length > 0 && !expense) {
+                setFormData(prev => ({ ...prev, category_id: response.data[0].id }));
+            }
         } catch (error) {
-            alert('Failed to record expense');
+            console.error('Error fetching expense categories:', error);
         }
     };
 
-    const categories = ['Utilities', 'Rent', 'Salaries', 'Maintenance', 'Marketing', 'Logistics', 'Supplies', 'Others'];
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        onSubmit(formData);
+    };
 
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-                <div className="flex justify-between items-center p-6 border-b">
-                    <div className="flex items-center gap-2">
-                        <DollarSign className="text-red-500" />
-                        <h2 className="text-xl font-black text-gray-900">Record Expense</h2>
-                    </div>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto py-10">
+            <div className="bg-theme-secondary rounded-lg shadow-xl w-full max-w-2xl my-auto">
+                <div className="flex justify-between items-center p-4 border-b border-theme">
+                    <h2 className="text-xl font-semibold text-theme-primary">{expense ? 'Edit Expense' : 'Add New Expense'}</h2>
+                    <button onClick={onClose} className="text-theme-muted hover:text-theme-primary transition">
                         <X size={24} />
                     </button>
                 </div>
 
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                    <div>
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Branch</label>
-                        <select
-                            value={formData.branch_id}
-                            onChange={(e) => setFormData({ ...formData, branch_id: e.target.value })}
-                            className="w-full px-4 py-2 bg-gray-50 border rounded-xl focus:ring-2 focus:ring-red-500 outline-none transition"
-                            required
-                        >
-                            {branches.map(b => (
-                                <option key={b.id} value={b.id}>{b.branch_name}</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
+                <form onSubmit={handleSubmit} className="p-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                        <div className="col-span-1 md:col-span-2 pb-2 border-b border-theme">
+                            <h3 className="text-sm font-semibold text-accent-gold uppercase">Expense Details</h3>
+                        </div>
                         <div>
-                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Category</label>
+                            <label className="block text-sm font-medium text-theme-secondary mb-1">Branch *</label>
                             <select
-                                value={formData.category}
-                                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                                className="w-full px-4 py-2 bg-gray-50 border rounded-xl focus:ring-2 focus:ring-red-500 outline-none"
+                                name="branch_id"
+                                value={formData.branch_id}
+                                onChange={handleChange}
+                                className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none"
                                 required
                             >
-                                {categories.map(c => (
-                                    <option key={c} value={c}>{c}</option>
+                                <option value="">Select Branch</option>
+                                {branches.map(b => (
+                                    <option key={b.id} value={b.id}>{b.branch_name}</option>
                                 ))}
                             </select>
                         </div>
                         <div>
-                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Expense Date</label>
+                            <label className="block text-sm font-medium text-theme-secondary mb-1">Category *</label>
+                            <select
+                                name="category_id"
+                                value={formData.category_id}
+                                onChange={handleChange}
+                                className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none"
+                                required
+                            >
+                                <option value="">Select Category</option>
+                                {categories.map(c => (
+                                    <option key={c.id} value={c.id}>{c.category_name}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-theme-secondary mb-1">Amount ({symbol}) *</label>
                             <input
-                                type="date"
-                                value={formData.expense_date}
-                                onChange={(e) => setFormData({ ...formData, expense_date: e.target.value })}
-                                className="w-full px-4 py-2 bg-gray-50 border rounded-xl focus:ring-2 focus:ring-red-500 outline-none"
+                                type="number"
+                                name="amount"
+                                value={formData.amount}
+                                onChange={handleChange}
+                                step="0.01"
+                                className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none"
+                                placeholder="0.00"
                                 required
                             />
                         </div>
+                        <div>
+                            <label className="block text-sm font-medium text-theme-secondary mb-1">Expense Date *</label>
+                            <input
+                                type="date"
+                                name="expense_date"
+                                value={formData.expense_date}
+                                onChange={handleChange}
+                                className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none"
+                                required
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-theme-secondary mb-1">Status</label>
+                            <select
+                                name="status"
+                                value={formData.status}
+                                onChange={handleChange}
+                                className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none"
+                            >
+                                <option value="pending">Pending</option>
+                                <option value="approved">Approved</option>
+                                <option value="rejected">Rejected</option>
+                                <option value="paid">Paid</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-theme-secondary mb-1">Receipt URL</label>
+                            <input
+                                type="text"
+                                name="receipt_url"
+                                value={formData.receipt_url}
+                                onChange={handleChange}
+                                className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none"
+                                placeholder="https://..."
+                            />
+                        </div>
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-theme-secondary mb-1">Description</label>
+                            <textarea
+                                name="description"
+                                value={formData.description}
+                                onChange={handleChange}
+                                rows="3"
+                                className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none resize-none"
+                                placeholder="Details about this expense..."
+                            ></textarea>
+                        </div>
                     </div>
 
-                    <div>
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Amount (₦)</label>
-                        <input
-                            type="number"
-                            value={formData.amount}
-                            onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                            className="w-full px-4 py-2 bg-gray-50 border rounded-xl focus:ring-2 focus:ring-red-500 outline-none font-bold text-lg"
-                            placeholder="0.00"
-                            required
-                        />
-                    </div>
-
-                    <div>
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Description / Notes</label>
-                        <textarea
-                            value={formData.description}
-                            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                            className="w-full px-4 py-2 bg-gray-50 border rounded-xl focus:ring-2 focus:ring-red-500 outline-none"
-                            rows="3"
-                            placeholder="Details about this expenditure..."
-                        ></textarea>
-                    </div>
-
-                    <div>
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Pay From (Bank Channel)</label>
-                        <select
-                            value={formData.channel_id}
-                            onChange={(e) => setFormData({ ...formData, channel_id: e.target.value })}
-                            className="w-full px-4 py-2 bg-gray-50 border rounded-xl focus:ring-2 focus:ring-red-500 outline-none transition"
-                            required
+                    <div className="flex justify-end gap-3 pt-6 border-t border-theme font-semibold">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="px-6 py-2 text-theme-secondary bg-theme-primary hover:bg-theme-tertiary border border-theme rounded-lg transition"
                         >
-                            <option value="">Select Channel</option>
-                            {channels.map(c => (
-                                <option key={c.id} value={c.id}>{c.channel_name} (₦{parseFloat(c.current_balance).toLocaleString()})</option>
-                            ))}
-                        </select>
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            className="px-8 py-2 bg-accent-gold text-white rounded-lg hover:bg-accent-goldDark shadow-md transition"
+                        >
+                            {expense ? 'Update Expense' : 'Save Expense'}
+                        </button>
                     </div>
-
-
-                    <button
-                        type="submit"
-                        className="w-full bg-red-600 hover:bg-red-700 text-white font-black py-3 rounded-xl shadow-lg shadow-red-100 transition active:scale-95 mt-4"
-                    >
-                        CONFIRM & POST EXPENSE
-                    </button>
                 </form>
             </div>
         </div>

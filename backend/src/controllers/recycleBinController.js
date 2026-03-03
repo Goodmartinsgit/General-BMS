@@ -192,7 +192,7 @@ const restoreItem = async (req, res) => {
     } catch (err) {
         await client.query('ROLLBACK');
         console.error(err);
-        res.status(500).json({ message: err.message || 'Server error' });
+        res.status(500).json({ message: 'Server error' });
     } finally {
         client.release();
     }
@@ -274,7 +274,7 @@ const purgeItem = async (req, res) => {
     } catch (err) {
         await client.query('ROLLBACK');
         console.error(err);
-        res.status(500).json({ message: err.message || 'Server error' });
+        res.status(500).json({ message: 'Server error' });
     } finally {
         client.release();
     }
@@ -432,7 +432,7 @@ const autoPurge = async (req, res) => {
     } catch (err) {
         await client.query('ROLLBACK');
         console.error(err);
-        res.status(500).json({ message: err.message || 'Server error' });
+        res.status(500).json({ message: 'Server error' });
     } finally {
         client.release();
     }

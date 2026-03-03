@@ -1,6 +1,12 @@
 import api from './axios';
 
 export const branchesAPI = {
+    // Get branch mode (single vs multi-branch) — auto-creates Main Branch if none exist
+    getBranchMode: async () => {
+        const response = await api.get('/branches/mode');
+        return response.data;
+    },
+
     // Get all branches
     getBranches: async (params = {}) => {
         const response = await api.get('/branches', { params });
@@ -31,21 +37,61 @@ export const branchesAPI = {
         return response.data;
     },
 
-    // Get branch inventory
-    getBranchInventory: async (id, params = {}) => {
-        const response = await api.get(`/branches/${id}/inventory`, { params });
+    // Get organizations
+    getOrganizations: async () => {
+        const response = await api.get('/branches/organizations');
         return response.data;
     },
 
-    // Get branch analytics
-    getBranchAnalytics: async (id, params = {}) => {
-        const response = await api.get(`/branches/${id}/analytics`, { params });
+    // =========================================================================
+    // BRANCH ANALYTICS (from /api/branch-analytics)
+    // =========================================================================
+
+    // Get branch performance dashboard
+    getBranchDashboard: async (branchId, params = {}) => {
+        const response = await api.get(`/branch-analytics/${branchId}/dashboard`, { params });
         return response.data;
     },
 
-    // Get branch sales summary
-    getBranchSales: async (id, params = {}) => {
-        const response = await api.get(`/branches/${id}/sales`, { params });
+    // Get branch sales report
+    getBranchSalesReport: async (branchId, params = {}) => {
+        const response = await api.get(`/branch-analytics/${branchId}/sales-report`, { params });
+        return response.data;
+    },
+
+    // Get branch inventory valuation
+    getBranchInventoryValuation: async (branchId) => {
+        const response = await api.get(`/branch-analytics/${branchId}/inventory-valuation`);
+        return response.data;
+    },
+
+    // Get branch low stock report
+    getBranchLowStock: async (branchId) => {
+        const response = await api.get(`/branch-analytics/${branchId}/low-stock`);
+        return response.data;
+    },
+
+    // Get branch P&L report
+    getBranchPLReport: async (branchId, params = {}) => {
+        const response = await api.get(`/branch-analytics/${branchId}/pl-report`, { params });
+        return response.data;
+    },
+
+    // Compare all branches
+    compareBranches: async (params = {}) => {
+        const response = await api.get('/branch-analytics/comparison', { params });
+        return response.data;
+    },
+
+    // Get branch staff performance
+    getBranchStaffPerformance: async (branchId, params = {}) => {
+        const response = await api.get(`/branch-analytics/${branchId}/staff-performance`, { params });
+        return response.data;
+    },
+
+    // Get branch customer analytics
+    getBranchCustomerAnalytics: async (branchId, params = {}) => {
+        const response = await api.get(`/branch-analytics/${branchId}/customer-analytics`, { params });
         return response.data;
     }
 };

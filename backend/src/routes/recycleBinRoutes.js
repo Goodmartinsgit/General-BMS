@@ -11,6 +11,7 @@ const {
     getStatistics
 } = require('../controllers/recycleBinController');
 const authenticateToken = require('../middleware/authMiddleware');
+const authorize = require('../middleware/permissionMiddleware');
 
 router.use(authenticateToken);
 
@@ -19,35 +20,35 @@ router.use(authenticateToken);
 // ============================================================================
 
 // Get all deleted items with filtering and pagination
-router.get('/', getAllDeletedItems);
+router.get('/', authorize('view_recycle_bin'), getAllDeletedItems);
 
 // Get recycle bin statistics
-router.get('/statistics', getStatistics);
+router.get('/statistics', authorize('view_recycle_bin'), getStatistics);
 
 // Get deleted items by entity type
-router.get('/entity/:entityType', getDeletedItemsByEntity);
+router.get('/entity/:entityType', authorize('view_recycle_bin'), getDeletedItemsByEntity);
 
 // Restore item from recycle bin
-router.post('/:id/restore', restoreItem);
+router.post('/:id/restore', authorize('manage_recycle_bin'), restoreItem);
 
 // Permanently delete item (purge)
-router.delete('/:id/purge', purgeItem);
+router.delete('/:id/purge', authorize('manage_recycle_bin'), purgeItem);
 
 // ============================================================================
 // AUDIT & LOGS ROUTES
 // ============================================================================
 
 // Get deletion audit trail
-router.get('/audit-trail', getDeletionAuditTrail);
+router.get('/audit-trail', authorize('view_recycle_bin'), getDeletionAuditTrail);
 
 // Get purge logs
-router.get('/purge-logs', getPurgeLogs);
+router.get('/purge-logs', authorize('view_recycle_bin'), getPurgeLogs);
 
 // ============================================================================
 // AUTO-PURGE ROUTES
 // ============================================================================
 
 // Trigger auto-purge of old items
-router.post('/auto-purge', autoPurge);
+router.post('/auto-purge', authorize('manage_recycle_bin'), autoPurge);
 
 module.exports = router;

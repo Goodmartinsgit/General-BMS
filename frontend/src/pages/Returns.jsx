@@ -9,15 +9,14 @@ import {
   TrendingDown,
   Grid,
   List,
+  RefreshCw,
+  AlertCircle,
 } from 'lucide-react';
 import {
   Button,
   SearchBar,
   ViewModeToggle,
-  Badge,
-  LoadingSpinner,
   EmptyState,
-  ConfirmDialog,
   Tabs,
   Modal,
 } from '../components/ui';
@@ -33,12 +32,16 @@ import {
 import { returnsAPI } from '../api/returns';
 import { branchesAPI } from '../api/branches';
 import { toast } from 'react-toastify';
+import PageHeader from '../components/common/PageHeader';
+import KPICard from '../components/dashboard/KPICard';
+import { useCurrency } from '../context/CurrencyContext';
 
 /**
  * Returns Page
  * Manage all returns and exchanges
  */
 const Returns = () => {
+  const { formatCurrency } = useCurrency();
   // State
   const [returns, setReturns] = useState([]);
   const [branches, setBranches] = useState([]);
@@ -61,9 +64,9 @@ const Returns = () => {
   // Statistics
   const [stats, setStats] = useState({
     total_returns: 0,
-    pending_approvals: 0,
+    pending_returns: 0,
     approved_returns: 0,
-    total_refund_amount: 0,
+    total_refunded: 0,
   });
 
   // Fetch returns
@@ -117,9 +120,9 @@ const Returns = () => {
       const response = await returnsAPI.getStats();
       setStats(response.stats || response || {
         total_returns: 0,
-        pending_approvals: 0,
+        pending_returns: 0,
         approved_returns: 0,
-        total_refund_amount: 0,
+        total_refunded: 0,
       });
     } catch (error) {
       console.error('Error fetching stats:', error);
@@ -334,44 +337,78 @@ const Returns = () => {
 
   const activeFilterCount = Object.values(filters).filter((v) => v && v !== 'all').length;
 
+  const headerActions = (
+    <>
+      <button
+        onClick={fetchReturns}
+        className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-theme-secondary border border-theme text-theme-secondary font-medium rounded-lg hover:bg-theme-tertiary transition-colors"
+      >
+        <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+        Refresh
+      </button>
+      <button
+        onClick={() => setShowReturnForm(true)}
+        className="bg-accent-gold text-white px-4 py-2 rounded-lg font-semibold text-sm hover:bg-accent-goldDark transition flex items-center gap-2"
+      >
+        <Plus className="w-4 h-4" />
+        Create Return
+      </button>
+    </>
+  );
+
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Returns & Exchanges</h1>
-        <p className="text-gray-600">Manage customer returns and product exchanges</p>
-      </div>
+    <div className="space-y-6 max-w-[1700px] mx-auto pb-10">
+      {/* Page Header */}
+      <PageHeader
+        title="Returns & Exchanges"
+        subtitle="Manage customer returns, refunds, and product exchanges"
+        badge={`${stats.total_returns || 0} Total Returns`}
+        icon={RotateCcw}
+        actions={headerActions}
+      />
 
       {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <StatCard
-          label="Total Returns"
-          value={stats.total_returns}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+        <KPICard
+          title="Total Returns"
+          value={stats.total_returns || 0}
           icon={RotateCcw}
-          variant="primary"
+          iconColor="bg-blue-500"
+          change="All time"
+          changeType="neutral"
+          loading={loading}
         />
-        <StatCard
-          label="Pending Approvals"
-          value={stats.pending_approvals}
+        <KPICard
+          title="Pending Approvals"
+          value={stats.pending_returns || 0}
+          icon={AlertCircle}
+          iconColor="bg-orange-500"
+          change={stats.pending_returns > 0 ? "Needs attention" : "All clear"}
+          changeType={stats.pending_returns > 0 ? "negative" : "neutral"}
+          loading={loading}
+        />
+        <KPICard
+          title="Approved Returns"
+          value={stats.approved_returns || 0}
           icon={Package}
-          variant="warning"
+          iconColor="bg-green-500"
+          change="Ready to process"
+          changeType="neutral"
+          loading={loading}
         />
-        <StatCard
-          label="Approved Returns"
-          value={stats.approved_returns}
-          icon={TrendingDown}
-          variant="info"
-        />
-        <StatCard
-          label="Total Refunded"
-          value={`$${stats.total_refund_amount.toLocaleString()}`}
+        <KPICard
+          title="Total Refunded"
+          value={formatCurrency(stats.total_refunded || 0)}
           icon={DollarSign}
-          variant="danger"
+          iconColor="bg-accent-gold"
+          change="All time"
+          changeType="neutral"
+          loading={loading}
         />
       </div>
 
-      {/* Toolbar */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+      {/* Search & Toolbar */}
+      <div className="bg-theme-secondary p-4 rounded-lg border border-theme shadow-theme-sm">
         <div className="flex flex-col md:flex-row gap-4">
           {/* Search */}
           <div className="flex-1">
@@ -384,64 +421,64 @@ const Returns = () => {
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2 flex-wrap">
-            <Button
-              variant="outline"
-              icon={Filter}
+            <button
               onClick={() => setShowFilters(!showFilters)}
-              className={activeFilterCount > 0 ? 'border-blue-600 text-blue-600' : ''}
+              className={`inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                activeFilterCount > 0
+                  ? 'bg-accent-gold text-white border border-accent-gold'
+                  : 'bg-theme-primary border border-theme text-theme-secondary hover:bg-theme-tertiary'
+              }`}
             >
+              <Filter className="w-4 h-4" />
               Filters {activeFilterCount > 0 && `(${activeFilterCount})`}
-            </Button>
+            </button>
 
             <ViewModeToggle
-              value={viewMode}
-              onChange={setViewMode}
+              mode={viewMode}
+              onModeChange={setViewMode}
               modes={['grid', 'list']}
             />
 
-            <Button variant="outline" icon={Download} onClick={handleExport}>
-              Export
-            </Button>
-
-            <Button
-              variant="primary"
-              icon={Plus}
-              onClick={() => setShowReturnForm(true)}
+            <button
+              onClick={handleExport}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm bg-theme-primary border border-theme text-theme-secondary font-medium rounded-lg hover:bg-theme-tertiary transition-colors"
             >
-              Create Return
-            </Button>
+              <Download className="w-4 h-4" />
+              Export
+            </button>
           </div>
         </div>
 
         {/* Filters Panel */}
         {showFilters && (
-          <div className="mt-4 pt-4 border-t border-gray-200">
+          <div className="mt-4 pt-4 border-t border-theme">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Return Type */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-theme-primary mb-2">
                   Return Type
                 </label>
                 <select
                   value={filters.return_type}
                   onChange={(e) => setFilters({ ...filters, return_type: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2.5 bg-theme-primary border border-theme rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none transition-all text-sm text-theme-primary"
                 >
                   <option value="">All Types</option>
                   <option value="refund">Refund</option>
                   <option value="exchange">Exchange</option>
+                  <option value="store_credit">Store Credit</option>
                 </select>
               </div>
 
               {/* Date Range */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
+                <label className="block text-sm font-medium text-theme-primary mb-2">
                   Date Range
                 </label>
                 <select
                   value={filters.date_range}
                   onChange={(e) => setFilters({ ...filters, date_range: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2.5 bg-theme-primary border border-theme rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none transition-all text-sm text-theme-primary"
                 >
                   <option value="">All Time</option>
                   <option value="today">Today</option>
@@ -450,12 +487,16 @@ const Returns = () => {
                   <option value="quarter">This Quarter</option>
                 </select>
               </div>
-            </div>
 
-            <div className="flex items-center gap-4 mt-4">
-              <Button variant="ghost" size="sm" onClick={clearFilters}>
-                Clear All Filters
-              </Button>
+              {/* Clear Filters */}
+              <div className="flex items-end">
+                <button
+                  onClick={clearFilters}
+                  className="px-4 py-2.5 text-sm text-theme-muted hover:text-accent-gold transition-colors"
+                >
+                  Clear All Filters
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -463,11 +504,11 @@ const Returns = () => {
 
       {/* Content */}
       {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <LoadingSpinner size="lg" />
+        <div className="bg-theme-secondary rounded-lg border border-theme shadow-theme-sm flex items-center justify-center py-20">
+          <div className="w-8 h-8 border-2 border-theme border-t-accent-gold rounded-full animate-spin" />
         </div>
       ) : (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
+        <div className="bg-theme-secondary rounded-lg shadow-theme-sm border border-theme">
           <Tabs tabs={tabs} />
         </div>
       )}

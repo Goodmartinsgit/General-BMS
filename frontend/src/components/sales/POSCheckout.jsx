@@ -5,6 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { salesAPI } from '../../api/sales';
 import { Button, Input } from '../ui';
 import { toast } from 'react-toastify';
+import { useCurrency } from '../../context/CurrencyContext';
 import CustomerAutocomplete from './CustomerAutocomplete';
 import ReferrerAutocomplete from './ReferrerAutocomplete';
 import PaymentMethodSelector from './PaymentMethodSelector';
@@ -22,6 +23,7 @@ const POSCheckout = ({ onSaleComplete }) => {
         clearCart
     } = useCart();
     const { auth } = useAuth();
+    const { formatCurrency, symbol } = useCurrency();
 
     const [paymentMethod, setPaymentMethod] = useState('Cash');
     const [notes, setNotes] = useState('');
@@ -31,7 +33,7 @@ const POSCheckout = ({ onSaleComplete }) => {
 
     const subtotal = getCartSubtotal();
     const total = getCartTotal();
-    const tax = 0; // Tax logic can be added later
+    const tax = 0;
 
     const handleCompleteSale = async () => {
         if (cartItems.length === 0) {
@@ -64,7 +66,6 @@ const POSCheckout = ({ onSaleComplete }) => {
             const result = await salesAPI.createSale(saleData);
             toast.success(`Sale completed! #${result.saleNumber || result.sale_number}`);
 
-            // Prepare receipt data
             const receiptData = {
                 sale_number: result.saleNumber || result.sale_number,
                 created_at: new Date().toISOString(),
@@ -105,115 +106,92 @@ const POSCheckout = ({ onSaleComplete }) => {
     };
 
     return (
-        <div className="flex flex-col h-full bg-white rounded-[2.5rem] border border-gray-100 shadow-xl shadow-gray-200/20 overflow-hidden">
-            <div className="p-6 border-b border-gray-100 flex items-center justify-between">
-                <div>
-                    <h3 className="text-lg font-black text-gray-900 tracking-tight flex items-center gap-2">
-                        Checkout Terminal
-                    </h3>
-                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-[0.2em] mt-0.5">Finalizing Transaction</p>
-                </div>
-                <button 
-                    onClick={() => clearCart()}
-                    className="p-2 text-gray-300 hover:text-rose-500 transition-colors"
-                >
-                    <RefreshCw size={20} />
-                </button>
-            </div>
-
-            <div className="flex-grow overflow-y-auto p-6 space-y-8 no-scrollbar">
-                {/* Customer & Referrer */}
-                <div className="space-y-6">
-                    <div className="space-y-4">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Affiliated Identity</label>
+        <div className="flex flex-col h-full bg-theme-secondary overflow-hidden">
+            {/* Compact form fields — scrollable if content overflows */}
+            <div className="flex-1 overflow-y-auto p-2 sm:p-3 md:p-4 space-y-2 sm:space-y-3 no-scrollbar">
+                {/* Customer & Referrer — side by side */}
+                <div className="grid grid-cols-2 gap-2 sm:gap-3">
+                    <div>
+                        <label className="block text-[10px] sm:text-xs font-medium text-theme-muted mb-0.5 sm:mb-1">Customer</label>
                         <CustomerAutocomplete />
                     </div>
-                    <div className="space-y-4">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Attribution Source</label>
+                    <div>
+                        <label className="block text-[10px] sm:text-xs font-medium text-theme-muted mb-0.5 sm:mb-1">Referrer</label>
                         <ReferrerAutocomplete />
                     </div>
                 </div>
 
                 {/* Payment Method */}
-                <div className="space-y-4">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Settlement Method</label>
-                    <PaymentMethodSelector 
-                        selectedMethod={paymentMethod} 
-                        onSelect={setPaymentMethod} 
+                <div>
+                    <label className="block text-[10px] sm:text-xs font-medium text-theme-muted mb-1 sm:mb-1.5">Payment Method</label>
+                    <PaymentMethodSelector
+                        selectedMethod={paymentMethod}
+                        onSelect={setPaymentMethod}
                     />
                 </div>
 
-                {/* Discounts & Notes */}
-                <div className="space-y-6">
-                    <div className="space-y-4">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Value Adjustments</label>
-                        <div className="relative">
-                            <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-black text-sm">₦</div>
-                            <input 
-                                type="number"
-                                value={discount}
-                                onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
-                                className="w-full pl-10 pr-4 py-3.5 bg-gray-50 border border-transparent rounded-2xl focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-300 outline-none transition-all text-sm font-black"
-                                placeholder="0.00"
-                            />
-                        </div>
-                    </div>
-
-                    <div className="space-y-4">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Transaction Memo</label>
-                        <textarea 
-                            value={notes}
-                            onChange={(e) => setNotes(e.target.value)}
-                            className="w-full px-4 py-4 bg-gray-50 border border-transparent rounded-2xl focus:bg-white focus:ring-2 focus:ring-blue-100 focus:border-blue-300 outline-none text-sm font-medium min-h-[100px] transition-all resize-none"
-                            placeholder="Type internal notes here..."
+                {/* Discount */}
+                <div>
+                    <label className="block text-[10px] sm:text-xs font-medium text-theme-muted mb-0.5 sm:mb-1">Discount</label>
+                    <div className="relative">
+                        <div className="absolute left-2 sm:left-3 top-1/2 -translate-y-1/2 text-theme-muted text-xs sm:text-sm">{symbol}</div>
+                        <input
+                            type="number"
+                            value={discount}
+                            onChange={(e) => setDiscount(parseFloat(e.target.value) || 0)}
+                            className="w-full pl-6 sm:pl-8 pr-2 sm:pr-4 py-1.5 sm:py-2 bg-theme-primary border border-theme rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none transition-all text-xs sm:text-sm text-theme-primary placeholder-theme-muted"
+                            placeholder="0.00"
                         />
                     </div>
                 </div>
+
+                {/* Notes */}
+                <div>
+                    <label className="block text-[10px] sm:text-xs font-medium text-theme-muted mb-0.5 sm:mb-1">Notes</label>
+                    <textarea
+                        value={notes}
+                        onChange={(e) => setNotes(e.target.value)}
+                        rows={2}
+                        className="w-full px-2 sm:px-3 py-1.5 sm:py-2 bg-theme-primary border border-theme rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none text-xs sm:text-sm text-theme-primary transition-all resize-none placeholder-theme-muted"
+                        placeholder="Add notes..."
+                    />
+                </div>
             </div>
 
-            {/* Summary & Terminal Execution */}
-            <div className="p-8 bg-gray-950 text-white relative overflow-hidden">
-                {/* Decorative element */}
-                <div className="absolute top-0 right-0 w-32 h-32 bg-blue-600/10 rounded-full blur-3xl -mr-16 -mt-16"></div>
-                
-                <div className="relative space-y-3 mb-8">
-                    <div className="flex justify-between items-center text-gray-500 font-bold uppercase tracking-[0.2em] text-[9px]">
-                        <span>Gross Subtotal</span>
-                        <span className="text-gray-300">₦{subtotal.toLocaleString()}</span>
+            {/* Summary & Complete — always visible at bottom */}
+            <div className="shrink-0 px-2 sm:px-3 md:px-4 pt-2 sm:pt-3 pb-2 sm:pb-3 md:pb-4 bg-theme-primary border-t border-theme">
+                <div className="space-y-1 sm:space-y-1.5 mb-2 sm:mb-3">
+                    <div className="flex justify-between items-center text-[10px] sm:text-xs text-theme-muted">
+                        <span>Subtotal</span>
+                        <span className="text-theme-primary font-medium">{formatCurrency(subtotal)}</span>
                     </div>
                     {discount > 0 && (
-                        <div className="flex justify-between items-center text-rose-500 font-bold uppercase tracking-[0.2em] text-[9px]">
-                            <span>Relief Applied</span>
-                            <span>-₦{discount.toLocaleString()}</span>
+                        <div className="flex justify-between items-center text-[10px] sm:text-xs text-rose-500">
+                            <span>Discount</span>
+                            <span>-{formatCurrency(discount)}</span>
                         </div>
                     )}
-                    <div className="h-px bg-gray-800 my-4"></div>
-                    <div className="flex justify-between items-end">
-                        <div>
-                            <div className="text-[9px] font-black text-blue-500 uppercase tracking-[0.3em] mb-1">Net Payable</div>
-                            <div className="text-3xl font-black text-white tracking-tighter">₦{total.toLocaleString()}</div>
-                        </div>
-                        <div className="text-right">
-                             <div className="text-[9px] font-black text-gray-500 uppercase tracking-[0.3em] mb-1">Currency</div>
-                             <div className="text-xs font-bold text-gray-400">NGN / NIRA</div>
-                        </div>
+                    <div className="h-px bg-theme"></div>
+                    <div className="flex justify-between items-center">
+                        <span className="text-xs sm:text-sm font-medium text-theme-secondary">Total</span>
+                        <span className="text-lg sm:text-xl font-bold text-theme-primary">{formatCurrency(total)}</span>
                     </div>
                 </div>
 
                 <button
                     disabled={processing || cartItems.length === 0}
                     onClick={handleCompleteSale}
-                    className="w-full py-5 bg-blue-600 hover:bg-blue-500 disabled:bg-gray-800 disabled:text-gray-600 text-white rounded-[1.5rem] font-black text-lg transition-all shadow-xl shadow-blue-500/20 active:scale-[0.98] flex items-center justify-center gap-3 group relative overflow-hidden"
+                    className="w-full py-2 sm:py-2.5 md:py-3 bg-accent-gold hover:bg-accent-goldDark disabled:bg-theme-tertiary disabled:text-theme-muted text-white rounded-lg font-semibold transition-all flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm"
                 >
                     {processing ? (
                         <>
-                            <RefreshCw className="w-6 h-6 animate-spin" />
-                            <span className="uppercase tracking-widest text-sm">Processing...</span>
+                            <RefreshCw className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
+                            Processing...
                         </>
                     ) : (
                         <>
-                            <span className="uppercase tracking-widest text-sm">Authorize Settlement</span>
-                            <CheckCircle className="w-5 h-5 group-hover:scale-110 transition-transform" />
+                            Complete Sale
+                            <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         </>
                     )}
                 </button>

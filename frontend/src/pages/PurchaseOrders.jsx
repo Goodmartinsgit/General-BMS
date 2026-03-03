@@ -1,564 +1,488 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Plus,
-  Filter,
-  Download,
-  FileText,
-  Package,
-  Clock,
-  CheckCircle,
-  XCircle,
-  Truck,
+  Plus, Filter, FileText, Clock, CheckCircle, Truck,
+  Search, X, RefreshCw, User, Calendar,
 } from 'lucide-react';
-import {
-  Button,
-  SearchBar,
-  Badge,
-  LoadingSpinner,
-  EmptyState,
-  ConfirmDialog,
-  Tabs,
-} from '../components/ui';
-import {
-  PurchaseOrderFormModal,
-  PurchaseOrderCard,
-  GRNFormModal,
-} from '../components/purchase-order';
+import { toast } from 'react-toastify';
+import api from '../api/axios';
+import { branchesAPI } from '../api/branches';
+import { useCurrency } from '../context/CurrencyContext';
+import Modal from '../components/ui/Modal';
+import PageHeader from '../components/common/PageHeader';
+import PurchaseOrderCard from '../components/purchase-order/PurchaseOrderCard';
+import PurchaseOrderFormModal from '../components/purchase-order/PurchaseOrderFormModal';
+import GRNFormModal from '../components/purchase-order/GRNFormModal';
 
-/**
- * PurchaseOrders Page
- * Main purchase order management page
- */
+const STATUS_TABS = [
+  { key: 'all',                label: 'All' },
+  { key: 'draft',              label: 'Draft' },
+  { key: 'confirmed',          label: 'Confirmed' },
+  { key: 'partially_received', label: 'Partial' },
+  { key: 'received',           label: 'Received' },
+  { key: 'cancelled',          label: 'Cancelled' },
+];
+
 const PurchaseOrders = () => {
-  // State
+  const { formatCurrency } = useCurrency();
+
+  // Data
   const [purchaseOrders, setPurchaseOrders] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [suppliers,      setSuppliers]      = useState([]);
+  const [branches,       setBranches]       = useState([]);
+  const [stats,          setStats]          = useState(null);
+  const [loading,        setLoading]        = useState(true);
+  const [submitLoading,  setSubmitLoading]  = useState(false);
+
+  // Filters
   const [searchQuery, setSearchQuery] = useState('');
-  const [filters, setFilters] = useState({
-    status: 'all',
-    supplier_id: '',
-    branch_id: '',
-    date_from: '',
-    date_to: '',
-  });
+  const [activeTab,   setActiveTab]   = useState('all');
   const [showFilters, setShowFilters] = useState(false);
-  const [showPOForm, setShowPOForm] = useState(false);
-  const [selectedPO, setSelectedPO] = useState(null);
-  const [showGRNForm, setShowGRNForm] = useState(false);
-  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
-  const [poToCancel, setPoToCancel] = useState(null);
+  const [filters,     setFilters]     = useState({ supplier_id: '', branch_id: '', date_from: '', date_to: '' });
 
-  // Filter options (these would come from API)
-  const [suppliers, setSuppliers] = useState([]);
-  const [branches, setBranches] = useState([]);
+  // Modals
+  const [showPOForm,    setShowPOForm]    = useState(false);
+  const [selectedPO,    setSelectedPO]    = useState(null);
+  const [showGRNForm,   setShowGRNForm]   = useState(false);
+  const [grnPO,         setGrnPO]         = useState(null);
+  const [viewPO,        setViewPO]        = useState(null);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [showCancel,    setShowCancel]    = useState(false);
+  const [cancelPO,      setCancelPO]      = useState(null);
+  const [cancelReason,  setCancelReason]  = useState('');
 
-  // Statistics
-  const [stats, setStats] = useState({
-    total_pos: 0,
-    draft_count: 0,
-    confirmed_count: 0,
-    pending_delivery: 0,
-    total_value: 0,
-  });
-
-  // Fetch purchase orders
+  // ─── Load reference data once ───────────────────────────────────────────────
   useEffect(() => {
-    fetchPurchaseOrders();
-  }, [searchQuery, filters]);
-
-  // Fetch filter options
-  useEffect(() => {
-    fetchSuppliers();
-    fetchBranches();
-    fetchStats();
+    Promise.all([
+      api.get('/suppliers').then(r => setSuppliers(r.data || [])).catch(() => {}),
+      branchesAPI.getBranches().then(setBranches).catch(() => {}),
+    ]);
   }, []);
 
-  const fetchPurchaseOrders = async () => {
+  // ─── Load POs ───────────────────────────────────────────────────────────────
+  const fetchPOs = useCallback(async () => {
     setLoading(true);
     try {
-      // TODO: Replace with actual API call
-      const mockData = [
-        {
-          id: '1',
-          po_number: 'PO-20260131-0001',
-          supplier_id: '1',
-          supplier_name: 'ABC Suppliers Ltd',
-          branch_id: '1',
-          branch_name: 'Main Store',
-          status: 'confirmed',
-          total_amount: 5430.50,
-          total_items: 15,
-          expected_delivery_date: '2026-02-05',
-          created_at: '2026-01-31T10:30:00Z',
-          created_by_name: 'John Doe',
-          items: [],
-        },
-        {
-          id: '2',
-          po_number: 'PO-20260130-0002',
-          supplier_id: '2',
-          supplier_name: 'XYZ Distributors',
-          branch_id: '2',
-          branch_name: 'Warehouse',
-          status: 'partially_received',
-          total_amount: 8920.00,
-          total_items: 25,
-          expected_delivery_date: '2026-02-03',
-          created_at: '2026-01-30T14:15:00Z',
-          created_by_name: 'Jane Smith',
-          items: [],
-        },
-        {
-          id: '3',
-          po_number: 'PO-20260129-0003',
-          supplier_id: '1',
-          supplier_name: 'ABC Suppliers Ltd',
-          branch_id: '1',
-          branch_name: 'Main Store',
-          status: 'draft',
-          total_amount: 2150.75,
-          total_items: 8,
-          expected_delivery_date: '2026-02-10',
-          created_at: '2026-01-29T09:00:00Z',
-          created_by_name: 'John Doe',
-          items: [],
-        },
-      ];
+      const params = { limit: 100 };
+      if (activeTab !== 'all')  params.status      = activeTab;
+      if (filters.supplier_id)  params.supplier_id = filters.supplier_id;
+      if (filters.branch_id)    params.branch_id   = filters.branch_id;
+      if (filters.date_from)    params.from_date   = filters.date_from;
+      if (filters.date_to)      params.to_date     = filters.date_to;
 
-      setPurchaseOrders(mockData);
-    } catch (error) {
-      console.error('Error fetching purchase orders:', error);
+      const [posRes, statsRes] = await Promise.all([
+        api.get('/purchase-orders', { params }),
+        api.get('/purchase-orders/statistics'),
+      ]);
+
+      setPurchaseOrders(posRes.data?.purchase_orders || []);
+      setStats(statsRes.data || null);
+    } catch {
+      toast.error('Failed to load purchase orders');
     } finally {
       setLoading(false);
     }
-  };
+  }, [activeTab, filters]);
 
-  const fetchSuppliers = async () => {
-    // TODO: Replace with actual API call
-    setSuppliers([
-      { id: '1', supplier_name: 'ABC Suppliers Ltd' },
-      { id: '2', supplier_name: 'XYZ Distributors' },
-      { id: '3', supplier_name: 'Global Imports Inc' },
-    ]);
-  };
+  useEffect(() => { fetchPOs(); }, [fetchPOs]);
 
-  const fetchBranches = async () => {
-    // TODO: Replace with actual API call
-    setBranches([
-      { id: '1', branch_name: 'Main Store' },
-      { id: '2', branch_name: 'Warehouse' },
-      { id: '3', branch_name: 'Branch 2' },
-    ]);
-  };
-
-  const fetchStats = async () => {
-    // TODO: Replace with actual API call
-    setStats({
-      total_pos: 45,
-      draft_count: 8,
-      confirmed_count: 12,
-      pending_delivery: 15,
-      total_value: 125430.50,
-    });
-  };
-
-  const handleCreatePO = async (poData) => {
-    try {
-      // TODO: Replace with actual API call
-      // const response = await fetch('/api/purchase-orders', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(poData),
-      // });
-
-      await fetchPurchaseOrders();
-      await fetchStats();
-      setShowPOForm(false);
-      setSelectedPO(null);
-    } catch (error) {
-      console.error('Error creating purchase order:', error);
-    }
-  };
-
-  const handleUpdatePO = async (poData) => {
-    try {
-      // TODO: Replace with actual API call
-      // const response = await fetch(`/api/purchase-orders/${selectedPO.id}`, {
-      //   method: 'PUT',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(poData),
-      // });
-
-      await fetchPurchaseOrders();
-      setShowPOForm(false);
-      setSelectedPO(null);
-    } catch (error) {
-      console.error('Error updating purchase order:', error);
-    }
-  };
-
-  const handleConfirmPO = async (po) => {
-    try {
-      // TODO: Replace with actual API call
-      // await fetch(`/api/purchase-orders/${po.id}/confirm`, {
-      //   method: 'POST',
-      // });
-
-      await fetchPurchaseOrders();
-      await fetchStats();
-    } catch (error) {
-      console.error('Error confirming purchase order:', error);
-    }
-  };
-
-  const handleCancelPO = async () => {
-    if (!poToCancel) return;
-
-    try {
-      // TODO: Replace with actual API call
-      // await fetch(`/api/purchase-orders/${poToCancel.id}/cancel`, {
-      //   method: 'POST',
-      // });
-
-      await fetchPurchaseOrders();
-      await fetchStats();
-      setShowCancelConfirm(false);
-      setPoToCancel(null);
-    } catch (error) {
-      console.error('Error cancelling purchase order:', error);
-    }
-  };
-
-  const handleCreateGRN = async (grnData) => {
-    try {
-      // TODO: Replace with actual API call
-      // const response = await fetch('/api/goods-received-notes', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify({
-      //     ...grnData,
-      //     purchase_order_id: selectedPO.id,
-      //   }),
-      // });
-
-      await fetchPurchaseOrders();
-      await fetchStats();
-      setShowGRNForm(false);
-      setSelectedPO(null);
-    } catch (error) {
-      console.error('Error creating GRN:', error);
-    }
-  };
-
-  const handleExport = () => {
-    // TODO: Implement export to CSV/Excel
-    console.log('Export purchase orders');
-  };
-
-  const clearFilters = () => {
-    setFilters({
-      status: 'all',
-      supplier_id: '',
-      branch_id: '',
-      date_from: '',
-      date_to: '',
-    });
-    setSearchQuery('');
-  };
-
-  // Filter POs by status for tabs
-  const filterByStatus = (status) => {
-    if (status === 'all') return purchaseOrders;
-    return purchaseOrders.filter((po) => po.status === status);
-  };
-
-  const tabs = [
-    {
-      label: 'All',
-      count: purchaseOrders.length,
-      content: renderPOGrid(purchaseOrders),
-    },
-    {
-      label: 'Draft',
-      count: filterByStatus('draft').length,
-      content: renderPOGrid(filterByStatus('draft')),
-    },
-    {
-      label: 'Confirmed',
-      count: filterByStatus('confirmed').length,
-      content: renderPOGrid(filterByStatus('confirmed')),
-    },
-    {
-      label: 'Partially Received',
-      count: filterByStatus('partially_received').length,
-      content: renderPOGrid(filterByStatus('partially_received')),
-    },
-    {
-      label: 'Received',
-      count: filterByStatus('received').length,
-      content: renderPOGrid(filterByStatus('received')),
-    },
-  ];
-
-  function renderPOGrid(orders) {
-    if (orders.length === 0) {
-      return (
-        <EmptyState
-          icon={FileText}
-          title="No purchase orders found"
-          description="Create a purchase order to get started"
-        />
-      );
-    }
-
+  // ─── Client-side search ─────────────────────────────────────────────────────
+  const filtered = purchaseOrders.filter(po => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 p-6">
-        {orders.map((po) => (
-          <PurchaseOrderCard
-            key={po.id}
-            purchaseOrder={po}
-            onView={(po) => {
-              // TODO: Show detail view
-              console.log('View PO:', po);
-            }}
-            onEdit={(po) => {
-              setSelectedPO(po);
-              setShowPOForm(true);
-            }}
-            onDelete={(po) => {
-              // TODO: Implement delete
-              console.log('Delete PO:', po);
-            }}
-            onApprove={handleConfirmPO}
-            onCancel={(po) => {
-              setPoToCancel(po);
-              setShowCancelConfirm(true);
-            }}
-          />
-        ))}
-      </div>
+      po.po_number?.toLowerCase().includes(q) ||
+      po.supplier_name?.toLowerCase().includes(q) ||
+      po.branch_name?.toLowerCase().includes(q)
     );
-  }
+  });
 
-  const activeFilterCount = Object.values(filters).filter((v) => v && v !== 'all').length;
+  // ─── Handlers ───────────────────────────────────────────────────────────────
+  const handleCreate = async (data) => {
+    setSubmitLoading(true);
+    try {
+      await api.post('/purchase-orders', data);
+      toast.success('Purchase order created');
+      setShowPOForm(false);
+      setSelectedPO(null);
+      fetchPOs();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Failed to create purchase order');
+    } finally {
+      setSubmitLoading(false);
+    }
+  };
+
+  const handleUpdate = async (data) => {
+    setSubmitLoading(true);
+    try {
+      await api.put(`/purchase-orders/${selectedPO.id}`, data);
+      toast.success('Purchase order updated');
+      setShowPOForm(false);
+      setSelectedPO(null);
+      fetchPOs();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Failed to update purchase order');
+    } finally {
+      setSubmitLoading(false);
+    }
+  };
+
+  const handleApprove = async (po) => {
+    try {
+      await api.post(`/purchase-orders/${po.id}/approve`);
+      toast.success(`${po.po_number} confirmed`);
+      fetchPOs();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Failed to confirm purchase order');
+    }
+  };
+
+  const handleCancelSubmit = async () => {
+    if (!cancelPO) return;
+    try {
+      await api.post(`/purchase-orders/${cancelPO.id}/cancel`, { cancellation_reason: cancelReason });
+      toast.success(`${cancelPO.po_number} cancelled`);
+      setShowCancel(false);
+      setCancelPO(null);
+      setCancelReason('');
+      fetchPOs();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Failed to cancel purchase order');
+    }
+  };
+
+  const handleReceive = async (grnData) => {
+    setSubmitLoading(true);
+    try {
+      await api.post(`/purchase-orders/${grnPO.id}/receive`, grnData);
+      toast.success('Goods received successfully');
+      setShowGRNForm(false);
+      setGrnPO(null);
+      fetchPOs();
+    } catch (err) {
+      toast.error(err?.response?.data?.message || 'Failed to record GRN');
+    } finally {
+      setSubmitLoading(false);
+    }
+  };
+
+  const handleViewPO = async (po) => {
+    try {
+      const res = await api.get(`/purchase-orders/${po.id}`);
+      setViewPO(res.data);
+      setShowViewModal(true);
+    } catch {
+      toast.error('Failed to load purchase order details');
+    }
+  };
+
+  const activeFilterCount = Object.values(filters).filter(Boolean).length;
+
+  const tabCounts = STATUS_TABS.reduce((acc, t) => {
+    acc[t.key] = t.key === 'all'
+      ? purchaseOrders.length
+      : purchaseOrders.filter(p => p.status === t.key).length;
+    return acc;
+  }, {});
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-theme-primary mb-2">Purchase Orders</h1>
-        <p className="text-theme-secondary">Manage purchase orders and track deliveries</p>
-      </div>
+    <div className="space-y-4 sm:space-y-6">
+      <PageHeader
+        title="Purchase Orders"
+        subtitle="Manage supplier orders and track deliveries"
+        icon={FileText}
+        badge={stats ? `${stats.total_pos} total` : null}
+        actions={
+          <>
+            <button
+              onClick={fetchPOs}
+              disabled={loading}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-theme-secondary bg-theme-secondary border border-theme rounded-lg hover:bg-theme-tertiary transition-colors disabled:opacity-50"
+            >
+              <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              <span className="hidden sm:inline">Refresh</span>
+            </button>
+            <button
+              onClick={() => { setSelectedPO(null); setShowPOForm(true); }}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-accent-gold rounded-lg hover:bg-accent-goldDark transition-colors"
+            >
+              <Plus className="w-4 h-4" /> Create PO
+            </button>
+          </>
+        }
+      />
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <StatCard
-          label="Total POs"
-          value={stats.total_pos}
-          icon={FileText}
-          variant="primary"
-        />
-        <StatCard
-          label="Draft"
-          value={stats.draft_count}
-          icon={Clock}
-          variant="default"
-        />
-        <StatCard
-          label="Confirmed"
-          value={stats.confirmed_count}
-          icon={CheckCircle}
-          variant="info"
-        />
-        <StatCard
-          label="Pending Delivery"
-          value={stats.pending_delivery}
-          icon={Truck}
-          variant="warning"
-        />
-      </div>
+      {/* Stats */}
+      {stats && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+          {[
+            { label: 'Total POs',        value: stats.total_pos,     icon: FileText,    color: 'text-accent-gold', bg: 'bg-accent-gold/10' },
+            { label: 'Draft',            value: stats.draft_pos,     icon: Clock,       color: 'text-theme-muted', bg: 'bg-theme-tertiary' },
+            { label: 'Confirmed',        value: stats.confirmed_pos, icon: CheckCircle, color: 'text-blue-500',    bg: 'bg-blue-500/10'    },
+            { label: 'Pending Delivery',
+              value: Number(stats.partially_received_pos || 0) + Number(stats.confirmed_pos || 0),
+              icon: Truck, color: 'text-yellow-500', bg: 'bg-yellow-500/10' },
+          ].map(({ label, value, icon: Icon, color, bg }) => (
+            <div key={label} className="bg-theme-secondary border border-theme rounded-xl p-3 sm:p-4 flex items-center gap-3">
+              <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${bg}`}>
+                <Icon className={`w-5 h-5 ${color}`} />
+              </div>
+              <div className="min-w-0">
+                <p className="text-lg sm:text-xl font-bold text-theme-primary leading-tight">{value}</p>
+                <p className="text-[10px] sm:text-xs text-theme-muted">{label}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {/* Toolbar */}
-      <div className="bg-theme-secondary rounded-2xl shadow-theme-sm border border-theme p-4 mb-6">
-        <div className="flex flex-col md:flex-row gap-4">
-          {/* Search */}
-          <div className="flex-1">
-            <SearchBar
-              value={searchQuery}
-              onChange={setSearchQuery}
+      <div className="bg-theme-secondary border border-theme rounded-xl p-3 sm:p-4 space-y-3">
+        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-muted pointer-events-none" />
+            <input
+              type="text"
               placeholder="Search by PO number, supplier..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 bg-theme-primary border border-theme text-theme-primary text-sm rounded-lg placeholder-theme-muted focus:outline-none focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 transition-all"
             />
+            {searchQuery && (
+              <button onClick={() => setSearchQuery('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-theme-muted hover:text-theme-primary">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
-
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button
-              variant="outline"
-              icon={Filter}
-              onClick={() => setShowFilters(!showFilters)}
-              className={activeFilterCount > 0 ? 'border-blue-600 text-blue-600' : ''}
-            >
-              Filters {activeFilterCount > 0 && `(${activeFilterCount})`}
-            </Button>
-
-            <Button variant="outline" icon={Download} onClick={handleExport}>
-              Export
-            </Button>
-
-            <Button
-              variant="primary"
-              icon={Plus}
-              onClick={() => {
-                setSelectedPO(null);
-                setShowPOForm(true);
-              }}
-            >
-              Create PO
-            </Button>
-          </div>
+          <button
+            onClick={() => setShowFilters(v => !v)}
+            className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border rounded-lg transition-colors ${
+              activeFilterCount > 0
+                ? 'bg-accent-gold/10 border-accent-gold/30 text-accent-gold'
+                : 'bg-theme-primary border-theme text-theme-secondary hover:bg-theme-tertiary'
+            }`}
+          >
+            <Filter className="w-4 h-4" />
+            Filters
+            {activeFilterCount > 0 && (
+              <span className="px-1.5 py-0.5 text-[10px] font-bold bg-accent-gold text-white rounded-full">{activeFilterCount}</span>
+            )}
+          </button>
         </div>
 
-        {/* Filters Panel */}
         {showFilters && (
-          <div className="mt-4 pt-4 border-t border-theme">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {/* Supplier */}
-              <div>
-                <label className="block text-sm font-medium text-theme-secondary mb-1">
-                  Supplier
-                </label>
-                <select
-                  value={filters.supplier_id}
-                  onChange={(e) => setFilters({ ...filters, supplier_id: e.target.value })}
-                  className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="" className="bg-theme-secondary">All Suppliers</option>
-                  {suppliers.map((supplier) => (
-                    <option key={supplier.id} value={supplier.id} className="bg-theme-secondary">
-                      {supplier.supplier_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Branch */}
-              <div>
-                <label className="block text-sm font-medium text-theme-secondary mb-1">Branch</label>
-                <select
-                  value={filters.branch_id}
-                  onChange={(e) => setFilters({ ...filters, branch_id: e.target.value })}
-                  className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="" className="bg-theme-secondary">All Branches</option>
-                  {branches.map((branch) => (
-                    <option key={branch.id} value={branch.id} className="bg-theme-secondary">
-                      {branch.branch_name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Date From */}
-              <div>
-                <label className="block text-sm font-medium text-theme-secondary mb-1">From Date</label>
-                <input
-                  type="date"
-                  value={filters.date_from}
-                  onChange={(e) => setFilters({ ...filters, date_from: e.target.value })}
-                  className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              {/* Date To */}
-              <div>
-                <label className="block text-sm font-medium text-theme-secondary mb-1">To Date</label>
-                <input
-                  type="date"
-                  value={filters.date_to}
-                  onChange={(e) => setFilters({ ...filters, date_to: e.target.value })}
-                  className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
+          <div className="pt-3 border-t border-theme space-y-3">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+              {[
+                { key: 'supplier_id', label: 'Supplier', opts: suppliers, optKey: 'supplier_name', placeholder: 'All Suppliers' },
+                { key: 'branch_id',   label: 'Branch',   opts: branches,  optKey: 'branch_name',   placeholder: 'All Branches'  },
+              ].map(({ key, label, opts, optKey, placeholder }) => (
+                <div key={key}>
+                  <label className="block text-xs font-medium text-theme-muted mb-1">{label}</label>
+                  <select value={filters[key]} onChange={e => setFilters(f => ({ ...f, [key]: e.target.value }))}
+                    className="w-full px-3 py-2 bg-theme-primary border border-theme text-theme-primary text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-gold/20 transition-all">
+                    <option value="">{placeholder}</option>
+                    {opts.map(o => <option key={o.id} value={o.id}>{o[optKey]}</option>)}
+                  </select>
+                </div>
+              ))}
+              {[
+                { key: 'date_from', label: 'From Date' },
+                { key: 'date_to',   label: 'To Date'   },
+              ].map(({ key, label }) => (
+                <div key={key}>
+                  <label className="block text-xs font-medium text-theme-muted mb-1">{label}</label>
+                  <input type="date" value={filters[key]} onChange={e => setFilters(f => ({ ...f, [key]: e.target.value }))}
+                    className="w-full px-3 py-2 bg-theme-primary border border-theme text-theme-primary text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-gold/20 transition-all" />
+                </div>
+              ))}
             </div>
-
-            <div className="flex items-center gap-4 mt-4">
-              <Button variant="ghost" size="sm" onClick={clearFilters}>
-                Clear All Filters
-              </Button>
-            </div>
+            {activeFilterCount > 0 && (
+              <button onClick={() => setFilters({ supplier_id: '', branch_id: '', date_from: '', date_to: '' })}
+                className="text-xs text-theme-muted hover:text-red-500 transition-colors flex items-center gap-1">
+                <X className="w-3.5 h-3.5" /> Clear all filters
+              </button>
+            )}
           </div>
         )}
+
+        {/* Status tabs */}
+        <div className="flex items-center gap-1 flex-wrap">
+          {STATUS_TABS.map(({ key, label }) => (
+            <button key={key} onClick={() => setActiveTab(key)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                activeTab === key ? 'bg-accent-gold text-white' : 'text-theme-muted hover:text-theme-primary hover:bg-theme-tertiary'
+              }`}
+            >
+              {label}
+              <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold ${activeTab === key ? 'bg-white/20' : 'bg-theme-tertiary'}`}>
+                {tabCounts[key] ?? 0}
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Content */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <LoadingSpinner size="lg" />
+          <div className="w-8 h-8 border-2 border-theme border-t-accent-gold rounded-full animate-spin" />
+        </div>
+      ) : filtered.length === 0 ? (
+        <div className="bg-theme-secondary border border-theme rounded-xl p-12 text-center">
+          <FileText className="w-12 h-12 text-theme-muted mx-auto mb-3 opacity-40" />
+          <p className="text-theme-primary font-medium">No purchase orders found</p>
+          <p className="text-theme-muted text-sm mt-1">
+            {searchQuery || activeFilterCount > 0 ? 'Try adjusting your search or filters' : 'Create your first purchase order to get started'}
+          </p>
         </div>
       ) : (
-        <div className="bg-theme-secondary rounded-2xl shadow-theme-sm border border-theme">
-          <Tabs tabs={tabs} />
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {filtered.map(po => (
+            <PurchaseOrderCard
+              key={po.id}
+              purchaseOrder={po}
+              formatCurrency={formatCurrency}
+              onView={handleViewPO}
+              onEdit={p => { setSelectedPO(p); setShowPOForm(true); }}
+              onApprove={handleApprove}
+              onReceive={p => { setGrnPO(p); setShowGRNForm(true); }}
+              onCancel={p => { setCancelPO(p); setCancelReason(''); setShowCancel(true); }}
+            />
+          ))}
         </div>
       )}
 
-      {/* Purchase Order Form Modal */}
+      {/* Create / Edit PO */}
       <PurchaseOrderFormModal
         isOpen={showPOForm}
-        onClose={() => {
-          setShowPOForm(false);
-          setSelectedPO(null);
-        }}
-        onSubmit={selectedPO ? handleUpdatePO : handleCreatePO}
+        onClose={() => { setShowPOForm(false); setSelectedPO(null); }}
+        onSubmit={selectedPO ? handleUpdate : handleCreate}
         purchaseOrder={selectedPO}
         suppliers={suppliers}
         branches={branches}
+        loading={submitLoading}
       />
 
-      {/* GRN Form Modal */}
+      {/* GRN */}
       <GRNFormModal
         isOpen={showGRNForm}
-        onClose={() => {
-          setShowGRNForm(false);
-          setSelectedPO(null);
-        }}
-        onSubmit={handleCreateGRN}
-        purchaseOrder={selectedPO}
+        onClose={() => { setShowGRNForm(false); setGrnPO(null); }}
+        onSubmit={handleReceive}
+        purchaseOrder={grnPO}
+        loading={submitLoading}
       />
+
+      {/* View PO Detail */}
+      {viewPO && (
+        <Modal
+          isOpen={showViewModal}
+          onClose={() => { setShowViewModal(false); setViewPO(null); }}
+          title={viewPO.po_number}
+          subtitle={`${viewPO.supplier_name} → ${viewPO.branch_name}`}
+          size="xl"
+        >
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {[
+                { icon: User,     label: 'Created By',    val: viewPO.created_by_name || '—' },
+                { icon: Calendar, label: 'PO Date',       val: viewPO.po_date ? new Date(viewPO.po_date).toLocaleDateString() : '—' },
+                { icon: Truck,    label: 'Exp. Delivery', val: viewPO.expected_delivery_date ? new Date(viewPO.expected_delivery_date).toLocaleDateString() : '—' },
+              ].map(({ icon: Icon, label, val }) => (
+                <div key={label} className="bg-theme-tertiary border border-theme rounded-lg p-2.5">
+                  <div className="flex items-center gap-1.5 text-xs text-theme-muted mb-1">
+                    <Icon className="w-3.5 h-3.5" /> {label}
+                  </div>
+                  <p className="text-sm font-medium text-theme-primary">{val}</p>
+                </div>
+              ))}
+            </div>
+
+            {viewPO.items?.length > 0 && (
+              <div className="border border-theme rounded-xl overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-theme-tertiary border-b border-theme">
+                    <tr>
+                      <th className="px-4 py-2.5 text-left text-xs font-medium text-theme-muted uppercase">Product</th>
+                      <th className="px-4 py-2.5 text-center text-xs font-medium text-theme-muted uppercase">Ordered</th>
+                      <th className="px-4 py-2.5 text-center text-xs font-medium text-theme-muted uppercase">Received</th>
+                      <th className="px-4 py-2.5 text-right text-xs font-medium text-theme-muted uppercase">Unit Price</th>
+                      <th className="px-4 py-2.5 text-right text-xs font-medium text-theme-muted uppercase">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-theme">
+                    {viewPO.items.map((item, i) => (
+                      <tr key={i} className="hover:bg-theme-tertiary/50">
+                        <td className="px-4 py-3">
+                          <p className="font-medium text-theme-primary">{item.product_name}</p>
+                          {item.variant_name && <p className="text-xs text-theme-muted">{item.variant_name}</p>}
+                        </td>
+                        <td className="px-4 py-3 text-center text-theme-primary">{item.quantity_ordered}</td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`font-medium ${(item.quantity_received || 0) >= item.quantity_ordered ? 'text-green-500' : 'text-yellow-500'}`}>
+                            {item.quantity_received || 0}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right text-theme-secondary">{formatCurrency(item.unit_price)}</td>
+                        <td className="px-4 py-3 text-right font-semibold text-theme-primary">{formatCurrency(item.line_total)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="bg-theme-tertiary border-t-2 border-theme">
+                    <tr>
+                      <td colSpan={4} className="px-4 py-3 text-right font-semibold text-theme-secondary">Total Amount</td>
+                      <td className="px-4 py-3 text-right font-bold text-accent-gold text-lg">{formatCurrency(viewPO.total_amount)}</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+
+            {viewPO.notes && (
+              <div className="p-3 bg-theme-tertiary border border-theme rounded-lg text-sm text-theme-secondary">
+                <span className="font-medium text-theme-muted text-xs uppercase">Notes: </span>{viewPO.notes}
+              </div>
+            )}
+          </div>
+        </Modal>
+      )}
 
       {/* Cancel Confirmation */}
-      <ConfirmDialog
-        isOpen={showCancelConfirm}
-        onClose={() => {
-          setShowCancelConfirm(false);
-          setPoToCancel(null);
-        }}
-        onConfirm={handleCancelPO}
+      <Modal
+        isOpen={showCancel}
+        onClose={() => { setShowCancel(false); setCancelPO(null); setCancelReason(''); }}
         title="Cancel Purchase Order"
-        message={`Are you sure you want to cancel purchase order "${poToCancel?.po_number}"? This action cannot be undone.`}
-        confirmText="Cancel PO"
-        variant="danger"
-      />
-    </div>
-  );
-};
-
-// Stat Card Component
-const StatCard = ({ label, value, icon: Icon, variant = 'default' }) => {
-  const variants = {
-    default: 'bg-theme-tertiary text-theme-primary border border-theme',
-    primary: 'bg-blue-50 text-blue-900 border border-blue-100 dark:bg-blue-900/20 dark:text-blue-200 dark:border-blue-800',
-    success: 'bg-green-50 text-green-900 border border-green-100 dark:bg-green-900/20 dark:text-green-200 dark:border-green-800',
-    warning: 'bg-yellow-50 text-yellow-900 border border-yellow-100 dark:bg-yellow-900/20 dark:text-yellow-200 dark:border-yellow-800',
-    info: 'bg-cyan-50 text-cyan-900 border border-cyan-100 dark:bg-cyan-900/20 dark:text-cyan-200 dark:border-cyan-800',
-  };
-
-  return (
-    <div className={`p-4 rounded-2xl ${variants[variant]} shadow-sm`}>
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-sm font-medium opacity-75">{label}</span>
-        <Icon className="w-5 h-5 opacity-50" />
-      </div>
-      <p className="text-2xl font-bold">{value}</p>
+        subtitle={cancelPO?.po_number}
+        size="sm"
+        footer={
+          <div className="flex items-center gap-3">
+            <button onClick={() => setShowCancel(false)}
+              className="px-4 py-2 text-sm font-medium text-theme-secondary bg-theme-primary border border-theme rounded-lg hover:bg-theme-tertiary transition-colors">
+              Keep PO
+            </button>
+            <button onClick={handleCancelSubmit}
+              className="px-5 py-2 text-sm font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors">
+              Cancel PO
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-theme-secondary">
+            This will cancel <span className="font-semibold text-theme-primary">{cancelPO?.po_number}</span>. This action cannot be undone.
+          </p>
+          <div>
+            <label className="block text-xs font-medium text-theme-muted mb-1">Reason (optional)</label>
+            <textarea
+              value={cancelReason}
+              onChange={e => setCancelReason(e.target.value)}
+              rows={2}
+              placeholder="Enter cancellation reason..."
+              className="w-full px-3 py-2 bg-theme-primary border border-theme text-theme-primary text-sm rounded-lg placeholder-theme-muted focus:outline-none focus:ring-2 focus:ring-accent-gold/20 transition-all resize-none"
+            />
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

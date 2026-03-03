@@ -1,28 +1,29 @@
 import React, { useState, useEffect } from 'react';
-import { X, Truck, User, Mail, Phone, MapPin, Tag } from 'lucide-react';
-import axios from 'axios';
+import { X } from 'lucide-react';
 
-const SupplierFormModal = ({ isOpen, onClose, onSuccess, supplier }) => {
+const SupplierFormModal = ({ isOpen, onClose, onSubmit, supplier }) => {
     const [formData, setFormData] = useState({
         supplier_name: '',
         contact_person: '',
         email: '',
         phone_number: '',
+        whatsapp_number: '',
         address: '',
-        category: 'Wholesale'
+        payment_terms: '',
+        notes: ''
     });
-
-    const API_URL = 'http://localhost:5000/api/suppliers';
 
     useEffect(() => {
         if (supplier) {
             setFormData({
-                supplier_name: supplier.supplier_name,
+                supplier_name: supplier.supplier_name || '',
                 contact_person: supplier.contact_person || '',
                 email: supplier.email || '',
                 phone_number: supplier.phone_number || '',
+                whatsapp_number: supplier.whatsapp_number || '',
                 address: supplier.address || '',
-                category: supplier.category || 'Wholesale'
+                payment_terms: supplier.payment_terms || '',
+                notes: supplier.notes || ''
             });
         } else {
             setFormData({
@@ -30,115 +31,150 @@ const SupplierFormModal = ({ isOpen, onClose, onSuccess, supplier }) => {
                 contact_person: '',
                 email: '',
                 phone_number: '',
+                whatsapp_number: '',
                 address: '',
-                category: 'Wholesale'
+                payment_terms: '',
+                notes: ''
             });
         }
     }, [supplier, isOpen]);
 
-    const handleSubmit = async (e) => {
-        e.preventDefault();
-        try {
-            if (supplier) {
-                await axios.put(`${API_URL}/${supplier.id}`, formData);
-            } else {
-                await axios.post(API_URL, formData);
-            }
-            onSuccess();
-            onClose();
-        } catch (error) {
-            alert('Failed to save supplier data');
-        }
-    };
-
     if (!isOpen) return null;
 
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        onSubmit(formData);
+    };
+
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden">
-                <div className="flex justify-between items-center p-6 border-b">
-                    <div className="flex items-center gap-2 text-slate-900">
-                        <Truck />
-                        <h2 className="text-xl font-black">{supplier ? 'Edit Partner' : 'New Supply Partner'}</h2>
-                    </div>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto py-10">
+            <div className="bg-theme-secondary rounded-lg shadow-xl w-full max-w-3xl my-auto">
+                <div className="flex justify-between items-center p-4 border-b border-theme">
+                    <h2 className="text-xl font-semibold text-theme-primary">{supplier ? 'Edit Supplier' : 'Add New Supplier'}</h2>
+                    <button onClick={onClose} className="text-theme-muted hover:text-theme-primary transition">
                         <X size={24} />
                     </button>
                 </div>
-
-                <form onSubmit={handleSubmit} className="p-6 space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="col-span-2">
-                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Company Name</label>
+                <form onSubmit={handleSubmit} className="p-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                        <div className="col-span-1 md:col-span-2 pb-2 border-b border-theme">
+                            <h3 className="text-sm font-semibold text-accent-gold uppercase">Basic Information</h3>
+                        </div>
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-theme-secondary mb-1">Supplier Name</label>
                             <input
                                 type="text"
+                                name="supplier_name"
                                 value={formData.supplier_name}
-                                onChange={(e) => setFormData({ ...formData, supplier_name: e.target.value })}
-                                className="w-full px-4 py-2 bg-gray-50 border rounded-xl focus:ring-2 focus:ring-slate-900 outline-none font-bold"
+                                onChange={handleChange}
+                                className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none"
                                 required
                             />
                         </div>
                         <div>
-                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Contact Person</label>
+                            <label className="block text-sm font-medium text-theme-secondary mb-1">Contact Person</label>
                             <input
                                 type="text"
+                                name="contact_person"
                                 value={formData.contact_person}
-                                onChange={(e) => setFormData({ ...formData, contact_person: e.target.value })}
-                                className="w-full px-4 py-2 bg-gray-50 border rounded-xl focus:ring-2 focus:ring-slate-900 outline-none"
+                                onChange={handleChange}
+                                className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none"
                             />
                         </div>
                         <div>
-                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Category</label>
-                            <select
-                                value={formData.category}
-                                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-                                className="w-full px-4 py-2 bg-gray-50 border rounded-xl focus:ring-2 focus:ring-slate-900 outline-none"
-                            >
-                                <option value="Wholesale">Wholesale Vendor</option>
-                                <option value="Manufacturer">Manufacturer</option>
-                                <option value="Service Provider">Service Provider</option>
-                                <option value="Individual">Individual Vendor</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Email</label>
+                            <label className="block text-sm font-medium text-theme-secondary mb-1">Email Address</label>
                             <input
                                 type="email"
+                                name="email"
                                 value={formData.email}
-                                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                                className="w-full px-4 py-2 bg-gray-50 border rounded-xl focus:ring-2 focus:ring-slate-900 outline-none font-mono text-sm"
+                                onChange={handleChange}
+                                className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none"
+                            />
+                        </div>
+
+                        <div className="col-span-1 md:col-span-2 pb-2 border-b border-theme mt-4">
+                            <h3 className="text-sm font-semibold text-accent-gold uppercase">Contact Details</h3>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-theme-secondary mb-1">Phone Number</label>
+                            <input
+                                type="text"
+                                name="phone_number"
+                                value={formData.phone_number}
+                                onChange={handleChange}
+                                className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none"
                             />
                         </div>
                         <div>
-                            <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Phone</label>
+                            <label className="block text-sm font-medium text-theme-secondary mb-1">WhatsApp Number</label>
                             <input
                                 type="text"
-                                value={formData.phone_number}
-                                onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
-                                className="w-full px-4 py-2 bg-gray-50 border rounded-xl focus:ring-2 focus:ring-slate-900 outline-none font-mono"
+                                name="whatsapp_number"
+                                value={formData.whatsapp_number}
+                                onChange={handleChange}
+                                className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none"
                             />
+                        </div>
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-theme-secondary mb-1">Address</label>
+                            <input
+                                type="text"
+                                name="address"
+                                value={formData.address}
+                                onChange={handleChange}
+                                className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none"
+                            />
+                        </div>
+
+                        <div className="col-span-1 md:col-span-2 pb-2 border-b border-theme mt-4">
+                            <h3 className="text-sm font-semibold text-accent-gold uppercase">Business Terms</h3>
+                        </div>
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-theme-secondary mb-1">Payment Terms</label>
+                            <input
+                                type="text"
+                                name="payment_terms"
+                                value={formData.payment_terms}
+                                onChange={handleChange}
+                                placeholder="e.g., Net 30, COD, 50% advance"
+                                className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none"
+                            />
+                        </div>
+                        <div className="md:col-span-2">
+                            <label className="block text-sm font-medium text-theme-secondary mb-1">Notes</label>
+                            <textarea
+                                name="notes"
+                                value={formData.notes}
+                                onChange={handleChange}
+                                rows="3"
+                                className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none"
+                            ></textarea>
                         </div>
                     </div>
 
-                    <div>
-                        <label className="block text-[10px] font-bold text-gray-400 uppercase mb-1">Business Address</label>
-                        <textarea
-                            value={formData.address}
-                            onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                            className="w-full px-4 py-2 bg-gray-50 border rounded-xl focus:ring-2 focus:ring-slate-900 outline-none"
-                            rows="2"
-                        ></textarea>
+                    <div className="flex justify-end gap-3 pt-6 border-t border-theme font-semibold">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="px-6 py-2 text-theme-secondary bg-theme-primary hover:bg-theme-tertiary border border-theme rounded-lg transition"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            className="px-8 py-2 bg-accent-gold text-white rounded-lg hover:bg-accent-goldDark shadow-md transition"
+                        >
+                            {supplier ? 'Update Supplier' : 'Save Supplier'}
+                        </button>
                     </div>
-
-                    <button
-                        type="submit"
-                        className="w-full bg-slate-900 hover:bg-slate-800 text-white font-black py-4 rounded-xl shadow-lg transition active:scale-95 mt-4 flex items-center justify-center gap-2"
-                    >
-                        {supplier ? 'SAVE MODIFICATIONS' : 'REGISTER SUPPLIER'}
-                    </button>
                 </form>
             </div>
         </div>

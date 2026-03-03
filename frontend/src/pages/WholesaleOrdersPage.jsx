@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { ShoppingBag, Search, Filter, Clock, CheckCircle, Package, Truck, ChevronRight, Eye } from 'lucide-react';
+import api from '../api/axios';
+import { ShoppingBag, Search, Filter, Clock, CheckCircle, Package, Truck, ChevronRight, Eye, RefreshCw } from 'lucide-react';
 import WholesaleOrderFormModal from '../components/WholesaleOrderFormModal';
 import InvoicePrintModal from '../components/InvoicePrintModal';
+import { toast } from 'react-toastify';
+import PageHeader from '../components/common/PageHeader';
 
 const WholesaleOrdersPage = () => {
     const [orders, setOrders] = useState([]);
@@ -12,8 +14,6 @@ const WholesaleOrdersPage = () => {
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
 
-    const API_URL = 'http://localhost:5000/api';
-
     useEffect(() => {
         fetchOrders();
     }, []);
@@ -21,10 +21,11 @@ const WholesaleOrdersPage = () => {
     const fetchOrders = async () => {
         try {
             setLoading(true);
-            const response = await axios.get(`${API_URL}/wholesale-orders`);
+            const response = await api.get('/wholesale-orders');
             setOrders(response.data);
         } catch (error) {
             console.error('Error fetching orders:', error);
+            toast.error('Failed to load wholesale orders');
         } finally {
             setLoading(false);
         }
@@ -32,122 +33,192 @@ const WholesaleOrdersPage = () => {
 
     const updateStatus = async (id, status) => {
         try {
-            await axios.patch(`${API_URL}/wholesale-orders/${id}/status`, { status });
+            await api.patch(`/wholesale-orders/${id}/status`, { status });
+            toast.success('Order status updated successfully');
             fetchOrders();
         } catch (error) {
-            alert('Failed to update status');
+            toast.error('Failed to update status');
         }
     };
 
     const viewInvoice = async (id) => {
         try {
-            const response = await axios.get(`${API_URL}/wholesale-orders/${id}`);
+            const response = await api.get(`/wholesale-orders/${id}`);
             setSelectedOrder(response.data);
             setIsInvoiceOpen(true);
         } catch (error) {
-            alert('Failed to load invoice details');
+            toast.error('Failed to load invoice details');
         }
     };
 
     const getStatusStyle = (status) => {
         switch (status) {
-            case 'Pending': return 'bg-orange-100 text-orange-600';
-            case 'Approved': return 'bg-blue-100 text-blue-600';
-            case 'Packed': return 'bg-purple-100 text-purple-600';
-            case 'Dispatched': return 'bg-indigo-100 text-indigo-600';
-            case 'Completed': return 'bg-green-100 text-green-600';
-            default: return 'bg-gray-100 text-gray-600';
+            case 'Pending': return {
+                bg: 'bg-orange-50 dark:bg-orange-900/30',
+                text: 'text-orange-600 dark:text-orange-400',
+                border: 'border-orange-100 dark:border-orange-800'
+            };
+            case 'Approved': return {
+                bg: 'bg-blue-50 dark:bg-blue-900/30',
+                text: 'text-blue-600 dark:text-blue-400',
+                border: 'border-blue-100 dark:border-blue-800'
+            };
+            case 'Packed': return {
+                bg: 'bg-purple-50 dark:bg-purple-900/30',
+                text: 'text-purple-600 dark:text-purple-400',
+                border: 'border-purple-100 dark:border-purple-800'
+            };
+            case 'Dispatched': return {
+                bg: 'bg-indigo-50 dark:bg-indigo-900/30',
+                text: 'text-indigo-600 dark:text-indigo-400',
+                border: 'border-indigo-100 dark:border-indigo-800'
+            };
+            case 'Completed': return {
+                bg: 'bg-emerald-50 dark:bg-emerald-900/30',
+                text: 'text-emerald-600 dark:text-emerald-400',
+                border: 'border-emerald-100 dark:border-emerald-800'
+            };
+            default: return {
+                bg: 'bg-gray-50 dark:bg-gray-900/30',
+                text: 'text-gray-600 dark:text-gray-400',
+                border: 'border-gray-100 dark:border-gray-800'
+            };
         }
     };
 
-    return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-gray-800">Wholesale Order Management</h2>
-                <button
-                    onClick={() => setIsModalOpen(true)}
-                    className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition shadow-md"
-                >
-                    <ShoppingBag size={20} /> Create Wholesale Order
-                </button>
-            </div>
+    const actions = (
+        <>
+            <button
+                onClick={fetchOrders}
+                className="bg-theme-secondary border border-theme text-theme-secondary px-4 py-2 rounded-lg font-medium text-sm hover:bg-theme-tertiary transition flex items-center gap-2"
+            >
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Refresh
+            </button>
+            <button
+                onClick={() => setIsModalOpen(true)}
+                className="bg-accent-gold text-white px-4 py-2 rounded-lg font-semibold text-sm hover:bg-accent-goldDark transition flex items-center gap-2"
+            >
+                <ShoppingBag className="w-4 h-4" /> Create Order
+            </button>
+        </>
+    );
 
-            <div className="bg-white p-4 rounded-lg shadow-sm border flex gap-4 items-center">
+    return (
+        <div className="space-y-6 max-w-[1700px] mx-auto pb-10">
+            <PageHeader
+                title="Wholesale Orders"
+                subtitle="Manage bulk orders and B2B transactions"
+                badge={`${orders.length} Orders`}
+                icon={ShoppingBag}
+                actions={actions}
+            />
+
+            {/* Search Bar */}
+            <div className="bg-theme-secondary p-4 rounded-lg border border-theme shadow-theme-sm flex gap-4 items-center">
                 <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-muted w-5 h-5 pointer-events-none" />
                     <input
                         type="text"
                         placeholder="Search by order number or customer..."
-                        className="pl-10 pr-4 py-2 bg-gray-50 border rounded-lg w-full focus:ring-2 focus:ring-blue-500 outline-none"
+                        className="w-full pl-10 pr-4 py-2.5 bg-theme-primary border border-theme rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none transition-all text-sm text-theme-primary placeholder-theme-muted"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 gap-4">
-                {loading ? (
-                    <div className="text-center py-20 text-gray-400 italic">Syncing wholesale orders...</div>
-                ) : orders.length === 0 ? (
-                    <div className="text-center py-20 text-gray-400 italic bg-white rounded-xl border border-dashed">No wholesale orders recorded.</div>
-                ) : (
-                    orders.map((order) => (
-                        <div key={order.id} className="bg-white rounded-xl border shadow-sm hover:shadow-md transition overflow-hidden">
-                            <div className="p-4 flex flex-wrap items-center justify-between gap-4">
-                                <div className="flex items-center gap-4">
-                                    <div className="p-3 bg-slate-50 rounded-lg text-slate-400">
-                                        <Package size={24} />
-                                    </div>
-                                    <div>
-                                        <div className="font-mono text-xs text-blue-500 font-bold">{order.order_number}</div>
-                                        <div className="font-black text-gray-900 uppercase">{order.customer_name}</div>
-                                        <div className="text-[10px] text-gray-400 flex items-center gap-1 mt-0.5">
-                                            <Clock size={10} /> {new Date(order.created_at).toLocaleDateString()} at {new Date(order.created_at).toLocaleTimeString()}
+            {/* Content */}
+            {loading ? (
+                <div className="bg-theme-secondary p-20 text-center rounded-lg shadow-theme-sm border border-theme">
+                    <div className="w-12 h-12 border-4 border-theme-muted border-t-accent-gold rounded-full animate-spin mx-auto mb-4"></div>
+                    <p className="text-theme-muted text-sm">Loading wholesale orders...</p>
+                </div>
+            ) : orders.length === 0 ? (
+                <div className="bg-theme-secondary p-20 text-center rounded-lg shadow-theme-sm border-2 border-dashed border-theme">
+                    <ShoppingBag className="mx-auto text-theme-muted mb-4" size={48} />
+                    <p className="font-bold text-theme-primary text-lg">No Wholesale Orders</p>
+                    <p className="text-theme-muted text-sm mt-1">Create your first wholesale order to get started</p>
+                    <button
+                        onClick={() => setIsModalOpen(true)}
+                        className="mt-4 bg-accent-gold text-white px-6 py-2 rounded-lg font-semibold text-sm hover:bg-accent-goldDark transition inline-flex items-center gap-2"
+                    >
+                        <ShoppingBag className="w-4 h-4" /> Create Order
+                    </button>
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 gap-4">
+                    {orders.map((order) => {
+                        const statusConfig = getStatusStyle(order.status);
+                        return (
+                            <div key={order.id} className="bg-theme-secondary rounded-xl border border-theme shadow-theme-sm hover:shadow-theme-md transition overflow-hidden">
+                                <div className="p-5 flex flex-wrap items-center justify-between gap-4">
+                                    <div className="flex items-center gap-4">
+                                        <div className="w-12 h-12 rounded-lg bg-accent-gold/10 flex items-center justify-center text-accent-gold border border-accent-gold/20">
+                                            <Package className="w-6 h-6" />
+                                        </div>
+                                        <div>
+                                            <div className="font-mono text-xs text-accent-gold font-bold mb-0.5">{order.order_number}</div>
+                                            <div className="font-bold text-theme-primary">{order.customer_name}</div>
+                                            <div className="text-[10px] text-theme-muted flex items-center gap-1.5 mt-1">
+                                                <Clock className="w-3 h-3" /> {new Date(order.created_at).toLocaleDateString()} • {new Date(order.created_at).toLocaleTimeString()}
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
 
-                                <div className="flex items-center gap-8">
-                                    <div className="text-right">
-                                        <div className="text-[9px] uppercase font-bold text-gray-400 mb-0.5">Order Value</div>
-                                        <div className="text-lg font-black text-gray-900">₦{parseFloat(order.total_amount).toLocaleString()}</div>
+                                    <div className="flex items-center gap-8">
+                                        <div className="text-right">
+                                            <div className="text-[10px] uppercase font-bold text-theme-muted mb-1">Order Value</div>
+                                            <div className="text-xl font-bold text-accent-gold">&#8358;{parseFloat(order.total_amount).toLocaleString()}</div>
+                                        </div>
+                                        <div className="text-center">
+                                            <div className="text-[10px] uppercase font-bold text-theme-muted mb-2">Status</div>
+                                            <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase border ${statusConfig.bg} ${statusConfig.text} ${statusConfig.border}`}>
+                                                {order.status}
+                                            </span>
+                                        </div>
                                     </div>
-                                    <div className="text-center">
-                                        <div className="text-[9px] uppercase font-bold text-gray-400 mb-1">Workflow Status</div>
-                                        <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${getStatusStyle(order.status)}`}>
-                                            {order.status}
-                                        </span>
-                                    </div>
-                                </div>
 
-                                <div className="flex items-center gap-2 border-l pl-4">
-                                    {order.status === 'Pending' && (
-                                        <button onClick={() => updateStatus(order.id, 'Approved')} className="bg-blue-600 text-white p-2 rounded hover:bg-blue-700 transition" title="Approve Order">
-                                            <CheckCircle size={18} />
+                                    <div className="flex items-center gap-2 border-l border-theme pl-4">
+                                        {order.status === 'Pending' && (
+                                            <button
+                                                onClick={() => updateStatus(order.id, 'Approved')}
+                                                className="bg-blue-500 text-white p-2 rounded-lg hover:bg-blue-600 transition-colors"
+                                                title="Approve Order"
+                                            >
+                                                <CheckCircle size={18} />
+                                            </button>
+                                        )}
+                                        {order.status === 'Approved' && (
+                                            <button
+                                                onClick={() => updateStatus(order.id, 'Packed')}
+                                                className="bg-purple-500 text-white p-2 rounded-lg hover:bg-purple-600 transition-colors"
+                                                title="Mark as Packed"
+                                            >
+                                                <Package size={18} />
+                                            </button>
+                                        )}
+                                        {order.status === 'Packed' && (
+                                            <button
+                                                onClick={() => updateStatus(order.id, 'Dispatched')}
+                                                className="bg-indigo-500 text-white p-2 rounded-lg hover:bg-indigo-600 transition-colors"
+                                                title="Dispatch Order"
+                                            >
+                                                <Truck size={18} />
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={() => viewInvoice(order.id)}
+                                            className="p-2 text-theme-muted hover:text-accent-gold transition-colors rounded-lg hover:bg-theme-primary"
+                                        >
+                                            <Eye size={20} />
                                         </button>
-                                    )}
-                                    {order.status === 'Approved' && (
-                                        <button onClick={() => updateStatus(order.id, 'Packed')} className="bg-purple-600 text-white p-2 rounded hover:bg-purple-700 transition" title="Mark as Packed">
-                                            <Package size={18} />
-                                        </button>
-                                    )}
-                                    {order.status === 'Packed' && (
-                                        <button onClick={() => updateStatus(order.id, 'Dispatched')} className="bg-indigo-600 text-white p-2 rounded hover:bg-indigo-700 transition" title="Dispatch Order">
-                                            <Truck size={18} />
-                                        </button>
-                                    )}
-                                    <button 
-                                        onClick={() => viewInvoice(order.id)}
-                                        className="p-2 text-gray-400 hover:text-blue-600 transition"
-                                    >
-                                        <Eye size={20} />
-                                    </button>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
-                    ))
-                )}
-            </div>
+                        );
+                    })}
+                </div>
+            )}
 
             <WholesaleOrderFormModal
                 isOpen={isModalOpen}

@@ -1,14 +1,11 @@
 import React, { useEffect } from 'react';
 import { X } from 'lucide-react';
 
-/**
- * Modal Component
- * Reusable modal dialog with header, body, and footer
- */
 const Modal = ({
   isOpen,
   onClose,
   title,
+  subtitle,
   children,
   footer,
   size = 'md',
@@ -16,7 +13,6 @@ const Modal = ({
   closeOnOverlayClick = true,
   closeOnEscape = true,
 }) => {
-  // Handle escape key
   useEffect(() => {
     if (!isOpen || !closeOnEscape) return;
 
@@ -30,7 +26,6 @@ const Modal = ({
     return () => document.removeEventListener('keydown', handleEscape);
   }, [isOpen, closeOnEscape, onClose]);
 
-  // Lock body scroll when modal is open
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
@@ -45,13 +40,12 @@ const Modal = ({
 
   if (!isOpen) return null;
 
-  // Size variants
   const sizeClasses = {
     sm: 'max-w-md',
-    md: 'max-w-lg',
-    lg: 'max-w-2xl',
-    xl: 'max-w-4xl',
-    full: 'max-w-7xl',
+    md: 'max-w-xl',
+    lg: 'max-w-3xl',
+    xl: 'max-w-5xl',
+    full: 'max-w-[95vw]',
   };
 
   const handleOverlayClick = (e) => {
@@ -62,23 +56,33 @@ const Modal = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 overflow-y-auto"
+      className="fixed inset-0 z-[60] flex items-center justify-center p-4 overflow-y-auto"
       onClick={handleOverlayClick}
     >
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm"></div>
+
       <div
         className={`
-          bg-theme-secondary rounded-2xl shadow-2xl w-full ${sizeClasses[size] || sizeClasses.md}
-          transform transition-all duration-200 my-8 border border-theme
+          relative bg-theme-secondary rounded-xl shadow-theme-xl w-full ${sizeClasses[size] || sizeClasses.md}
+          border border-theme overflow-hidden
         `}
       >
         {/* Header */}
         {(title || showCloseButton) && (
-          <div className="flex items-center justify-between p-6 border-b border-theme">
-            <h3 className="text-xl font-bold text-theme-primary">{title}</h3>
+          <div className="flex items-start justify-between p-6 pb-3">
+            <div className="space-y-1">
+              {title && (
+                <h3 className="text-lg font-semibold text-theme-primary">{title}</h3>
+              )}
+              {subtitle && (
+                <p className="text-sm text-theme-muted">{subtitle}</p>
+              )}
+            </div>
+
             {showCloseButton && (
               <button
                 onClick={onClose}
-                className="text-theme-secondary hover:text-theme-primary transition-colors p-2 hover:bg-theme-tertiary rounded-lg"
+                className="text-theme-muted hover:text-theme-primary transition-colors p-2 hover:bg-theme-tertiary rounded-lg"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -87,11 +91,13 @@ const Modal = ({
         )}
 
         {/* Body */}
-        <div className="p-6 text-theme-secondary">{children}</div>
+        <div className="px-6 py-4 text-theme-secondary max-h-[70vh] overflow-y-auto custom-scrollbar">
+          {children}
+        </div>
 
         {/* Footer */}
         {footer && (
-          <div className="flex items-center justify-end gap-3 p-6 border-t border-theme bg-theme-tertiary/50 rounded-b-2xl">
+          <div className="flex items-center justify-end gap-3 px-6 py-4 bg-theme-tertiary/30 border-t border-theme">
             {footer}
           </div>
         )}

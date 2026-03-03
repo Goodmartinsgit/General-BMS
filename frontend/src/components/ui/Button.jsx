@@ -23,13 +23,13 @@ const Button = ({
 
   // Variant styles
   const variants = {
-    primary: 'bg-blue-600 hover:bg-blue-700 text-white focus:ring-blue-500 shadow-lg shadow-blue-600/20',
-    secondary: 'bg-theme-tertiary hover:bg-gray-200 dark:hover:bg-gray-700 text-theme-primary focus:ring-gray-400',
-    success: 'bg-green-600 hover:bg-green-700 text-white focus:ring-green-500 shadow-lg shadow-green-600/20',
-    danger: 'bg-red-600 hover:bg-red-700 text-white focus:ring-red-500 shadow-lg shadow-red-600/20',
-    warning: 'bg-yellow-500 hover:bg-yellow-600 text-white focus:ring-yellow-400 shadow-lg shadow-yellow-500/20',
-    outline: 'border-2 border-blue-600 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 focus:ring-blue-500',
-    ghost: 'text-theme-secondary hover:bg-theme-tertiary focus:ring-gray-400',
+    primary: 'bg-accent-gold hover:bg-accent-goldDark text-white focus:ring-accent-gold/20 shadow-lg shadow-accent-gold/20',
+    secondary: 'bg-theme-tertiary hover:bg-theme-primary text-theme-primary focus:ring-accent-gold/20 border border-theme',
+    success: 'bg-green-600 hover:bg-green-700 text-white focus:ring-green-500/20 shadow-lg shadow-green-600/20',
+    danger: 'bg-red-600 hover:bg-red-700 text-white focus:ring-red-500/20 shadow-lg shadow-red-600/20',
+    warning: 'bg-yellow-500 hover:bg-yellow-600 text-white focus:ring-yellow-400/20 shadow-lg shadow-yellow-500/20',
+    outline: 'border-2 border-theme text-theme-primary hover:bg-theme-tertiary focus:ring-accent-gold/20',
+    ghost: 'text-theme-secondary hover:bg-theme-tertiary focus:ring-accent-gold/20',
   };
 
   // Size styles

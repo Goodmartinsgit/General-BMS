@@ -102,8 +102,7 @@ const ReceiptPreviewModal = ({
                 ${styles}
             </head>
             <body>
-                <div class="receipt">
-                    ${receiptRef.current.innerHTML}
+                <div class="receipt" id="receipt-container">
                 </div>
                 <script>
                     window.onload = function() {
@@ -117,6 +116,13 @@ const ReceiptPreviewModal = ({
             </html>
         `);
         printWindow.document.close();
+
+        // Safely clone the receipt content instead of using innerHTML
+        const container = printWindow.document.getElementById('receipt-container');
+        if (container && receiptRef.current) {
+            const clonedContent = receiptRef.current.cloneNode(true);
+            container.appendChild(printWindow.document.adoptNode(clonedContent));
+        }
     };
 
     const handleDownload = async () => {

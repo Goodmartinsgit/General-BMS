@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, Layers } from 'lucide-react';
 
 const PriceTierFormModal = ({ isOpen, onClose, onSubmit, tier }) => {
     const [formData, setFormData] = useState({
@@ -43,29 +43,34 @@ const PriceTierFormModal = ({ isOpen, onClose, onSubmit, tier }) => {
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
-                <div className="flex justify-between items-center p-4 border-b">
-                    <h2 className="text-xl font-semibold">{tier ? 'Edit Price Tier' : 'Add Price Tier'}</h2>
-                    <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-                        <X size={24} />
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={onClose}>
+            <div className="bg-theme-secondary rounded-xl max-w-md w-full shadow-2xl border border-theme" onClick={(e) => e.stopPropagation()}>
+                <div className="flex items-center justify-between p-6 border-b border-theme">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-accent-gold text-white flex items-center justify-center">
+                            <Layers size={20} />
+                        </div>
+                        <h2 className="text-xl font-bold text-theme-primary">{tier ? 'Edit Price Tier' : 'Add Price Tier'}</h2>
+                    </div>
+                    <button onClick={onClose} className="p-1.5 text-theme-muted hover:text-theme-primary hover:bg-theme-tertiary rounded-lg transition-colors">
+                        <X size={20} />
                     </button>
                 </div>
-                <form onSubmit={handleSubmit} className="p-4 space-y-4">
+                <form onSubmit={handleSubmit} className="p-6 space-y-4">
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Tier Name</label>
+                        <label className="block text-sm font-medium text-theme-primary mb-2">Tier Name</label>
                         <input
                             type="text"
                             name="tier_name"
                             value={formData.tier_name}
                             onChange={handleChange}
                             placeholder="e.g. Gold Customer, Wholesale Level 1"
-                            className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                            className="w-full bg-theme-primary border border-theme rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none transition-all text-theme-primary placeholder-theme-muted text-sm"
                             required
                         />
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Discount Percentage (%)</label>
+                        <label className="block text-sm font-medium text-theme-primary mb-2">Discount Percentage (%)</label>
                         <input
                             type="number"
                             name="discount_percentage"
@@ -74,43 +79,51 @@ const PriceTierFormModal = ({ isOpen, onClose, onSubmit, tier }) => {
                             step="0.01"
                             min="0"
                             max="100"
-                            className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                            className="w-full bg-theme-primary border border-theme rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none transition-all text-theme-primary text-sm"
                             required
                         />
-                        <p className="text-[10px] text-gray-500 mt-1">This discount will be applied to the base product price.</p>
+                        <p className="text-xs text-theme-muted mt-1.5">This discount will be applied to the base product price.</p>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                        <label className="block text-sm font-medium text-theme-primary mb-2">Notes</label>
                         <textarea
                             name="notes"
                             value={formData.notes}
                             onChange={handleChange}
                             rows="2"
-                            className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                            placeholder="Optional description for this tier..."
+                            className="w-full bg-theme-primary border border-theme rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none transition-all text-theme-primary placeholder-theme-muted text-sm resize-none"
                         ></textarea>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="checkbox"
-                            name="is_active"
-                            id="tier_active"
-                            checked={formData.is_active}
-                            onChange={handleChange}
-                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                        />
-                        <label htmlFor="tier_active" className="text-sm font-medium text-gray-700">Active</label>
+                    <div className="flex items-center gap-3">
+                        <button
+                            type="button"
+                            role="switch"
+                            aria-checked={formData.is_active}
+                            onClick={() => setFormData(prev => ({ ...prev, is_active: !prev.is_active }))}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                formData.is_active ? 'bg-accent-gold' : 'bg-theme-tertiary'
+                            }`}
+                        >
+                            <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
+                                formData.is_active ? 'translate-x-6' : 'translate-x-1'
+                            }`} />
+                        </button>
+                        <label className="text-sm font-medium text-theme-primary">
+                            {formData.is_active ? 'Active' : 'Inactive'}
+                        </label>
                     </div>
-                    <div className="flex justify-end gap-2 pt-4 border-t">
+                    <div className="flex gap-3 pt-4 border-t border-theme">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded"
+                            className="flex-1 px-4 py-2.5 bg-theme-secondary border border-theme text-theme-secondary rounded-lg hover:bg-theme-tertiary transition font-medium"
                         >
                             Cancel
                         </button>
                         <button
                             type="submit"
-                            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+                            className="flex-1 px-4 py-2.5 bg-accent-gold text-white rounded-lg hover:bg-accent-goldDark transition font-semibold"
                         >
                             {tier ? 'Update Tier' : 'Create Tier'}
                         </button>

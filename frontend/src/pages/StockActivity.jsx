@@ -1,415 +1,299 @@
-import React, { useState, useEffect } from 'react';
-import { Filter, Download, Package, TrendingUp, TrendingDown, Activity } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
-  Button,
-  SearchBar,
-  LoadingSpinner,
-  EmptyState,
-} from '../components/ui';
-import { StockActivityLog } from '../components/stock';
+  Filter, Package, TrendingUp, TrendingDown, Activity,
+  Search, X, RefreshCw,
+} from 'lucide-react';
+import { toast } from 'react-toastify';
+import { stockAPI } from '../api/stock';
+import { branchesAPI } from '../api/branches';
+import StockActivityLog from '../components/stock/StockActivityLog';
+import PageHeader from '../components/common/PageHeader';
 
-/**
- * StockActivity Page
- * View complete stock movement history
- */
+const MOVEMENT_TYPES = [
+  { value: 'sale',         label: 'Sales' },
+  { value: 'receipt',      label: 'Receipts' },
+  { value: 'return',       label: 'Returns' },
+  { value: 'transfer_in',  label: 'Transfers In' },
+  { value: 'transfer_out', label: 'Transfers Out' },
+  { value: 'damage',       label: 'Damages' },
+  { value: 'adjustment',   label: 'Adjustments' },
+];
+
+const DATE_RANGES = [
+  { value: '',        label: 'All Time' },
+  { value: 'today',   label: 'Today' },
+  { value: 'week',    label: 'This Week' },
+  { value: 'month',   label: 'This Month' },
+  { value: 'quarter', label: 'This Quarter' },
+  { value: 'year',    label: 'This Year' },
+];
+
+const getDateRange = (range) => {
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, '0');
+  const fmt = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+
+  switch (range) {
+    case 'today': {
+      const today = fmt(now);
+      return { startDate: today, endDate: today };
+    }
+    case 'week': {
+      const start = new Date(now);
+      start.setDate(now.getDate() - 6);
+      return { startDate: fmt(start), endDate: fmt(now) };
+    }
+    case 'month': {
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      return { startDate: fmt(start), endDate: fmt(now) };
+    }
+    case 'quarter': {
+      const quarterStart = Math.floor(now.getMonth() / 3) * 3;
+      const start = new Date(now.getFullYear(), quarterStart, 1);
+      return { startDate: fmt(start), endDate: fmt(now) };
+    }
+    case 'year': {
+      const start = new Date(now.getFullYear(), 0, 1);
+      return { startDate: fmt(start), endDate: fmt(now) };
+    }
+    default:
+      return {};
+  }
+};
+
 const StockActivity = () => {
-  // State
-  const [activities, setActivities] = useState([]);
-  const [branches, setBranches] = useState([]);
-  const [loading, setLoading] = useState(false);
+  const [activities, setActivities]   = useState([]);
+  const [branches, setBranches]       = useState([]);
+  const [loading, setLoading]         = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filters, setFilters] = useState({
-    activity_type: '',
-    branch: '',
-    date_range: '',
-    product: '',
-  });
   const [showFilters, setShowFilters] = useState(false);
-
-  // Statistics
-  const [stats, setStats] = useState({
-    total_activities: 0,
-    stock_in: 0,
-    stock_out: 0,
-    net_change: 0,
+  const [filters, setFilters]         = useState({
+    movementType: '',
+    branchId:     '',
+    dateRange:    '',
   });
 
-  // Fetch activities
+  // ─── Fetch branches once ───────────────────────────────────────────────────
   useEffect(() => {
-    fetchActivities();
-  }, [searchQuery, filters]);
-
-  // Fetch branches
-  useEffect(() => {
-    fetchBranches();
+    branchesAPI.getBranches()
+      .then(setBranches)
+      .catch(() => toast.error('Failed to load branches'));
   }, []);
 
-  // Fetch stats
-  useEffect(() => {
-    fetchStats();
-  }, []);
-
-  const fetchActivities = async () => {
+  // ─── Fetch activity whenever filters change ────────────────────────────────
+  const fetchActivity = useCallback(async () => {
     setLoading(true);
     try {
-      // TODO: Replace with actual API call
-      // const params = new URLSearchParams({
-      //   search: searchQuery,
-      //   ...filters,
-      // });
-      // const response = await fetch(`/api/stock-activities?${params}`);
-      // const data = await response.json();
+      const params = { limit: 200 };
+      if (filters.movementType) params.movementType = filters.movementType;
+      if (filters.branchId)     params.branchId     = filters.branchId;
+      const dateRange = getDateRange(filters.dateRange);
+      if (dateRange.startDate) params.startDate = dateRange.startDate;
+      if (dateRange.endDate)   params.endDate   = dateRange.endDate;
 
-      // Mock data for now
-      const mockData = [
-        {
-          id: '1',
-          activity_type: 'sale',
-          product_name: 'Premium Ceramic Tile',
-          variant_name: null,
-          quantity: 25,
-          branch_name: 'Main Branch',
-          reference_number: 'SAL-20260131-0042',
-          created_at: '2026-01-31T14:30:00',
-          created_by_name: 'Alice Smith',
-          notes: null,
-        },
-        {
-          id: '2',
-          activity_type: 'purchase',
-          product_name: 'Tile Adhesive',
-          variant_name: 'White - 25kg',
-          quantity: 100,
-          branch_name: 'Warehouse',
-          reference_number: 'PO-20260131-0015',
-          created_at: '2026-01-31T13:15:00',
-          created_by_name: 'Bob Johnson',
-          notes: 'Bulk purchase from supplier XYZ',
-        },
-        {
-          id: '3',
-          activity_type: 'transfer_out',
-          product_name: 'Porcelain Floor Tile',
-          variant_name: 'Matte - 600x600mm',
-          quantity: 50,
-          branch_name: 'Main Branch',
-          related_branch_name: 'Downtown Store',
-          reference_number: 'TRF-20260131-0001',
-          created_at: '2026-01-31T12:00:00',
-          created_by_name: 'Carol Davis',
-          notes: null,
-        },
-        {
-          id: '4',
-          activity_type: 'return',
-          product_name: 'Wireless Mouse',
-          variant_name: null,
-          quantity: 3,
-          branch_name: 'Main Branch',
-          reference_number: 'RET-20260131-0001',
-          created_at: '2026-01-31T11:30:00',
-          created_by_name: 'Alice Smith',
-          notes: 'Customer return - defective',
-        },
-        {
-          id: '5',
-          activity_type: 'damage',
-          product_name: 'Premium Ceramic Tile',
-          variant_name: null,
-          quantity: 30,
-          branch_name: 'Main Branch',
-          reference_number: 'DMG-20260131-0001',
-          created_at: '2026-01-31T10:30:00',
-          created_by_name: 'Alice Smith',
-          notes: 'Water damage from roof leak',
-        },
-        {
-          id: '6',
-          activity_type: 'transfer_in',
-          product_name: 'Mechanical Keyboard',
-          variant_name: 'RGB - Cherry MX Blue',
-          quantity: 15,
-          branch_name: 'Downtown Store',
-          related_branch_name: 'Warehouse',
-          reference_number: 'TRF-20260131-0002',
-          created_at: '2026-01-31T09:45:00',
-          created_by_name: 'Bob Johnson',
-          notes: null,
-        },
-        {
-          id: '7',
-          activity_type: 'adjustment',
-          product_name: 'USB-C Cable',
-          variant_name: 'Red - 2m',
-          quantity: 5,
-          branch_name: 'Main Branch',
-          reference_number: 'ADJ-20260131-0001',
-          created_at: '2026-01-31T09:00:00',
-          created_by_name: 'Manager Admin',
-          notes: 'Stock count correction',
-        },
-      ];
-
-      setActivities(mockData);
-    } catch (error) {
-      console.error('Error fetching activities:', error);
+      const data = await stockAPI.getActivity(params);
+      setActivities(Array.isArray(data) ? data : []);
+    } catch {
+      toast.error('Failed to load stock activity');
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters]);
 
-  const fetchBranches = async () => {
-    try {
-      // TODO: Replace with actual API call
-      const mockBranches = [
-        { id: '1', branch_name: 'Main Branch', main_branch: true },
-        { id: '2', branch_name: 'Downtown Store', main_branch: false },
-        { id: '3', branch_name: 'Warehouse', main_branch: false },
-      ];
+  useEffect(() => { fetchActivity(); }, [fetchActivity]);
 
-      setBranches(mockBranches);
-    } catch (error) {
-      console.error('Error fetching branches:', error);
-    }
-  };
+  // ─── Client-side search ────────────────────────────────────────────────────
+  const filtered = activities.filter(a => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      a.product_name?.toLowerCase().includes(q) ||
+      a.product_code?.toLowerCase().includes(q) ||
+      a.branch_name?.toLowerCase().includes(q) ||
+      a.notes?.toLowerCase().includes(q)
+    );
+  });
 
-  const fetchStats = async () => {
-    // TODO: Replace with actual API call
-    setStats({
-      total_activities: 1847,
-      stock_in: 15250,
-      stock_out: 12800,
-      net_change: 2450,
-    });
-  };
+  // ─── Stats (computed from visible filtered data) ───────────────────────────
+  const stockIn  = filtered.filter(a => (a.quantity ?? 0) > 0).reduce((s, a) => s + (a.quantity ?? 0), 0);
+  const stockOut = filtered.filter(a => (a.quantity ?? 0) < 0).reduce((s, a) => s + Math.abs(a.quantity ?? 0), 0);
+  const netChange = stockIn - stockOut;
 
-  const handleExport = () => {
-    // TODO: Implement export to CSV
-    console.log('Export stock activity');
-  };
+  const activeFilterCount = [filters.movementType, filters.branchId, filters.dateRange].filter(Boolean).length;
 
   const clearFilters = () => {
-    setFilters({
-      activity_type: '',
-      branch: '',
-      date_range: '',
-      product: '',
-    });
+    setFilters({ movementType: '', branchId: '', dateRange: '' });
     setSearchQuery('');
   };
 
-  const activityTypes = [
-    { value: 'sale', label: 'Sales' },
-    { value: 'purchase', label: 'Purchases' },
-    { value: 'return', label: 'Returns' },
-    { value: 'transfer_in', label: 'Transfers In' },
-    { value: 'transfer_out', label: 'Transfers Out' },
-    { value: 'damage', label: 'Damages' },
-    { value: 'adjustment', label: 'Adjustments' },
-  ];
-
-  const activeFilterCount = Object.values(filters).filter((v) => v && v !== 'all').length;
-
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Stock Activity Log</h1>
-        <p className="text-gray-600">Complete history of all stock movements</p>
-      </div>
+    <div className="space-y-4 sm:space-y-6">
+      <PageHeader
+        title="Stock Activity Log"
+        subtitle="Complete history of all stock movements"
+        icon={Activity}
+        badge={`${filtered.length} records`}
+        actions={
+          <button
+            onClick={fetchActivity}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-theme-secondary bg-theme-secondary border border-theme rounded-lg hover:bg-theme-tertiary transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+            <span className="hidden sm:inline">Refresh</span>
+          </button>
+        }
+      />
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <StatCard
-          label="Total Activities"
-          value={stats.total_activities}
-          icon={Activity}
-          variant="primary"
-        />
-        <StatCard
-          label="Stock In"
-          value={`+${stats.stock_in.toLocaleString()}`}
-          icon={TrendingUp}
-          variant="success"
-        />
-        <StatCard
-          label="Stock Out"
-          value={`-${stats.stock_out.toLocaleString()}`}
-          icon={TrendingDown}
-          variant="danger"
-        />
-        <StatCard
-          label="Net Change"
-          value={`${stats.net_change >= 0 ? '+' : ''}${stats.net_change.toLocaleString()}`}
-          icon={Package}
-          variant={stats.net_change >= 0 ? 'success' : 'warning'}
-        />
+      {/* Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
+        {[
+          { label: 'Records Loaded', value: filtered.length, icon: Activity,    color: 'text-accent-gold',  bg: 'bg-accent-gold/10'  },
+          { label: 'Stock In',       value: `+${stockIn.toLocaleString()}`,  icon: TrendingUp,   color: 'text-green-500', bg: 'bg-green-500/10' },
+          { label: 'Stock Out',      value: `-${stockOut.toLocaleString()}`, icon: TrendingDown, color: 'text-red-500',   bg: 'bg-red-500/10'   },
+          {
+            label: 'Net Change',
+            value: `${netChange >= 0 ? '+' : ''}${netChange.toLocaleString()}`,
+            icon: Package,
+            color: netChange >= 0 ? 'text-green-500' : 'text-red-500',
+            bg:    netChange >= 0 ? 'bg-green-500/10' : 'bg-red-500/10',
+          },
+        ].map(({ label, value, icon: Icon, color, bg }) => (
+          <div key={label} className="bg-theme-secondary border border-theme rounded-xl p-3 sm:p-4 flex items-center gap-3">
+            <div className={`w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0 ${bg}`}>
+              <Icon className={`w-5 h-5 ${color}`} />
+            </div>
+            <div className="min-w-0">
+              <p className={`text-base sm:text-xl font-bold leading-tight ${color}`}>{value}</p>
+              <p className="text-[10px] sm:text-xs text-theme-muted">{label}</p>
+            </div>
+          </div>
+        ))}
       </div>
 
       {/* Toolbar */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
-        <div className="flex flex-col md:flex-row gap-4">
+      <div className="bg-theme-secondary border border-theme rounded-xl p-3 sm:p-4 space-y-3">
+        <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center">
           {/* Search */}
-          <div className="flex-1">
-            <SearchBar
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-theme-muted pointer-events-none" />
+            <input
+              type="text"
+              placeholder="Search by product, branch, or notes..."
               value={searchQuery}
-              onChange={setSearchQuery}
-              placeholder="Search by product, reference, or branch..."
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 bg-theme-primary border border-theme text-theme-primary text-sm rounded-lg placeholder-theme-muted focus:outline-none focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 transition-all"
             />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-theme-muted hover:text-theme-primary"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button
-              variant="outline"
-              icon={Filter}
-              onClick={() => setShowFilters(!showFilters)}
-              className={activeFilterCount > 0 ? 'border-blue-600 text-blue-600' : ''}
-            >
-              Filters {activeFilterCount > 0 && `(${activeFilterCount})`}
-            </Button>
-
-            <Button variant="outline" icon={Download} onClick={handleExport}>
-              Export
-            </Button>
-          </div>
+          {/* Filter toggle */}
+          <button
+            onClick={() => setShowFilters(v => !v)}
+            className={`flex items-center gap-2 px-3 py-2 text-sm font-medium border rounded-lg transition-colors ${
+              activeFilterCount > 0
+                ? 'bg-accent-gold/10 border-accent-gold/30 text-accent-gold'
+                : 'bg-theme-primary border-theme text-theme-secondary hover:bg-theme-tertiary'
+            }`}
+          >
+            <Filter className="w-4 h-4" />
+            Filters
+            {activeFilterCount > 0 && (
+              <span className="px-1.5 py-0.5 text-[10px] font-bold bg-accent-gold text-white rounded-full">
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
         </div>
 
-        {/* Filters Panel */}
+        {/* Expanded Filters */}
         {showFilters && (
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {/* Activity Type */}
+          <div className="pt-3 border-t border-theme space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Movement Type */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Activity Type
-                </label>
+                <label className="block text-xs font-medium text-theme-muted mb-1">Movement Type</label>
                 <select
-                  value={filters.activity_type}
-                  onChange={(e) => setFilters({ ...filters, activity_type: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={filters.movementType}
+                  onChange={e => setFilters(f => ({ ...f, movementType: e.target.value }))}
+                  className="w-full px-3 py-2 bg-theme-primary border border-theme text-theme-primary text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 transition-all"
                 >
                   <option value="">All Types</option>
-                  {activityTypes.map((type) => (
-                    <option key={type.value} value={type.value}>
-                      {type.label}
-                    </option>
+                  {MOVEMENT_TYPES.map(t => (
+                    <option key={t.value} value={t.value}>{t.label}</option>
                   ))}
                 </select>
               </div>
 
               {/* Branch */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Branch</label>
+                <label className="block text-xs font-medium text-theme-muted mb-1">Branch</label>
                 <select
-                  value={filters.branch}
-                  onChange={(e) => setFilters({ ...filters, branch: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={filters.branchId}
+                  onChange={e => setFilters(f => ({ ...f, branchId: e.target.value }))}
+                  className="w-full px-3 py-2 bg-theme-primary border border-theme text-theme-primary text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 transition-all"
                 >
                   <option value="">All Branches</option>
-                  {branches.map((branch) => (
-                    <option key={branch.id} value={branch.id}>
-                      {branch.branch_name}
-                    </option>
+                  {branches.map(b => (
+                    <option key={b.id} value={b.id}>{b.branch_name}</option>
                   ))}
                 </select>
               </div>
 
               {/* Date Range */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Date Range
-                </label>
+                <label className="block text-xs font-medium text-theme-muted mb-1">Date Range</label>
                 <select
-                  value={filters.date_range}
-                  onChange={(e) => setFilters({ ...filters, date_range: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  value={filters.dateRange}
+                  onChange={e => setFilters(f => ({ ...f, dateRange: e.target.value }))}
+                  className="w-full px-3 py-2 bg-theme-primary border border-theme text-theme-primary text-sm rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 transition-all"
                 >
-                  <option value="">All Time</option>
-                  <option value="today">Today</option>
-                  <option value="week">This Week</option>
-                  <option value="month">This Month</option>
-                  <option value="quarter">This Quarter</option>
-                  <option value="year">This Year</option>
+                  {DATE_RANGES.map(r => (
+                    <option key={r.value} value={r.value}>{r.label}</option>
+                  ))}
                 </select>
               </div>
-
-              {/* Product Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Product</label>
-                <input
-                  type="text"
-                  value={filters.product}
-                  onChange={(e) => setFilters({ ...filters, product: e.target.value })}
-                  placeholder="Filter by product..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
             </div>
 
-            <div className="flex items-center gap-4 mt-4">
-              <Button variant="ghost" size="sm" onClick={clearFilters}>
-                Clear All Filters
-              </Button>
-              <p className="text-sm text-gray-600">
-                Showing {activities.length} of {stats.total_activities} activities
-              </p>
-            </div>
+            {activeFilterCount > 0 && (
+              <button
+                onClick={clearFilters}
+                className="text-xs text-theme-muted hover:text-red-500 transition-colors flex items-center gap-1"
+              >
+                <X className="w-3.5 h-3.5" /> Clear all filters
+              </button>
+            )}
           </div>
         )}
       </div>
 
       {/* Content */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="bg-theme-secondary border border-theme rounded-xl p-4 sm:p-6">
         {loading ? (
           <div className="flex items-center justify-center py-20">
-            <LoadingSpinner size="lg" />
+            <div className="w-8 h-8 border-2 border-theme border-t-accent-gold rounded-full animate-spin" />
           </div>
-        ) : activities.length === 0 ? (
-          <EmptyState
-            icon={Package}
-            title="No stock activity found"
-            description="No stock movements match the current filters"
-          />
+        ) : filtered.length === 0 ? (
+          <div className="text-center py-16">
+            <Package className="w-12 h-12 text-theme-muted mx-auto mb-3 opacity-40" />
+            <p className="text-theme-primary font-medium">No activity found</p>
+            <p className="text-theme-muted text-sm mt-1">
+              {searchQuery || activeFilterCount > 0
+                ? 'Try adjusting your search or filters'
+                : 'No stock movements have been recorded yet'}
+            </p>
+          </div>
         ) : (
-          <StockActivityLog activities={activities} loading={loading} />
+          <StockActivityLog activities={filtered} />
         )}
       </div>
-
-      {/* Pagination could be added here */}
-      {!loading && activities.length > 0 && (
-        <div className="mt-6 flex items-center justify-center gap-4">
-          <Button variant="outline" size="sm" disabled>
-            Previous
-          </Button>
-          <span className="text-sm text-gray-600">Page 1 of 10</span>
-          <Button variant="outline" size="sm">
-            Next
-          </Button>
-        </div>
-      )}
-    </div>
-  );
-};
-
-// Stat Card Component
-const StatCard = ({ label, value, icon: Icon, variant = 'default' }) => {
-  const variants = {
-    default: 'bg-gray-50 text-gray-900',
-    primary: 'bg-blue-50 text-blue-900',
-    success: 'bg-green-50 text-green-900',
-    warning: 'bg-yellow-50 text-yellow-900',
-    info: 'bg-cyan-50 text-cyan-900',
-    danger: 'bg-red-50 text-red-900',
-  };
-
-  return (
-    <div className={`p-4 rounded-lg ${variants[variant]}`}>
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-sm font-medium opacity-75">{label}</span>
-        <Icon className="w-5 h-5 opacity-50" />
-      </div>
-      <p className="text-2xl font-bold">{value}</p>
     </div>
   );
 };

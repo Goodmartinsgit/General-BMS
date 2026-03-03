@@ -168,7 +168,7 @@ const getAllPromotions = async (req, res) => {
     });
   } catch (err) {
     console.error('Error fetching promotions:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -209,7 +209,7 @@ const getPromotion = async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Error fetching promotion:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -304,7 +304,7 @@ const createPromotion = async (req, res) => {
       return res.status(400).json({ message: 'Promotion code already exists' });
     }
     console.error('Error creating promotion:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -379,7 +379,7 @@ const updatePromotion = async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Error updating promotion:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -415,7 +415,7 @@ const deletePromotion = async (req, res) => {
     res.json({ message: 'Promotion deleted successfully' });
   } catch (err) {
     console.error('Error deleting promotion:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -441,7 +441,7 @@ const togglePromotionStatus = async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Error toggling promotion status:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -595,7 +595,7 @@ const validatePromotionCode = async (req, res) => {
     });
   } catch (err) {
     console.error('Error validating promotion:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -632,7 +632,7 @@ const applyPromotion = async (req, res) => {
     res.json({ message: 'Promotion applied successfully' });
   } catch (err) {
     console.error('Error applying promotion:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -674,7 +674,7 @@ const getPromotionStatistics = async (req, res) => {
     });
   } catch (err) {
     console.error('Error fetching promotion statistics:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -707,7 +707,7 @@ const getPromotionPerformance = async (req, res) => {
     res.json(performance.rows[0]);
   } catch (err) {
     console.error('Error fetching promotion performance:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 

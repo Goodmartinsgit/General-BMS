@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { Truck, Search, Plus, Phone, Mail, MapPin, Edit, Trash2, Tag } from 'lucide-react';
+import api from '../api/axios';
+import { Truck, Search, Plus, Phone, Mail, MapPin, Edit, Trash2, Download } from 'lucide-react';
+import PageHeader from '../components/common/PageHeader';
 import SupplierFormModal from '../components/SupplierFormModal';
 
 const SuppliersPage = () => {
@@ -10,8 +11,6 @@ const SuppliersPage = () => {
     const [editingSupplier, setEditingSupplier] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
 
-    const API_URL = 'http://localhost:5000/api/suppliers';
-
     useEffect(() => {
         fetchSuppliers();
     }, []);
@@ -19,7 +18,7 @@ const SuppliersPage = () => {
     const fetchSuppliers = async () => {
         try {
             setLoading(true);
-            const response = await axios.get(API_URL);
+            const response = await api.get('/suppliers');
             setSuppliers(response.data);
         } catch (error) {
             console.error('Error fetching suppliers:', error);
@@ -28,100 +27,194 @@ const SuppliersPage = () => {
         }
     };
 
+    const handleAddSupplier = () => {
+        setEditingSupplier(null);
+        setIsModalOpen(true);
+    };
+
+    const handleEditSupplier = (supplier) => {
+        setEditingSupplier(supplier);
+        setIsModalOpen(true);
+    };
+
     const handleDelete = async (id) => {
-        if (!confirm('Are you sure you want to delete this supplier?')) return;
-        try {
-            await axios.delete(`${API_URL}/${id}`);
-            fetchSuppliers();
-        } catch (error) {
-            alert('Delete failed');
+        if (window.confirm('Are you sure you want to delete this supplier?')) {
+            try {
+                await api.delete(`/suppliers/${id}`);
+                fetchSuppliers();
+            } catch (error) {
+                alert('Failed to delete supplier');
+            }
         }
     };
 
-    const filteredSuppliers = suppliers.filter(s => 
-        s.supplier_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        s.category?.toLowerCase().includes(searchTerm.toLowerCase())
+    const handleModalSubmit = async (formData) => {
+        try {
+            if (editingSupplier) {
+                await api.put(`/suppliers/${editingSupplier.id}`, formData);
+            } else {
+                await api.post('/suppliers', formData);
+            }
+            setIsModalOpen(false);
+            fetchSuppliers();
+        } catch (error) {
+            alert(error.response?.data?.message || 'Failed to save supplier');
+        }
+    };
+
+    const filteredSuppliers = suppliers.filter(s =>
+        s.supplier_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        s.contact_person?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        s.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const actions = (
+        <>
+            <button className="hidden sm:flex bg-theme-secondary border border-theme text-theme-secondary px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium text-xs sm:text-sm hover:bg-theme-tertiary transition items-center gap-1.5 sm:gap-2">
+                <Download size={14} className="sm:w-4 sm:h-4" /> Export
+            </button>
+            <button
+                onClick={handleAddSupplier}
+                className="bg-accent-gold text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm hover:bg-accent-goldDark transition flex items-center justify-center gap-1.5 sm:gap-2 w-full sm:w-auto"
+            >
+                <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Add Supplier
+            </button>
+        </>
     );
 
     return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <h2 className="text-2xl font-bold text-gray-800">Supply Chain Partners</h2>
-                <button
-                    onClick={() => { setEditingSupplier(null); setIsModalOpen(true); }}
-                    className="flex items-center gap-2 bg-slate-900 text-white px-4 py-2 rounded-lg hover:bg-slate-800 transition shadow-md"
-                >
-                    <Plus size={20} /> Add New Supplier
-                </button>
-            </div>
+        <div className="space-y-4 sm:space-y-6 max-w-[1700px] mx-auto pb-6 sm:pb-10">
+            <PageHeader
+                title="Suppliers"
+                subtitle="Manage your supplier relationships"
+                badge={`${suppliers.length} Suppliers`}
+                icon={Truck}
+                actions={actions}
+            />
 
-            <div className="bg-white p-4 rounded-lg shadow-sm border flex gap-4 items-center">
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            {/* Search Bar */}
+            <div className="bg-theme-secondary p-3 sm:p-4 rounded-lg border border-theme shadow-theme-sm">
+                <div className="relative w-full">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-muted w-4 h-4 sm:w-5 sm:h-5 pointer-events-none" />
                     <input
                         type="text"
-                        placeholder="Search vendors by name or industry..."
-                        className="pl-10 pr-4 py-2 bg-gray-50 border rounded-lg w-full focus:ring-2 focus:ring-blue-500 outline-none"
+                        placeholder="Search suppliers..."
+                        className="w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-2 sm:py-2.5 bg-theme-primary border border-theme rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none transition-all text-xs sm:text-sm text-theme-primary placeholder-theme-muted"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {loading ? (
-                    <div className="col-span-full text-center py-20 text-gray-400 italic">Finding vendors...</div>
-                ) : filteredSuppliers.length === 0 ? (
-                    <div className="col-span-full text-center py-20 text-gray-400 italic bg-white rounded-xl border border-dashed">No suppliers found.</div>
-                ) : (
-                    filteredSuppliers.map((supplier) => (
-                        <div key={supplier.id} className="bg-white rounded-xl border shadow-sm hover:shadow-md transition flex flex-col overflow-hidden group">
-                            <div className="p-5 border-b bg-slate-50/50 group-hover:bg-slate-50 transition">
-                                <div className="flex justify-between items-start mb-2">
-                                    <h3 className="text-lg font-black text-slate-800 uppercase tracking-tight">{supplier.supplier_name}</h3>
-                                    <span className="px-2 py-0.5 bg-blue-100 text-blue-600 rounded text-[9px] font-bold uppercase">
-                                        {supplier.category || 'General'}
-                                    </span>
-                                </div>
-                                <div className="text-sm text-gray-500 font-medium flex items-center gap-2">
-                                    <Edit size={14} className="text-gray-300" /> {supplier.contact_person || 'No contact person'}
-                                </div>
-                            </div>
-                            <div className="p-5 space-y-3 flex-1">
-                                <div className="flex items-center gap-3 text-sm text-gray-600 hover:text-blue-600 cursor-pointer transition">
-                                    <Phone size={14} className="text-slate-400" /> {supplier.phone_number || '---'}
-                                </div>
-                                <div className="flex items-center gap-3 text-sm text-gray-600 hover:text-blue-600 cursor-pointer transition">
-                                    <Mail size={14} className="text-slate-400" /> {supplier.email || '---'}
-                                </div>
-                                <div className="flex items-start gap-3 text-sm text-gray-600">
-                                    <MapPin size={14} className="text-slate-400 mt-1 flex-shrink-0" /> 
-                                    <span className="line-clamp-2">{supplier.address || 'No address specified'}</span>
-                                </div>
-                            </div>
-                            <div className="p-4 bg-slate-50 border-t flex justify-end gap-2">
-                                <button 
-                                    onClick={() => { setEditingSupplier(supplier); setIsModalOpen(true); }}
-                                    className="p-2 text-slate-400 hover:text-blue-600 hover:bg-white rounded shadow-sm transition"
-                                >
-                                    <Edit size={16} />
-                                </button>
-                                <button 
-                                    onClick={() => handleDelete(supplier.id)}
-                                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-white rounded shadow-sm transition"
-                                >
-                                    <Trash2 size={16} />
-                                </button>
-                            </div>
-                        </div>
-                    ))
-                )}
+            {/* Suppliers Table */}
+            <div className="bg-theme-secondary rounded-lg border border-theme shadow-theme-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead>
+                            <tr className="bg-theme-primary border-b border-theme">
+                                <th className="px-3 sm:px-6 py-2 sm:py-3 text-[10px] sm:text-xs font-semibold text-theme-muted uppercase">Supplier</th>
+                                <th className="px-3 sm:px-6 py-2 sm:py-3 text-[10px] sm:text-xs font-semibold text-theme-muted uppercase hidden md:table-cell">Contact</th>
+                                <th className="px-3 sm:px-6 py-2 sm:py-3 text-[10px] sm:text-xs font-semibold text-theme-muted uppercase hidden lg:table-cell">Phone & Email</th>
+                                <th className="px-3 sm:px-6 py-2 sm:py-3 text-[10px] sm:text-xs font-semibold text-theme-muted uppercase hidden xl:table-cell">Address</th>
+                                <th className="px-3 sm:px-6 py-2 sm:py-3 text-[10px] sm:text-xs font-semibold text-theme-muted uppercase text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-theme">
+                            {loading ? (
+                                Array(5).fill(0).map((_, i) => (
+                                    <tr key={i} className="animate-pulse">
+                                        <td colSpan="5" className="px-3 sm:px-6 py-4 sm:py-8">
+                                            <div className="flex items-center gap-2 sm:gap-3">
+                                                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-theme-tertiary rounded-lg"></div>
+                                                <div className="space-y-2 flex-1">
+                                                    <div className="w-32 sm:w-48 h-3 sm:h-4 bg-theme-tertiary rounded"></div>
+                                                    <div className="w-24 sm:w-32 h-2 sm:h-3 bg-theme-tertiary rounded"></div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : filteredSuppliers.length === 0 ? (
+                                <tr>
+                                    <td colSpan="5" className="px-3 sm:px-6 py-12 sm:py-16 text-center">
+                                        <div className="flex flex-col items-center gap-3 sm:gap-4">
+                                            <div className="w-12 h-12 sm:w-16 sm:h-16 bg-theme-tertiary rounded-full flex items-center justify-center text-theme-muted">
+                                                <Truck size={24} className="sm:w-8 sm:h-8" />
+                                            </div>
+                                            <div>
+                                                <p className="font-semibold text-theme-primary text-sm sm:text-base md:text-lg">No suppliers found</p>
+                                                <p className="text-theme-muted text-xs sm:text-sm mt-1">Try adjusting your search or add a new supplier.</p>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                            ) : (
+                                filteredSuppliers.map((supplier) => (
+                                    <tr key={supplier.id} className="hover:bg-theme-primary transition-colors group">
+                                        <td className="px-3 sm:px-6 py-3 sm:py-4">
+                                            <div className="flex items-center gap-2 sm:gap-3">
+                                                <div className="w-8 h-8 sm:w-10 sm:h-10 bg-purple-100 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400 rounded-lg flex items-center justify-center">
+                                                    <Truck size={16} className="sm:w-5 sm:h-5" />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="font-semibold text-theme-primary text-xs sm:text-sm truncate">{supplier.supplier_name}</div>
+                                                    {supplier.payment_terms && (
+                                                        <div className="text-[10px] sm:text-xs text-theme-muted mt-0.5 truncate">{supplier.payment_terms}</div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-3 sm:px-6 py-3 sm:py-4 hidden md:table-cell">
+                                            <div className="text-xs sm:text-sm text-theme-secondary">
+                                                {supplier.contact_person || 'N/A'}
+                                            </div>
+                                        </td>
+                                        <td className="px-3 sm:px-6 py-3 sm:py-4 hidden lg:table-cell">
+                                            <div className="space-y-1">
+                                                <div className="flex items-center gap-2 text-xs sm:text-sm text-theme-secondary">
+                                                    <Phone size={12} className="sm:w-3.5 sm:h-3.5 text-theme-muted" /> {supplier.phone_number || 'N/A'}
+                                                </div>
+                                                <div className="flex items-center gap-2 text-[10px] sm:text-xs text-theme-muted">
+                                                    <Mail size={12} className="sm:w-3.5 sm:h-3.5 text-theme-muted" /> {supplier.email || 'N/A'}
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-3 sm:px-6 py-3 sm:py-4 hidden xl:table-cell">
+                                            <div className="flex items-start gap-2 text-xs sm:text-sm text-theme-secondary">
+                                                <MapPin size={12} className="sm:w-3.5 sm:h-3.5 text-theme-muted mt-0.5 flex-shrink-0" />
+                                                <span className="line-clamp-2">{supplier.address || 'No address'}</span>
+                                            </div>
+                                        </td>
+                                        <td className="px-3 sm:px-6 py-3 sm:py-4 text-right">
+                                            <div className="flex justify-end gap-1 sm:gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                                                <button
+                                                    onClick={() => handleEditSupplier(supplier)}
+                                                    className="p-1.5 sm:p-2 text-theme-muted hover:text-accent-gold hover:bg-accent-gold/10 rounded-lg transition"
+                                                    title="Edit Supplier"
+                                                >
+                                                    <Edit size={14} className="sm:w-4 sm:h-4" />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDelete(supplier.id)}
+                                                    className="p-1.5 sm:p-2 text-theme-muted hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"
+                                                    title="Delete Supplier"
+                                                >
+                                                    <Trash2 size={14} className="sm:w-4 sm:h-4" />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             <SupplierFormModal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
-                onSuccess={fetchSuppliers}
+                onSubmit={handleModalSubmit}
                 supplier={editingSupplier}
             />
         </div>

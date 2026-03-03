@@ -6,29 +6,23 @@ import {
     DollarSign,
     RefreshCw,
     Download,
-    ArrowUpRight,
-    ArrowDownRight
+    BarChart3,
+    Target,
+    RotateCw
 } from 'lucide-react';
-import { Button, LoadingSpinner, Badge } from '../components/ui';
-import {
-    RevenueBarChart,
-    TopProductsTable,
-    StatsSummaryCard
-} from '../components/analytics';
+import PageHeader from '../components/common/PageHeader';
+import RevenueBarChart from '../components/analytics/RevenueBarChart';
 import { analyticsAPI } from '../api/analytics';
 import { branchesAPI } from '../api/branches';
 import { toast } from 'react-toastify';
+import { useCurrency } from '../context/CurrencyContext';
 
-/**
- * InventoryAnalytics Page
- * Track inventory levels, turnover, and stock health
- */
 const InventoryAnalytics = () => {
+    const { formatCurrency, symbol } = useCurrency();
     const [loading, setLoading] = useState(true);
     const [branchFilter, setBranchFilter] = useState('all');
     const [branches, setBranches] = useState([]);
 
-    // Analytics data
     const [stats, setStats] = useState({
         total_products: 0,
         total_value: 0,
@@ -75,7 +69,6 @@ const InventoryAnalytics = () => {
                 avg_turnover_rate: turnoverRes.avg_turnover_rate || 0
             });
 
-            // Category breakdown from inventory value response
             const categories = inventoryValueRes.by_category || inventoryValueRes.categories || [];
             setCategoryStock(categories.map(cat => ({
                 name: cat.category_name || cat.name,
@@ -83,7 +76,6 @@ const InventoryAnalytics = () => {
                 quantity: cat.total_quantity || cat.quantity || 0
             })));
 
-            // Low stock items
             const lowItems = lowStockRes.items || lowStockRes.data || lowStockRes || [];
             setLowStockItems(lowItems.map(item => ({
                 id: item.id,
@@ -96,7 +88,6 @@ const InventoryAnalytics = () => {
                         item.current_stock <= (item.reorder_level / 2) ? 'critical' : 'low'
             })));
 
-            // Stock movement data
             const movements = movementRes.movements || movementRes.data || movementRes || [];
             setStockMovement(movements.map(m => ({
                 name: m.period || m.week || m.name,
@@ -131,93 +122,83 @@ const InventoryAnalytics = () => {
         }
     };
 
-    const getStatusBadge = (status) => {
-        switch (status) {
-            case 'critical':
-                return <Badge variant="danger">Critical</Badge>;
-            case 'low':
-                return <Badge variant="warning">Low Stock</Badge>;
-            default:
-                return <Badge variant="default">Normal</Badge>;
-        }
-    };
-
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center h-[60vh]">
-                <LoadingSpinner size="lg" />
+    const actions = (
+        <div className="flex items-center gap-3">
+            <div className="relative">
+                <Target className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-muted w-4 h-4 pointer-events-none" />
+                <select
+                    value={branchFilter}
+                    onChange={(e) => setBranchFilter(e.target.value)}
+                    className="pl-9 pr-4 py-2 bg-theme-primary border border-theme rounded-lg text-sm focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none transition-all text-theme-primary appearance-none cursor-pointer"
+                >
+                    <option value="all">All Branches</option>
+                    {branches.map((branch) => (
+                        <option key={branch.id} value={branch.id}>{branch.branch_name}</option>
+                    ))}
+                </select>
             </div>
-        );
-    }
+            <button
+                onClick={fetchAnalytics}
+                className="bg-theme-secondary border border-theme text-theme-secondary px-4 py-2 rounded-lg font-medium text-sm hover:bg-theme-tertiary transition flex items-center gap-2"
+            >
+                <RefreshCw size={16} /> Refresh
+            </button>
+            <button
+                onClick={handleExport}
+                className="bg-accent-gold text-white px-4 py-2 rounded-lg font-semibold text-sm hover:bg-accent-goldDark transition flex items-center gap-2"
+            >
+                <Download size={16} /> Export
+            </button>
+        </div>
+    );
+
+    const statsCards = [
+        { title: 'Total Products', value: stats.total_products.toLocaleString(), icon: Package, color: 'bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400' },
+        { title: 'Inventory Value', value: formatCurrency(stats.total_value), icon: DollarSign, color: 'bg-green-100 text-green-600 dark:bg-green-900/20 dark:text-green-400' },
+        { title: 'Low Stock Items', value: stats.low_stock_count, icon: TrendingDown, color: 'bg-amber-100 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400' },
+        { title: 'Out of Stock', value: stats.out_of_stock_count, icon: AlertTriangle, color: 'bg-red-100 text-red-600 dark:bg-red-900/20 dark:text-red-400' },
+        { title: 'Turnover Rate', value: `${stats.avg_turnover_rate}x / yr`, icon: RotateCw, color: 'bg-purple-100 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400' }
+    ];
 
     return (
-        <div className="p-6 max-w-7xl mx-auto space-y-6">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div>
-                    <h1 className="text-3xl font-bold text-gray-900">Inventory Analytics</h1>
-                    <p className="text-gray-600 mt-1">Monitor stock levels and inventory health</p>
-                </div>
-                <div className="flex items-center gap-3">
-                    <select
-                        value={branchFilter}
-                        onChange={(e) => setBranchFilter(e.target.value)}
-                        className="px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                        <option value="all">All Branches</option>
-                        {branches.map((branch) => (
-                            <option key={branch.id} value={branch.id}>
-                                {branch.branch_name}
-                            </option>
-                        ))}
-                    </select>
-                    <Button variant="outline" icon={RefreshCw} onClick={fetchAnalytics}>
-                        Refresh
-                    </Button>
-                    <Button variant="outline" icon={Download} onClick={handleExport}>
-                        Export
-                    </Button>
-                </div>
-            </div>
+        <div className="space-y-6 max-w-[1700px] mx-auto pb-10">
+            <PageHeader
+                title="Inventory Analytics"
+                subtitle="Monitor stock levels and inventory health"
+                icon={BarChart3}
+                actions={actions}
+            />
 
-            {/* Key Metrics */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                <StatsSummaryCard
-                    title="Total Products"
-                    value={stats.total_products.toLocaleString()}
-                    icon={Package}
-                    color="blue"
-                    size="small"
-                />
-                <StatsSummaryCard
-                    title="Inventory Value"
-                    value={`$${stats.total_value.toLocaleString()}`}
-                    icon={DollarSign}
-                    color="green"
-                    size="small"
-                />
-                <StatsSummaryCard
-                    title="Low Stock Items"
-                    value={stats.low_stock_count}
-                    icon={TrendingDown}
-                    color="orange"
-                    size="small"
-                />
-                <StatsSummaryCard
-                    title="Out of Stock"
-                    value={stats.out_of_stock_count}
-                    icon={AlertTriangle}
-                    color="red"
-                    size="small"
-                />
-                <StatsSummaryCard
-                    title="Turnover Rate"
-                    value={`${stats.avg_turnover_rate}x`}
-                    subtitle="Per year"
-                    color="purple"
-                    size="small"
-                />
-            </div>
+            {/* Stats Cards */}
+            {loading ? (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+                    {Array(5).fill(0).map((_, i) => (
+                        <div key={i} className="bg-theme-secondary p-6 rounded-lg border border-theme shadow-theme-sm animate-pulse">
+                            <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-theme-tertiary rounded-lg"></div>
+                                <div className="space-y-2 flex-1">
+                                    <div className="h-3 w-20 bg-theme-tertiary rounded"></div>
+                                    <div className="h-6 w-16 bg-theme-tertiary rounded"></div>
+                                </div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
+                    {statsCards.map((card, i) => (
+                        <div key={i} className="bg-theme-secondary p-6 rounded-lg border border-theme shadow-theme-sm flex items-center gap-4">
+                            <div className={`p-3 rounded-lg ${card.color}`}>
+                                <card.icon size={24} />
+                            </div>
+                            <div>
+                                <div className="text-sm text-theme-muted font-medium">{card.title}</div>
+                                <div className="text-2xl font-semibold text-theme-primary">{card.value}</div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            )}
 
             {/* Charts Row */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -227,9 +208,10 @@ const InventoryAnalytics = () => {
                     height={280}
                     layout="horizontal"
                     dataKeys={[
-                        { key: 'value', color: '#3b82f6', name: 'Value ($)' }
+                        { key: 'value', color: '#d4a843', name: `Value (${symbol})` }
                     ]}
                     xAxisKey="name"
+                    formatValue={(val) => `${symbol}${val.toLocaleString()}`}
                 />
                 <RevenueBarChart
                     data={stockMovement}
@@ -246,48 +228,92 @@ const InventoryAnalytics = () => {
             </div>
 
             {/* Low Stock Items Table */}
-            <div className="bg-white rounded-lg border border-gray-200 p-6">
-                <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">Low Stock Alerts</h3>
-                    <Button variant="outline" size="sm">
-                        View All
-                    </Button>
+            <div className="bg-theme-secondary rounded-lg border border-theme shadow-theme-sm overflow-hidden">
+                <div className="flex items-center justify-between p-6 border-b border-theme">
+                    <h3 className="text-lg font-semibold text-theme-primary">Low Stock Alerts</h3>
+                    <span className="bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-300 text-xs font-medium px-2.5 py-1 rounded-full">
+                        {lowStockItems.length} items
+                    </span>
                 </div>
                 <div className="overflow-x-auto">
-                    <table className="w-full">
+                    <table className="w-full text-left">
                         <thead>
-                            <tr className="border-b border-gray-200">
-                                <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Product</th>
-                                <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">SKU</th>
-                                <th className="text-center py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Current Stock</th>
-                                <th className="text-center py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Reorder Level</th>
-                                <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Branch</th>
-                                <th className="text-center py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Status</th>
-                                <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 uppercase">Action</th>
+                            <tr className="bg-theme-primary border-b border-theme">
+                                <th className="px-6 py-3 text-xs font-semibold text-theme-muted uppercase">Product</th>
+                                <th className="px-6 py-3 text-xs font-semibold text-theme-muted uppercase">SKU</th>
+                                <th className="px-6 py-3 text-xs font-semibold text-theme-muted uppercase text-center">Current Stock</th>
+                                <th className="px-6 py-3 text-xs font-semibold text-theme-muted uppercase text-center">Reorder Level</th>
+                                <th className="px-6 py-3 text-xs font-semibold text-theme-muted uppercase">Branch</th>
+                                <th className="px-6 py-3 text-xs font-semibold text-theme-muted uppercase text-center">Status</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-gray-100">
-                            {lowStockItems.map((item) => (
-                                <tr key={item.id} className="hover:bg-gray-50">
-                                    <td className="py-3 px-4">
-                                        <span className="font-medium text-gray-900">{item.name}</span>
-                                    </td>
-                                    <td className="py-3 px-4 text-sm text-gray-500">{item.sku}</td>
-                                    <td className="py-3 px-4 text-center">
-                                        <span className={`font-semibold ${item.status === 'critical' ? 'text-red-600' : 'text-orange-600'}`}>
-                                            {item.current_stock}
-                                        </span>
-                                    </td>
-                                    <td className="py-3 px-4 text-center text-gray-600">{item.reorder_level}</td>
-                                    <td className="py-3 px-4 text-sm text-gray-600">{item.branch}</td>
-                                    <td className="py-3 px-4 text-center">{getStatusBadge(item.status)}</td>
-                                    <td className="py-3 px-4 text-right">
-                                        <Button variant="outline" size="sm">
-                                            Reorder
-                                        </Button>
+                        <tbody className="divide-y divide-theme">
+                            {loading ? (
+                                Array(5).fill(0).map((_, i) => (
+                                    <tr key={i} className="animate-pulse">
+                                        <td colSpan="6" className="px-6 py-6">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 bg-theme-tertiary rounded-lg"></div>
+                                                <div className="space-y-2 flex-1">
+                                                    <div className="w-48 h-4 bg-theme-tertiary rounded"></div>
+                                                    <div className="w-32 h-3 bg-theme-tertiary rounded"></div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : lowStockItems.length === 0 ? (
+                                <tr>
+                                    <td colSpan="6" className="px-6 py-16 text-center">
+                                        <div className="flex flex-col items-center gap-4">
+                                            <div className="w-16 h-16 bg-theme-tertiary rounded-full flex items-center justify-center text-theme-muted">
+                                                <Package size={32} />
+                                            </div>
+                                            <div>
+                                                <p className="font-semibold text-theme-primary text-lg">All stock levels healthy</p>
+                                                <p className="text-theme-muted text-sm mt-1">No items are below their reorder level.</p>
+                                            </div>
+                                        </div>
                                     </td>
                                 </tr>
-                            ))}
+                            ) : (
+                                lowStockItems.map((item) => (
+                                    <tr key={item.id} className="hover:bg-theme-primary transition-colors">
+                                        <td className="px-6 py-4">
+                                            <span className="font-semibold text-theme-primary text-sm">{item.name}</span>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <span className="px-2 py-1 bg-theme-tertiary text-theme-secondary rounded text-xs font-mono">
+                                                {item.sku}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            <span className={`font-semibold text-sm ${
+                                                item.status === 'critical'
+                                                    ? 'text-red-600 dark:text-red-400'
+                                                    : 'text-amber-600 dark:text-amber-400'
+                                            }`}>
+                                                {item.current_stock}
+                                            </span>
+                                        </td>
+                                        <td className="px-6 py-4 text-center text-sm text-theme-muted">
+                                            {item.reorder_level}
+                                        </td>
+                                        <td className="px-6 py-4 text-sm text-theme-secondary">
+                                            {item.branch}
+                                        </td>
+                                        <td className="px-6 py-4 text-center">
+                                            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                                                item.status === 'critical'
+                                                    ? 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-300'
+                                                    : 'bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300'
+                                            }`}>
+                                                {item.status === 'critical' ? 'Critical' : 'Low Stock'}
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
                         </tbody>
                     </table>
                 </div>

@@ -1,19 +1,27 @@
-import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { CreditCard, Search, FileText, ArrowRight, CheckCircle2, AlertCircle, Filter, Download } from 'lucide-react';
+import React, { useState, useEffect, useCallback } from 'react';
+import api from '../api/axios';
+import { CreditCard, Search, FileText, ArrowRight, CheckCircle2, AlertCircle, Download, DollarSign, ShoppingBag, Package } from 'lucide-react';
+import PageHeader from '../components/common/PageHeader';
+import PeriodFilter from '../components/common/PeriodFilter';
+import { useCurrency } from '../context/CurrencyContext';
 
 const PaymentsPage = () => {
+    const { formatCurrency } = useCurrency();
     const [allocations, setAllocations] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
+    const [dateRange, setDateRange] = useState(null);
 
     useEffect(() => {
         fetchAllocations();
-    }, []);
+    }, [dateRange]);
 
     const fetchAllocations = async () => {
         try {
-            const res = await axios.get('/api/payments/allocations');
+            const params = {};
+            if (dateRange?.start_date) params.start_date = dateRange.start_date;
+            if (dateRange?.end_date) params.end_date = dateRange.end_date;
+            const res = await api.get('/payments/allocations', { params });
             setAllocations(res.data);
             setLoading(false);
         } catch (err) {
@@ -22,124 +30,188 @@ const PaymentsPage = () => {
         }
     };
 
-    const filteredAllocations = allocations.filter(alloc => 
+    const handlePeriodChange = useCallback((range) => {
+        setDateRange(range);
+    }, []);
+
+    const filteredAllocations = allocations.filter(alloc =>
         (alloc.sale_number?.toLowerCase().includes(searchTerm.toLowerCase())) ||
         (alloc.order_number?.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
+    const totalSalesAllocation = allocations.filter(a => a.sale_id).reduce((sum, a) => sum + parseFloat(a.amount), 0);
+    const totalWholesaleAllocation = allocations.filter(a => a.wholesale_order_id).reduce((sum, a) => sum + parseFloat(a.amount), 0);
+    const totalAllocated = totalSalesAllocation + totalWholesaleAllocation;
+
+    const actions = (
+        <div className="flex items-center gap-2">
+            <PeriodFilter storageKey="payments" onChange={handlePeriodChange} />
+            <button className="bg-theme-secondary border border-theme text-theme-secondary px-4 py-2 rounded-lg font-medium text-sm hover:bg-theme-tertiary transition flex items-center gap-2">
+                <Download size={16} /> Export
+            </button>
+        </div>
+    );
+
     return (
-        <div className="p-6 bg-slate-50 min-h-screen">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-                <div>
-                    <h1 className="text-2xl font-bold text-slate-800 flex items-center gap-2">
-                        <CreditCard className="text-purple-600" />
-                        Payment Allocations
-                    </h1>
-                    <p className="text-slate-500 text-sm">Track how payments are distributed across sales and orders</p>
-                </div>
-                
-                <div className="flex gap-2 w-full md:w-auto">
-                    <div className="relative flex-1 md:w-64">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                        <input 
-                            type="text" 
-                            placeholder="Search Sale/Order #"
-                            className="w-full pl-10 pr-4 py-2 border rounded-xl focus:ring-2 focus:ring-purple-500 outline-none transition"
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                        />
+        <div className="space-y-6 max-w-[1700px] mx-auto pb-10">
+            <PageHeader
+                title="Payment Allocations"
+                subtitle="Track how payments are distributed across sales and orders"
+                badge={`${allocations.length} Allocations`}
+                icon={CreditCard}
+                actions={actions}
+            />
+
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div className="bg-theme-secondary p-6 rounded-lg border border-theme shadow-theme-sm flex items-center gap-4">
+                    <div className="p-3 bg-green-100 text-green-600 dark:bg-green-900/20 dark:text-green-400 rounded-lg">
+                        <DollarSign size={24} />
                     </div>
-                    <button className="p-2 border rounded-xl bg-white hover:bg-slate-50 text-slate-600 transition">
-                        <Filter size={20} />
-                    </button>
-                    <button className="p-2 border rounded-xl bg-white hover:bg-slate-50 text-slate-600 transition">
-                        <Download size={20} />
-                    </button>
+                    <div>
+                        <div className="text-sm text-theme-muted font-medium">Total Allocated</div>
+                        <div className="text-2xl font-semibold text-theme-primary">
+                            {formatCurrency(totalAllocated)}
+                        </div>
+                    </div>
+                </div>
+                <div className="bg-theme-secondary p-6 rounded-lg border border-theme shadow-theme-sm flex items-center gap-4">
+                    <div className="p-3 bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 rounded-lg">
+                        <ShoppingBag size={24} />
+                    </div>
+                    <div>
+                        <div className="text-sm text-theme-muted font-medium">Retail Sales</div>
+                        <div className="text-2xl font-semibold text-theme-primary">
+                            {formatCurrency(totalSalesAllocation)}
+                        </div>
+                    </div>
+                </div>
+                <div className="bg-theme-secondary p-6 rounded-lg border border-theme shadow-theme-sm flex items-center gap-4">
+                    <div className="p-3 bg-purple-100 text-purple-600 dark:bg-purple-900/20 dark:text-purple-400 rounded-lg">
+                        <Package size={24} />
+                    </div>
+                    <div>
+                        <div className="text-sm text-theme-muted font-medium">Wholesale Orders</div>
+                        <div className="text-2xl font-semibold text-theme-primary">
+                            {formatCurrency(totalWholesaleAllocation)}
+                        </div>
+                    </div>
+                </div>
+                <div className="bg-theme-secondary p-6 rounded-lg border border-theme shadow-theme-sm flex items-center gap-4">
+                    <div className="p-3 bg-amber-100 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400 rounded-lg">
+                        <AlertCircle size={24} />
+                    </div>
+                    <div>
+                        <div className="text-sm text-theme-muted font-medium">Total Transactions</div>
+                        <div className="text-2xl font-semibold text-theme-primary">{allocations.length}</div>
+                    </div>
                 </div>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
-                <table className="w-full text-left border-collapse">
-                    <thead>
-                        <tr className="bg-slate-50 border-b border-slate-200">
-                            <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Reference</th>
-                            <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Type</th>
-                            <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Allocated Amount</th>
-                            <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Date</th>
-                            <th className="px-6 py-4 text-xs font-bold text-slate-500 uppercase tracking-wider text-right">Action</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100">
-                        {loading ? (
-                            <tr><td colSpan="5" className="px-6 py-10 text-center text-slate-400">Loading payment data...</td></tr>
-                        ) : filteredAllocations.length === 0 ? (
-                            <tr><td colSpan="5" className="px-6 py-10 text-center text-slate-400">No payment allocations found</td></tr>
-                        ) : (
-                            filteredAllocations.map(alloc => (
-                                <tr key={alloc.id} className="hover:bg-slate-50 transition">
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-2">
-                                            <FileText size={16} className="text-slate-400" />
-                                            <span className="font-medium text-slate-700">
-                                                {alloc.sale_number || alloc.order_number || 'N/A'}
-                                            </span>
+            {/* Search Bar */}
+            <div className="bg-theme-secondary p-4 rounded-lg border border-theme shadow-theme-sm">
+                <div className="relative w-full">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-muted w-5 h-5 pointer-events-none" />
+                    <input
+                        type="text"
+                        placeholder="Search by sale number or order number..."
+                        className="w-full pl-10 pr-4 py-2.5 bg-theme-primary border border-theme rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none transition-all text-sm text-theme-primary placeholder-theme-muted"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                </div>
+            </div>
+
+            {/* Allocations Table */}
+            <div className="bg-theme-secondary rounded-lg border border-theme shadow-theme-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead>
+                            <tr className="bg-theme-primary border-b border-theme">
+                                <th className="px-6 py-3 text-xs font-semibold text-theme-muted uppercase">Reference</th>
+                                <th className="px-6 py-3 text-xs font-semibold text-theme-muted uppercase">Type</th>
+                                <th className="px-6 py-3 text-xs font-semibold text-theme-muted uppercase">Allocated Amount</th>
+                                <th className="px-6 py-3 text-xs font-semibold text-theme-muted uppercase">Date</th>
+                                <th className="px-6 py-3 text-xs font-semibold text-theme-muted uppercase text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-theme">
+                            {loading ? (
+                                Array(5).fill(0).map((_, i) => (
+                                    <tr key={i} className="animate-pulse">
+                                        <td colSpan="5" className="px-6 py-6">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-8 h-8 bg-theme-tertiary rounded-lg"></div>
+                                                <div className="space-y-2 flex-1">
+                                                    <div className="w-48 h-4 bg-theme-tertiary rounded"></div>
+                                                    <div className="w-32 h-3 bg-theme-tertiary rounded"></div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : filteredAllocations.length === 0 ? (
+                                <tr>
+                                    <td colSpan="5" className="px-6 py-16 text-center">
+                                        <div className="flex flex-col items-center gap-4">
+                                            <div className="w-16 h-16 bg-theme-tertiary rounded-full flex items-center justify-center text-theme-muted">
+                                                <CreditCard size={32} />
+                                            </div>
+                                            <div>
+                                                <p className="font-semibold text-theme-primary text-lg">No payment allocations found</p>
+                                                <p className="text-theme-muted text-sm mt-1">Try adjusting your search or check back later.</p>
+                                            </div>
                                         </div>
                                     </td>
-                                    <td className="px-6 py-4">
-                                        {alloc.sale_id ? (
-                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-700">
-                                                Retail Sale
-                                            </span>
-                                        ) : (
-                                            <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700">
-                                                Wholesale Order
-                                            </span>
-                                        )}
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="text-slate-900 font-bold">₦{parseFloat(alloc.amount).toLocaleString()}</div>
-                                    </td>
-                                    <td className="px-6 py-4 text-sm text-slate-500">
-                                        {new Date(alloc.allocated_at).toLocaleDateString()}
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        <button className="text-slate-400 hover:text-blue-600 transition">
-                                            <ArrowRight size={18} />
-                                        </button>
-                                    </td>
                                 </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
-            </div>
-
-            <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-gradient-to-br from-blue-500 to-blue-700 p-6 rounded-2xl text-white shadow-lg shadow-blue-200">
-                    <div className="text-blue-100 text-sm mb-1">Total Sales Allocation</div>
-                    <div className="text-2xl font-bold">₦{allocations.filter(a => a.sale_id).reduce((sum, a) => sum + parseFloat(a.amount), 0).toLocaleString()}</div>
-                    <div className="mt-4 flex items-center gap-2 text-xs text-blue-100">
-                        <CheckCircle2 size={14} /> 100% reconciled today
-                    </div>
-                </div>
-                
-                <div className="bg-gradient-to-br from-purple-500 to-purple-700 p-6 rounded-2xl text-white shadow-lg shadow-purple-200">
-                    <div className="text-purple-100 text-sm mb-1">Wholesale Receivables Collected</div>
-                    <div className="text-2xl font-bold">₦{allocations.filter(a => a.wholesale_order_id).reduce((sum, a) => sum + parseFloat(a.amount), 0).toLocaleString()}</div>
-                    <div className="mt-4 flex items-center gap-2 text-xs text-purple-100">
-                        <CheckCircle2 size={14} /> Updated 5m ago
-                    </div>
-                </div>
-
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex flex-col justify-center">
-                    <div className="flex items-center justify-between mb-4">
-                        <div className="p-3 bg-red-100 text-red-600 rounded-xl">
-                            <AlertCircle size={24} />
-                        </div>
-                        <span className="text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded">Action Required</span>
-                    </div>
-                    <div className="text-slate-800 font-bold">Outstanding Balances</div>
-                    <div className="text-2xl font-bold text-slate-900">12 Orders</div>
+                            ) : (
+                                filteredAllocations.map(alloc => (
+                                    <tr key={alloc.id} className="hover:bg-theme-primary transition-colors group">
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-9 h-9 bg-accent-gold/10 text-accent-gold rounded-lg flex items-center justify-center border border-accent-gold/20">
+                                                    <FileText size={18} />
+                                                </div>
+                                                <div>
+                                                    <div className="font-semibold text-theme-primary text-sm">
+                                                        {alloc.sale_number || alloc.order_number || 'N/A'}
+                                                    </div>
+                                                    <div className="text-xs text-theme-muted mt-0.5">
+                                                        Payment #{alloc.id}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            {alloc.sale_id ? (
+                                                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300">
+                                                    Retail Sale
+                                                </span>
+                                            ) : (
+                                                <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300">
+                                                    Wholesale Order
+                                                </span>
+                                            )}
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="text-sm font-semibold text-green-600 dark:text-green-400">
+                                                {formatCurrency(alloc.amount)}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="text-sm text-theme-primary">{new Date(alloc.allocated_at).toLocaleDateString()}</div>
+                                            <div className="text-xs text-theme-muted">{new Date(alloc.allocated_at).toLocaleTimeString()}</div>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <button className="text-theme-muted hover:text-accent-gold transition-colors p-1.5 rounded-lg hover:bg-theme-tertiary">
+                                                <ArrowRight size={18} />
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>

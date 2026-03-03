@@ -113,7 +113,7 @@ const getAllPurchaseOrders = async (req, res) => {
     });
   } catch (err) {
     console.error('Error fetching purchase orders:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -166,7 +166,7 @@ const getPurchaseOrder = async (req, res) => {
     res.json(po);
   } catch (err) {
     console.error('Error fetching purchase order:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -268,7 +268,7 @@ const createPurchaseOrder = async (req, res) => {
     }
   } catch (err) {
     console.error('Error creating purchase order:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -353,7 +353,7 @@ const updatePurchaseOrder = async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Error updating purchase order:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -392,7 +392,7 @@ const approvePurchaseOrder = async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Error approving purchase order:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -425,7 +425,7 @@ const cancelPurchaseOrder = async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Error cancelling purchase order:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -632,7 +632,7 @@ const receiveGoods = async (req, res) => {
     }
   } catch (err) {
     console.error('Error receiving goods:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -658,7 +658,7 @@ const getPurchaseOrderGRNs = async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Error fetching GRNs:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -708,7 +708,7 @@ const getGRNDetails = async (req, res) => {
     res.json(grn);
   } catch (err) {
     console.error('Error fetching GRN details:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -773,7 +773,7 @@ const getPurchaseOrderStatistics = async (req, res) => {
     res.json(stats.rows[0]);
   } catch (err) {
     console.error('Error fetching PO statistics:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 

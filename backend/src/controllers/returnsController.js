@@ -19,7 +19,7 @@ const getReturnReasons = async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Error fetching return reasons:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -142,7 +142,7 @@ const getAllReturns = async (req, res) => {
     });
   } catch (err) {
     console.error('Error fetching returns:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -199,7 +199,7 @@ const getReturn = async (req, res) => {
     res.json(returnData);
   } catch (err) {
     console.error('Error fetching return:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -332,7 +332,7 @@ const createReturn = async (req, res) => {
     }
   } catch (err) {
     console.error('Error creating return:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -464,7 +464,7 @@ const approveReturn = async (req, res) => {
     }
   } catch (err) {
     console.error('Error approving return:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -496,7 +496,7 @@ const completeReturn = async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Error completing return:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -526,7 +526,7 @@ const rejectReturn = async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Error rejecting return:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -621,7 +621,7 @@ const createExchange = async (req, res) => {
     }
   } catch (err) {
     console.error('Error creating exchange:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -681,7 +681,7 @@ const getReturnStatistics = async (req, res) => {
     res.json(stats.rows[0]);
   } catch (err) {
     console.error('Error fetching return statistics:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { RotateCcw, Search, AlertCircle, Package, DollarSign } from 'lucide-react';
 import { Modal, Input, Button, Badge } from '../ui';
+import { useCurrency } from '../../context/CurrencyContext';
 
 /**
  * ReturnFormModal Component
@@ -13,6 +14,7 @@ const ReturnFormModal = ({
   initialSale = null,
   loading = false,
 }) => {
+  const { formatCurrency } = useCurrency();
   const [saleNumber, setSaleNumber] = useState('');
   const [sale, setSale] = useState(null);
   const [searchingSale, setSearchingsale] = useState(false);
@@ -201,7 +203,7 @@ const ReturnFormModal = ({
         {/* Search Sale */}
         {!initialSale && (
           <div className="space-y-4">
-            <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+            <h3 className="text-sm font-semibold text-theme-primary uppercase tracking-wide">
               Find Sale
             </h3>
 
@@ -231,11 +233,11 @@ const ReturnFormModal = ({
         {/* Sale Information */}
         {sale && (
           <>
-            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="p-4 bg-accent-gold/10 border border-accent-gold/30 rounded-lg">
               <div className="flex items-start justify-between mb-3">
                 <div>
-                  <p className="text-sm font-medium text-gray-700">Sale Information</p>
-                  <p className="text-xs text-gray-600">
+                  <p className="text-sm font-medium text-theme-primary">Sale Information</p>
+                  <p className="text-xs text-theme-muted">
                     {new Date(sale.sale_date).toLocaleDateString()}
                   </p>
                 </div>
@@ -244,15 +246,15 @@ const ReturnFormModal = ({
 
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
-                  <span className="text-gray-600">Customer:</span>
-                  <span className="ml-2 font-medium text-gray-900">
+                  <span className="text-theme-muted">Customer:</span>
+                  <span className="ml-2 font-medium text-theme-primary">
                     {sale.customer_name || 'Walk-in Customer'}
                   </span>
                 </div>
                 <div>
-                  <span className="text-gray-600">Total:</span>
-                  <span className="ml-2 font-medium text-gray-900">
-                    ${parseFloat(sale.total).toFixed(2)}
+                  <span className="text-theme-muted">Total:</span>
+                  <span className="ml-2 font-medium text-theme-primary">
+                    {formatCurrency(sale.total)}
                   </span>
                 </div>
               </div>
@@ -260,7 +262,7 @@ const ReturnFormModal = ({
 
             {/* Return Type */}
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+              <h3 className="text-sm font-semibold text-theme-primary uppercase tracking-wide">
                 Return Type
               </h3>
 
@@ -270,19 +272,19 @@ const ReturnFormModal = ({
                   onClick={() => handleChange('return_type', 'refund')}
                   className={`p-4 rounded-lg border-2 transition-all ${
                     formData.return_type === 'refund'
-                      ? 'border-blue-600 bg-blue-50'
-                      : 'border-gray-200 hover:border-gray-300'
+                      ? 'border-accent-gold bg-accent-gold/10'
+                      : 'border-theme hover:bg-theme-tertiary'
                   }`}
                 >
                   <DollarSign className={`w-6 h-6 mx-auto mb-2 ${
-                    formData.return_type === 'refund' ? 'text-blue-600' : 'text-gray-400'
+                    formData.return_type === 'refund' ? 'text-accent-gold' : 'text-theme-muted'
                   }`} />
                   <p className={`font-medium ${
-                    formData.return_type === 'refund' ? 'text-blue-900' : 'text-gray-900'
+                    formData.return_type === 'refund' ? 'text-accent-gold' : 'text-theme-primary'
                   }`}>
                     Refund
                   </p>
-                  <p className="text-xs text-gray-600 mt-1">Return money to customer</p>
+                  <p className="text-xs text-theme-muted mt-1">Return money to customer</p>
                 </button>
 
                 <button
@@ -290,38 +292,38 @@ const ReturnFormModal = ({
                   onClick={() => handleChange('return_type', 'exchange')}
                   className={`p-4 rounded-lg border-2 transition-all ${
                     formData.return_type === 'exchange'
-                      ? 'border-green-600 bg-green-50'
-                      : 'border-gray-200 hover:border-gray-300'
+                      ? 'border-emerald-600 bg-emerald-50'
+                      : 'border-theme hover:bg-theme-tertiary'
                   }`}
                 >
                   <RotateCcw className={`w-6 h-6 mx-auto mb-2 ${
-                    formData.return_type === 'exchange' ? 'text-green-600' : 'text-gray-400'
+                    formData.return_type === 'exchange' ? 'text-emerald-600' : 'text-theme-muted'
                   }`} />
                   <p className={`font-medium ${
-                    formData.return_type === 'exchange' ? 'text-green-900' : 'text-gray-900'
+                    formData.return_type === 'exchange' ? 'text-emerald-900' : 'text-theme-primary'
                   }`}>
                     Exchange
                   </p>
-                  <p className="text-xs text-gray-600 mt-1">Replace with other items</p>
+                  <p className="text-xs text-theme-muted mt-1">Replace with other items</p>
                 </button>
               </div>
             </div>
 
             {/* Return Reason */}
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+              <h3 className="text-sm font-semibold text-theme-primary uppercase tracking-wide">
                 General Return Reason
               </h3>
 
               <div className="space-y-1">
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-theme-primary">
                   Overall Reason <span className="text-red-500">*</span>
                 </label>
                 <select
                   value={formData.reason}
                   onChange={(e) => handleChange('reason', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                    errors.reason ? 'border-red-500' : 'border-gray-300'
+                  className={`w-full px-3 py-2.5 bg-theme-primary border rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 transition-all text-sm text-theme-primary ${
+                    errors.reason ? 'border-red-500' : 'border-theme'
                   }`}
                 >
                   <option value="">Select reason...</option>
@@ -337,14 +339,14 @@ const ReturnFormModal = ({
               </div>
 
               <div className="space-y-1">
-                <label className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-theme-primary">
                   Additional Notes
                 </label>
                 <textarea
                   value={formData.notes}
                   onChange={(e) => handleChange('notes', e.target.value)}
                   rows={2}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-3 py-2.5 bg-theme-primary border border-theme rounded-lg focus:outline-none focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 transition-all text-sm text-theme-primary placeholder-theme-muted"
                   placeholder="Optional details about the return..."
                 />
               </div>
@@ -352,36 +354,36 @@ const ReturnFormModal = ({
 
             {/* Items to Return */}
             <div className="space-y-4">
-              <h3 className="text-sm font-semibold text-gray-700 uppercase tracking-wide">
+              <h3 className="text-sm font-semibold text-theme-primary uppercase tracking-wide">
                 Items to Return {errors.items && <span className="text-red-500 text-xs normal-case">({errors.items})</span>}
               </h3>
 
-              <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <div className="border border-theme rounded-lg overflow-hidden">
                 <table className="w-full">
-                  <thead className="bg-gray-50 border-b border-gray-200">
+                  <thead className="bg-theme-tertiary border-b border-theme">
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Product</th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase">Sold</th>
-                      <th className="px-4 py-3 text-center text-xs font-medium text-gray-700 uppercase">Return Qty</th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Reason</th>
-                      <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase">Amount</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-theme-primary uppercase">Product</th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-theme-primary uppercase">Sold</th>
+                      <th className="px-4 py-3 text-center text-xs font-medium text-theme-primary uppercase">Return Qty</th>
+                      <th className="px-4 py-3 text-left text-xs font-medium text-theme-primary uppercase">Reason</th>
+                      <th className="px-4 py-3 text-right text-xs font-medium text-theme-primary uppercase">Amount</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-200">
+                  <tbody className="divide-y divide-theme">
                     {formData.items.map((item, index) => {
                       const returnAmount = item.quantity_returned * item.unit_price;
 
                       return (
-                        <tr key={index} className="hover:bg-gray-50">
+                        <tr key={index} className="hover:bg-theme-tertiary">
                           <td className="px-4 py-3">
                             <div>
-                              <p className="font-medium text-gray-900">{item.product_name}</p>
+                              <p className="font-medium text-theme-primary">{item.product_name}</p>
                               {item.variant_name && (
-                                <p className="text-xs text-gray-500">{item.variant_name}</p>
+                                <p className="text-xs text-theme-muted">{item.variant_name}</p>
                               )}
                             </div>
                           </td>
-                          <td className="px-4 py-3 text-center font-medium text-gray-900">
+                          <td className="px-4 py-3 text-center font-medium text-theme-primary">
                             {item.sold_quantity}
                           </td>
                           <td className="px-4 py-3">
@@ -391,8 +393,8 @@ const ReturnFormModal = ({
                               max={item.sold_quantity}
                               value={item.quantity_returned}
                               onChange={(e) => handleItemChange(index, 'quantity_returned', parseInt(e.target.value) || 0)}
-                              className={`w-20 px-2 py-1 text-center border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                errors[`item_${index}`] ? 'border-red-500' : 'border-gray-300'
+                              className={`w-20 px-2 py-1 text-center bg-theme-primary border rounded focus:outline-none focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 text-theme-primary ${
+                                errors[`item_${index}`] ? 'border-red-500' : 'border-theme'
                               }`}
                             />
                             {errors[`item_${index}`] && (
@@ -404,8 +406,8 @@ const ReturnFormModal = ({
                               value={item.return_reason}
                               onChange={(e) => handleItemChange(index, 'return_reason', e.target.value)}
                               disabled={item.quantity_returned === 0}
-                              className={`w-full px-2 py-1 text-sm border rounded focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                                errors[`item_reason_${index}`] ? 'border-red-500' : 'border-gray-300'
+                              className={`w-full px-2 py-1 text-sm bg-theme-primary border rounded focus:outline-none focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 text-theme-primary ${
+                                errors[`item_reason_${index}`] ? 'border-red-500' : 'border-theme'
                               }`}
                             >
                               <option value="">Select...</option>
@@ -419,20 +421,20 @@ const ReturnFormModal = ({
                               <p className="text-xs text-red-600 mt-1">{errors[`item_reason_${index}`]}</p>
                             )}
                           </td>
-                          <td className="px-4 py-3 text-right font-medium text-gray-900">
-                            ${returnAmount.toFixed(2)}
+                          <td className="px-4 py-3 text-right font-medium text-theme-primary">
+                            {formatCurrency(returnAmount)}
                           </td>
                         </tr>
                       );
                     })}
                   </tbody>
-                  <tfoot className="bg-gray-50 border-t-2 border-gray-300">
+                  <tfoot className="bg-accent-gold/10 border-t-2 border-accent-gold/30">
                     <tr>
-                      <td colSpan="4" className="px-4 py-3 text-right font-semibold text-gray-900">
+                      <td colSpan="4" className="px-4 py-3 text-right font-semibold text-theme-primary">
                         Total Return Amount:
                       </td>
-                      <td className="px-4 py-3 text-right font-bold text-gray-900 text-lg">
-                        ${totalReturnAmount.toFixed(2)}
+                      <td className="px-4 py-3 text-right font-bold text-accent-gold text-lg">
+                        {formatCurrency(totalReturnAmount)}
                       </td>
                     </tr>
                   </tfoot>
@@ -442,9 +444,9 @@ const ReturnFormModal = ({
 
             {/* Warning */}
             {formData.return_type === 'exchange' && (
-              <div className="flex items-start gap-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                <p className="text-sm text-blue-800">
+              <div className="flex items-start gap-2 p-3 bg-accent-gold/10 border border-accent-gold/30 rounded-lg">
+                <AlertCircle className="w-5 h-5 text-accent-gold flex-shrink-0 mt-0.5" />
+                <p className="text-sm text-theme-primary">
                   Exchange items can be selected after the return request is approved.
                 </p>
               </div>

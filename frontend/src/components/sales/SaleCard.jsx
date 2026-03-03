@@ -1,9 +1,11 @@
 import React from 'react';
 import { useCart } from '../../context/CartContext';
+import { useCurrency } from '../../context/CurrencyContext';
 import { CheckCircle, Clock, User } from 'lucide-react';
 import { format } from 'date-fns';
 
 const SaleCard = ({ sale, onClick }) => {
+    const { formatCurrency } = useCurrency();
     const isReversed = !!sale.reversed_at;
 
     const getStatusStyles = () => {
@@ -49,7 +51,7 @@ const SaleCard = ({ sale, onClick }) => {
                     {sale.payment_method}
                 </div>
                 <div className="text-xl font-black text-gray-900 tracking-tighter group-hover:text-blue-600 transition-colors">
-                    ₦{parseFloat(sale.total_amount).toLocaleString()}
+                    {formatCurrency(sale.total_amount)}
                 </div>
             </div>
         </div>

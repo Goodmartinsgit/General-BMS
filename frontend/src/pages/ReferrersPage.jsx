@@ -1,20 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { Plus, Edit, Trash2, User, Search, Filter, Phone, Mail, Banknote, DollarSign, Wallet, ArrowUpRight, History } from 'lucide-react';
+import api from '../api/axios';
+import { Plus, Edit, Trash2, User, Search, Phone, Mail, Banknote, Wallet, TrendingUp, Download, Users } from 'lucide-react';
+import PageHeader from '../components/common/PageHeader';
 import ReferrerFormModal from '../components/ReferrerFormModal';
 import CommissionPaymentModal from '../components/CommissionPaymentModal';
-
+import { useCurrency } from '../context/CurrencyContext';
 
 const ReferrersPage = () => {
+    const { formatCurrency } = useCurrency();
     const [referrers, setReferrers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
     const [selectedReferrer, setSelectedReferrer] = useState(null);
-
-
-    const API_URL = 'http://localhost:5000/api';
 
     useEffect(() => {
         fetchReferrers();
@@ -23,7 +22,7 @@ const ReferrersPage = () => {
     const fetchReferrers = async () => {
         try {
             setLoading(true);
-            const response = await axios.get(`${API_URL}/referrers`);
+            const response = await api.get('/referrers');
             setReferrers(response.data);
         } catch (error) {
             console.error('Error fetching referrers:', error);
@@ -45,7 +44,7 @@ const ReferrersPage = () => {
     const handleDeleteReferrer = async (id) => {
         if (window.confirm('Are you sure you want to delete this referrer?')) {
             try {
-                await axios.delete(`${API_URL}/referrers/${id}`);
+                await api.delete(`/referrers/${id}`);
                 fetchReferrers();
             } catch (error) {
                 alert('Failed to delete referrer');
@@ -60,7 +59,7 @@ const ReferrersPage = () => {
 
     const handlePaymentSubmit = async (paymentData) => {
         try {
-            await axios.post(`${API_URL}/referrers/pay`, paymentData);
+            await api.post('/referrers/pay', paymentData);
             setIsPaymentModalOpen(false);
             fetchReferrers();
             alert('Commission payment processed successfully!');
@@ -69,13 +68,12 @@ const ReferrersPage = () => {
         }
     };
 
-
     const handleModalSubmit = async (formData) => {
         try {
             if (selectedReferrer) {
-                await axios.put(`${API_URL}/referrers/${selectedReferrer.id}`, formData);
+                await api.put(`/referrers/${selectedReferrer.id}`, formData);
             } else {
-                await axios.post(`${API_URL}/referrers`, formData);
+                await api.post('/referrers', formData);
             }
             setIsModalOpen(false);
             fetchReferrers();
@@ -85,172 +83,210 @@ const ReferrersPage = () => {
     };
 
     const filteredReferrers = referrers.filter(r => {
-        return r.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        return r.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
                r.phone?.includes(searchTerm) ||
                r.referrer_code?.toLowerCase().includes(searchTerm.toLowerCase());
     });
 
-    return (
-        <div className="space-y-6">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h2 className="text-2xl font-bold text-gray-800">Referrer & Commissions Management</h2>
-                    <p className="text-sm text-gray-500">Track agents, manage referrals, and process commission payments.</p>
-                </div>
-                <button
-                    onClick={handleAddReferrer}
-                    className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition shadow-md"
-                >
-                    <Plus size={20} /> Register New Referrer
-                </button>
-            </div>
+    const activeReferrers = referrers.filter(r => r.is_active).length;
+    const pendingCommissions = referrers.reduce((acc, r) => acc + parseFloat(r.commission_balance || 0), 0);
+    const totalEarned = referrers.reduce((acc, r) => acc + parseFloat(r.total_commission_earned || 0), 0);
 
+    const actions = (
+        <>
+            <button className="bg-theme-secondary border border-theme text-theme-secondary px-4 py-2 rounded-lg font-medium text-sm hover:bg-theme-tertiary transition flex items-center gap-2">
+                <Download size={16} /> Export
+            </button>
+            <button
+                onClick={handleAddReferrer}
+                className="bg-accent-gold text-white px-4 py-2 rounded-lg font-semibold text-sm hover:bg-accent-goldDark transition flex items-center gap-2"
+            >
+                <Plus className="w-4 h-4" /> Add Referrer
+            </button>
+        </>
+    );
+
+    return (
+        <div className="space-y-6 max-w-[1700px] mx-auto pb-10">
+            <PageHeader
+                title="Referrers"
+                subtitle="Manage referrers and commission payments"
+                badge={`${referrers.length} Referrers`}
+                icon={Users}
+                actions={actions}
+            />
+
+            {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-                    <div className="p-3 bg-blue-50 text-blue-600 rounded-xl">
+                <div className="bg-theme-secondary p-6 rounded-lg border border-theme shadow-theme-sm flex items-center gap-4">
+                    <div className="p-3 bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 rounded-lg">
                         <User size={24} />
                     </div>
                     <div>
-                        <div className="text-sm text-gray-500 font-medium">Active Referrers</div>
-                        <div className="text-2xl font-bold text-gray-900">{referrers.filter(r => r.is_active).length}</div>
+                        <div className="text-sm text-theme-muted font-medium">Active Referrers</div>
+                        <div className="text-2xl font-semibold text-theme-primary">{activeReferrers}</div>
                     </div>
                 </div>
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-                    <div className="p-3 bg-green-50 text-green-600 rounded-xl">
+                <div className="bg-theme-secondary p-6 rounded-lg border border-theme shadow-theme-sm flex items-center gap-4">
+                    <div className="p-3 bg-green-100 text-green-600 dark:bg-green-900/20 dark:text-green-400 rounded-lg">
                         <Wallet size={24} />
                     </div>
                     <div>
-                        <div className="text-sm text-gray-500 font-medium">Pending Commissions</div>
-                        <div className="text-2xl font-bold text-gray-900">
-                            ₦{referrers.reduce((acc, r) => acc + parseFloat(r.commission_balance || 0), 0).toLocaleString()}
+                        <div className="text-sm text-theme-muted font-medium">Pending Commissions</div>
+                        <div className="text-2xl font-semibold text-theme-primary">
+                            {formatCurrency(pendingCommissions)}
                         </div>
                     </div>
                 </div>
-                <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
-                    <div className="p-3 bg-amber-50 text-amber-600 rounded-xl">
-                        <ArrowUpRight size={24} />
+                <div className="bg-theme-secondary p-6 rounded-lg border border-theme shadow-theme-sm flex items-center gap-4">
+                    <div className="p-3 bg-amber-100 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400 rounded-lg">
+                        <TrendingUp size={24} />
                     </div>
                     <div>
-                        <div className="text-sm text-gray-500 font-medium">Total Earned</div>
-                        <div className="text-2xl font-bold text-gray-900">
-                            ₦{referrers.reduce((acc, r) => acc + parseFloat(r.total_commission_earned || 0), 0).toLocaleString()}
+                        <div className="text-sm text-theme-muted font-medium">Total Earned</div>
+                        <div className="text-2xl font-semibold text-theme-primary">
+                            {formatCurrency(totalEarned)}
                         </div>
                     </div>
                 </div>
             </div>
 
-            <div className="bg-white p-4 rounded-lg shadow-sm border flex flex-wrap gap-4 items-center">
-                <div className="relative flex-1 min-w-[300px]">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+            {/* Search Bar */}
+            <div className="bg-theme-secondary p-4 rounded-lg border border-theme shadow-theme-sm">
+                <div className="relative w-full">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-muted w-5 h-5 pointer-events-none" />
                     <input
                         type="text"
                         placeholder="Search by name, code or phone..."
-                        className="pl-10 pr-4 py-2 bg-gray-50 border rounded-lg w-full focus:ring-2 focus:ring-blue-500 outline-none transition"
+                        className="w-full pl-10 pr-4 py-2.5 bg-theme-primary border border-theme rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none transition-all text-sm text-theme-primary placeholder-theme-muted"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
-                <div className="flex items-center gap-2">
-                    <Filter size={18} className="text-gray-400" />
-                    <span className="text-sm text-gray-500 font-medium">Filters Applied: 0</span>
-                </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-                <table className="w-full text-left border-collapse">
-                    <thead className="bg-slate-50 text-slate-500 uppercase text-[10px] font-bold tracking-widest border-b">
-                        <tr>
-                            <th className="px-6 py-4">Referrer Details</th>
-                            <th className="px-6 py-4">Contact Info</th>
-                            <th className="px-6 py-4">Config / Rate</th>
-                            <th className="px-6 py-4">Earnings Status</th>
-                            <th className="px-6 py-4 text-center">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                        {loading ? (
-                            <tr>
-                                <td colSpan="5" className="px-6 py-20 text-center">
-                                    <div className="flex flex-col items-center gap-2 text-gray-400">
-                                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                                        <span>Synchronizing with database...</span>
-                                    </div>
-                                </td>
+            {/* Referrers Table */}
+            <div className="bg-theme-secondary rounded-lg border border-theme shadow-theme-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                        <thead>
+                            <tr className="bg-theme-primary border-b border-theme">
+                                <th className="px-6 py-3 text-xs font-semibold text-theme-muted uppercase">Referrer</th>
+                                <th className="px-6 py-3 text-xs font-semibold text-theme-muted uppercase">Contact</th>
+                                <th className="px-6 py-3 text-xs font-semibold text-theme-muted uppercase">Commission</th>
+                                <th className="px-6 py-3 text-xs font-semibold text-theme-muted uppercase">Earnings</th>
+                                <th className="px-6 py-3 text-xs font-semibold text-theme-muted uppercase text-right">Actions</th>
                             </tr>
-                        ) : filteredReferrers.length === 0 ? (
-                            <tr>
-                                <td colSpan="5" className="px-6 py-20 text-center text-gray-400">
-                                    No referrer records found.
-                                </td>
-                            </tr>
-                        ) : (
-                            filteredReferrers.map((ref) => (
-                                <tr key={ref.id} className="hover:bg-slate-50 transition-colors group">
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-blue-50 text-blue-600 rounded-full">
-                                                <User size={18} />
+                        </thead>
+                        <tbody className="divide-y divide-theme">
+                            {loading ? (
+                                Array(5).fill(0).map((_, i) => (
+                                    <tr key={i} className="animate-pulse">
+                                        <td colSpan="5" className="px-6 py-8">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 bg-theme-tertiary rounded-lg"></div>
+                                                <div className="space-y-2 flex-1">
+                                                    <div className="w-48 h-4 bg-theme-tertiary rounded"></div>
+                                                    <div className="w-32 h-3 bg-theme-tertiary rounded"></div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            ) : filteredReferrers.length === 0 ? (
+                                <tr>
+                                    <td colSpan="5" className="px-6 py-16 text-center">
+                                        <div className="flex flex-col items-center gap-4">
+                                            <div className="w-16 h-16 bg-theme-tertiary rounded-full flex items-center justify-center text-theme-muted">
+                                                <Users size={32} />
                                             </div>
                                             <div>
-                                                <div className="font-bold text-gray-900 uppercase text-sm">{ref.full_name}</div>
-                                                <div className="text-[10px] text-gray-400 font-mono tracking-tighter">{ref.referrer_code}</div>
+                                                <p className="font-semibold text-theme-primary text-lg">No referrers found</p>
+                                                <p className="text-theme-muted text-sm mt-1">Try adjusting your search or add a new referrer.</p>
                                             </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-sm">
-                                        <div className="flex flex-col gap-1 text-gray-600">
-                                            <div className="flex items-center gap-1.5"><Phone size={12} className="text-gray-400" /> {ref.phone}</div>
-                                            <div className="flex items-center gap-1.5"><Mail size={12} className="text-gray-400" /> {ref.email || 'N/A'}</div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-1.5 mb-1">
-                                            <span className="text-[10px] font-black px-2 py-0.5 rounded uppercase bg-slate-100 text-slate-700">
-                                                {ref.commission_type}
-                                            </span>
-                                        </div>
-                                        <div className="text-sm font-bold text-blue-600">
-                                            {ref.commission_type === 'percentage' ? `${ref.commission_rate}%` : `₦${parseFloat(ref.fixed_commission_amount).toLocaleString()}`}
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex flex-col gap-1">
-                                            <div className="flex items-center justify-between text-[10px] uppercase font-bold">
-                                                <span className="text-gray-400">Balance:</span>
-                                                <span className="text-green-600">₦{parseFloat(ref.commission_balance).toLocaleString()}</span>
-                                            </div>
-                                            <div className="w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
-                                                <div className="bg-green-500 h-full" style={{ width: `${Math.min((ref.total_commission_paid / ref.total_commission_earned) * 100 || 0, 100)}%` }}></div>
-                                            </div>
-                                            <div className="flex items-center justify-between text-[9px] text-gray-400 font-medium">
-                                                <span>Paid: ₦{parseFloat(ref.total_commission_paid).toLocaleString()}</span>
-                                                <span>Total: ₦{parseFloat(ref.total_commission_earned).toLocaleString()}</span>
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex justify-center gap-3">
-                                            <button onClick={() => handleEditReferrer(ref)} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Edit Referrer">
-                                                <Edit size={18} />
-                                            </button>
-                                            <button 
-                                                onClick={() => handlePayCommission(ref)}
-                                                className="p-2 text-slate-400 hover:text-green-600 hover:bg-green-50 rounded-lg transition" 
-                                                title="Pay Commission"
-                                            >
-                                                <Banknote size={18} />
-                                            </button>
-
-                                            <button onClick={() => handleDeleteReferrer(ref.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition" title="Delete Referrer">
-                                                <Trash2 size={18} />
-                                            </button>
                                         </div>
                                     </td>
                                 </tr>
-                            ))
-                        )}
-                    </tbody>
-                </table>
+                            ) : (
+                                filteredReferrers.map((ref) => (
+                                    <tr key={ref.id} className="hover:bg-theme-primary transition-colors group">
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-10 h-10 bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 rounded-lg flex items-center justify-center">
+                                                    <User size={20} />
+                                                </div>
+                                                <div>
+                                                    <div className="font-semibold text-theme-primary text-sm">{ref.full_name}</div>
+                                                    <div className="text-xs text-theme-muted font-mono mt-0.5">{ref.referrer_code}</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="space-y-1">
+                                                <div className="flex items-center gap-2 text-sm text-theme-secondary">
+                                                    <Phone size={14} className="text-theme-muted" /> {ref.phone}
+                                                </div>
+                                                <div className="flex items-center gap-2 text-xs text-theme-muted">
+                                                    <Mail size={14} className="text-theme-muted" /> {ref.email || 'N/A'}
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="space-y-1">
+                                                <span className="inline-block text-xs font-medium px-2.5 py-1 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-300">
+                                                    {ref.commission_type}
+                                                </span>
+                                                <div className="text-sm font-semibold text-accent-gold">
+                                                    {ref.commission_type === 'percentage' ? `${ref.commission_rate}%` : `${formatCurrency(ref.fixed_commission_amount)}`}
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="space-y-1.5">
+                                                <div className="flex items-center justify-between text-xs">
+                                                    <span className="text-theme-muted">Balance:</span>
+                                                    <span className="font-semibold text-green-600 dark:text-green-400">{formatCurrency(ref.commission_balance)}</span>
+                                                </div>
+                                                <div className="w-full bg-theme-tertiary h-1.5 rounded-full overflow-hidden">
+                                                    <div className="bg-green-500 h-full" style={{ width: `${Math.min((ref.total_commission_paid / ref.total_commission_earned) * 100 || 0, 100)}%` }}></div>
+                                                </div>
+                                                <div className="flex items-center justify-between text-[10px] text-theme-muted">
+                                                    <span>Paid: {formatCurrency(ref.total_commission_paid)}</span>
+                                                    <span>Total: {formatCurrency(ref.total_commission_earned)}</span>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <button
+                                                    onClick={() => handleEditReferrer(ref)}
+                                                    className="p-2 text-theme-muted hover:text-accent-gold hover:bg-accent-gold/10 rounded-lg transition"
+                                                    title="Edit Referrer"
+                                                >
+                                                    <Edit size={16} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handlePayCommission(ref)}
+                                                    className="p-2 text-theme-muted hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition"
+                                                    title="Pay Commission"
+                                                >
+                                                    <Banknote size={16} />
+                                                </button>
+                                                <button
+                                                    onClick={() => handleDeleteReferrer(ref.id)}
+                                                    className="p-2 text-theme-muted hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"
+                                                    title="Delete Referrer"
+                                                >
+                                                    <Trash2 size={16} />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))
+                            )}
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             <ReferrerFormModal

@@ -86,37 +86,37 @@ const CustomerFormModal = ({ isOpen, onClose, onSubmit, customer, priceTiers, re
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto py-10">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-4xl my-auto">
-                <div className="flex justify-between items-center p-4 border-b">
-                    <h2 className="text-xl font-semibold">{customer ? 'Edit Customer' : 'Add New Customer'}</h2>
-                    <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
+            <div className="bg-theme-secondary rounded-lg shadow-xl w-full max-w-4xl my-auto">
+                <div className="flex justify-between items-center p-4 border-b border-theme">
+                    <h2 className="text-xl font-semibold text-theme-primary">{customer ? 'Edit Customer' : 'Add New Customer'}</h2>
+                    <button onClick={onClose} className="text-theme-muted hover:text-theme-primary transition">
                         <X size={24} />
                     </button>
                 </div>
                 <form onSubmit={handleSubmit} className="p-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-                        <div className="col-span-1 lg:col-span-3 pb-2 border-b">
-                            <h3 className="text-sm font-bold text-blue-600 uppercase tracking-wider">Basic Information</h3>
+                        <div className="col-span-1 lg:col-span-3 pb-2 border-b border-theme">
+                            <h3 className="text-sm font-semibold text-accent-gold uppercase">Basic Information</h3>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Customer Number</label>
+                            <label className="block text-sm font-medium text-theme-secondary mb-1">Customer Number</label>
                             <input
                                 type="text"
                                 name="customer_number"
                                 value={formData.customer_number}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none font-mono text-sm"
+                                className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none font-mono text-sm"
                                 required
                                 disabled={!!customer}
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Customer Type</label>
+                            <label className="block text-sm font-medium text-theme-secondary mb-1">Customer Type</label>
                             <select
                                 name="customer_type"
                                 value={formData.customer_type}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                                className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none"
                                 required
                             >
                                 <option value="Retail">Retail</option>
@@ -124,82 +124,82 @@ const CustomerFormModal = ({ isOpen, onClose, onSubmit, customer, priceTiers, re
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Customer/Company Name</label>
+                            <label className="block text-sm font-medium text-theme-secondary mb-1">Customer/Company Name</label>
                             <input
                                 type="text"
                                 name="customer_name"
                                 value={formData.customer_name}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                                className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none"
                                 required
                             />
                         </div>
 
-                        <div className="col-span-1 lg:col-span-3 pb-2 border-b mt-4">
-                            <h3 className="text-sm font-bold text-blue-600 uppercase tracking-wider">Contact Details</h3>
+                        <div className="col-span-1 lg:col-span-3 pb-2 border-b border-theme mt-4">
+                            <h3 className="text-sm font-semibold text-accent-gold uppercase">Contact Details</h3>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Contact Person</label>
+                            <label className="block text-sm font-medium text-theme-secondary mb-1">Contact Person</label>
                             <input
                                 type="text"
                                 name="contact_person"
                                 value={formData.contact_person}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                                className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                            <label className="block text-sm font-medium text-theme-secondary mb-1">Email Address</label>
                             <input
                                 type="email"
                                 name="email"
                                 value={formData.email}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                                className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                            <label className="block text-sm font-medium text-theme-secondary mb-1">Phone Number</label>
                             <input
                                 type="text"
                                 name="phone_number"
                                 value={formData.phone_number}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                                className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none"
                                 required
                             />
                         </div>
                         <div className="md:col-span-2">
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+                            <label className="block text-sm font-medium text-theme-secondary mb-1">Address</label>
                             <input
                                 type="text"
                                 name="address"
                                 value={formData.address}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                                className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+                            <label className="block text-sm font-medium text-theme-secondary mb-1">City</label>
                             <input
                                 type="text"
                                 name="city"
                                 value={formData.city}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                                className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none"
                             />
                         </div>
 
-                        <div className="col-span-1 lg:col-span-3 pb-2 border-b mt-4">
-                            <h3 className="text-sm font-bold text-blue-600 uppercase tracking-wider">Pricing & Credit</h3>
+                        <div className="col-span-1 lg:col-span-3 pb-2 border-b border-theme mt-4">
+                            <h3 className="text-sm font-semibold text-accent-gold uppercase">Pricing & Credit</h3>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Price Tier</label>
+                            <label className="block text-sm font-medium text-theme-secondary mb-1">Price Tier</label>
                             <select
                                 name="price_tier_id"
                                 value={formData.price_tier_id}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                                className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none"
                             >
                                 <option value="">Standard Retail</option>
                                 {priceTiers.map(tier => (
@@ -208,12 +208,12 @@ const CustomerFormModal = ({ isOpen, onClose, onSubmit, customer, priceTiers, re
                             </select>
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-blue-600 mb-1">Referrer / Agent</label>
+                            <label className="block text-sm font-medium text-theme-secondary mb-1">Referrer / Agent</label>
                             <select
                                 name="referred_by"
                                 value={formData.referred_by}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border border-blue-100 bg-blue-50/30 rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                                className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none"
                             >
                                 <option value="">No Referrer</option>
                                 {referrers.map(ref => (
@@ -223,23 +223,23 @@ const CustomerFormModal = ({ isOpen, onClose, onSubmit, customer, priceTiers, re
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Credit Limit</label>
+                            <label className="block text-sm font-medium text-theme-secondary mb-1">Credit Limit</label>
                             <input
                                 type="number"
                                 name="credit_limit"
                                 value={formData.credit_limit}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                                className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none"
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Payment Terms (Days)</label>
+                            <label className="block text-sm font-medium text-theme-secondary mb-1">Payment Terms (Days)</label>
                             <input
                                 type="number"
                                 name="payment_terms_days"
                                 value={formData.payment_terms_days}
                                 onChange={handleChange}
-                                className="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-blue-500 outline-none"
+                                className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none"
                             />
                         </div>
                     </div>
@@ -251,24 +251,24 @@ const CustomerFormModal = ({ isOpen, onClose, onSubmit, customer, priceTiers, re
                             id="cust_active"
                             checked={formData.is_active}
                             onChange={handleChange}
-                            className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            className="w-4 h-4 text-accent-gold border-theme rounded focus:ring-accent-gold"
                         />
-                        <label htmlFor="cust_active" className="text-sm font-medium text-gray-700">Active Account</label>
+                        <label htmlFor="cust_active" className="text-sm font-medium text-theme-secondary">Active Account</label>
                     </div>
 
-                    <div className="flex justify-end gap-3 pt-6 border-t font-semibold">
+                    <div className="flex justify-end gap-3 pt-6 border-t border-theme font-semibold">
                         <button
                             type="button"
                             onClick={onClose}
-                            className="px-6 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition"
+                            className="px-6 py-2 text-theme-secondary bg-theme-primary hover:bg-theme-tertiary border border-theme rounded-lg transition"
                         >
-                            Discard
+                            Cancel
                         </button>
                         <button
                             type="submit"
-                            className="px-8 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow-md transition"
+                            className="px-8 py-2 bg-accent-gold text-white rounded-lg hover:bg-accent-goldDark shadow-md transition"
                         >
-                            {customer ? 'Update Customer Record' : 'Save Customer Record'}
+                            {customer ? 'Update Customer' : 'Save Customer'}
                         </button>
                     </div>
                 </form>

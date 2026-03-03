@@ -21,7 +21,7 @@ const getAllVariantOptions = async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Error fetching variant options:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -49,7 +49,7 @@ const createVariantOption = async (req, res) => {
       return res.status(400).json({ message: 'Variant option already exists' });
     }
     console.error('Error creating variant option:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -106,7 +106,7 @@ const updateVariantOption = async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Error updating variant option:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -144,7 +144,7 @@ const deleteVariantOption = async (req, res) => {
     res.json({ message: 'Variant option deleted successfully' });
   } catch (err) {
     console.error('Error deleting variant option:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -173,7 +173,7 @@ const getVariantValues = async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Error fetching variant values:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -209,7 +209,7 @@ const createVariantValue = async (req, res) => {
       return res.status(400).json({ message: 'Value already exists for this option' });
     }
     console.error('Error creating variant value:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -261,7 +261,7 @@ const bulkCreateVariantValues = async (req, res) => {
     }
   } catch (err) {
     console.error('Error bulk creating variant values:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -335,7 +335,7 @@ const updateVariantValue = async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Error updating variant value:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -359,7 +359,7 @@ const deleteVariantValue = async (req, res) => {
     res.json({ message: 'Variant value deleted successfully' });
   } catch (err) {
     console.error('Error deleting variant value:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -414,7 +414,7 @@ const getProductVariants = async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Error fetching product variants:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -534,7 +534,7 @@ const createProductVariant = async (req, res) => {
       return res.status(400).json({ message: 'SKU already exists' });
     }
     console.error('Error creating product variant:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -611,7 +611,7 @@ const generateProductVariants = async (req, res) => {
     }
   } catch (err) {
     console.error('Error generating product variants:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -667,7 +667,7 @@ const updateProductVariant = async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Error updating product variant:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -703,7 +703,7 @@ const deleteProductVariant = async (req, res) => {
     res.json({ message: 'Variant deleted successfully' });
   } catch (err) {
     console.error('Error deleting product variant:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -732,7 +732,7 @@ const getVariantInventory = async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Error fetching variant inventory:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -787,7 +787,7 @@ const updateVariantInventory = async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Error updating variant inventory:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 

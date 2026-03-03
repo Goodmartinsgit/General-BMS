@@ -118,7 +118,7 @@ const updateReceiptConfig = async (req, res) => {
         });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ message: err.message || 'Server error' });
+        res.status(500).json({ message: 'Server error' });
     }
 };
 
@@ -253,7 +253,7 @@ const generateReceiptPDF = async (req, res) => {
         */
     } catch (err) {
         console.error(err);
-        res.status(500).json({ message: err.message || 'Server error' });
+        res.status(500).json({ message: 'Server error' });
     }
 };
 
@@ -268,7 +268,7 @@ const getReceiptData = async (req, res) => {
         res.json(receiptData);
     } catch (err) {
         console.error(err);
-        res.status(500).json({ message: err.message || 'Server error' });
+        res.status(500).json({ message: 'Server error' });
     }
 };
 
@@ -336,7 +336,7 @@ const emailReceipt = async (req, res) => {
         */
     } catch (err) {
         console.error(err);
-        res.status(500).json({ message: err.message || 'Server error' });
+        res.status(500).json({ message: 'Server error' });
     }
 };
 
@@ -394,7 +394,7 @@ const whatsappReceipt = async (req, res) => {
         */
     } catch (err) {
         console.error(err);
-        res.status(500).json({ message: err.message || 'Server error' });
+        res.status(500).json({ message: 'Server error' });
     }
 };
 
@@ -449,7 +449,7 @@ const printReceipt = async (req, res) => {
         });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ message: err.message || 'Server error' });
+        res.status(500).json({ message: 'Server error' });
     }
 };
 

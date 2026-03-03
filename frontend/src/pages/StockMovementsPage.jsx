@@ -1,13 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../api/axios';
 import { History, Calendar, User, ShoppingCart, RefreshCw, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 
 const StockMovementsPage = () => {
     const [movements, setMovements] = useState([]);
     const [loading, setLoading] = useState(true);
-
-    const API_URL = 'http://localhost:5000/api/inventory/movements';
 
     useEffect(() => {
         fetchMovements();
@@ -16,7 +14,7 @@ const StockMovementsPage = () => {
     const fetchMovements = async () => {
         try {
             setLoading(true);
-            const response = await axios.get(API_URL);
+            const response = await api.get('/inventory/movements');
             setMovements(response.data);
         } catch (error) {
             console.error('Error fetching movements:', error);

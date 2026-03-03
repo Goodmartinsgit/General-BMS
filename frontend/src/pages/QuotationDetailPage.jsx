@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { FiArrowLeft, FiPrinter, FiCheckCircle, FiTrash2, FiClock, FiCreditCard } from 'react-icons/fi';
-import axios from 'axios';
+import api from '../api/axios';
 import { format } from 'date-fns';
-
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+import { useCurrency } from '../context/CurrencyContext';
 
 const QuotationDetailPage = () => {
+    const { formatCurrency } = useCurrency();
     const { id } = useParams();
     const navigate = useNavigate();
     const [quotation, setQuotation] = useState(null);
@@ -29,7 +29,7 @@ const QuotationDetailPage = () => {
 
     const fetchQuotation = async () => {
         try {
-            const res = await axios.get(`${API_URL}/quotations/${id}`);
+            const res = await api.get(`/quotations/${id}`);
             setQuotation(res.data);
             setConvertData(prev => ({ ...prev, amount_paid: res.data.total_amount }));
         } catch (error) {
@@ -41,7 +41,7 @@ const QuotationDetailPage = () => {
 
     const fetchBankChannels = async () => {
         try {
-            const res = await axios.get(`${API_URL}/banks/channels`);
+            const res = await api.get('/banks/channels');
             setBankChannels(res.data);
         } catch (error) {
             console.error('Error fetching banks:', error);
@@ -52,7 +52,7 @@ const QuotationDetailPage = () => {
         e.preventDefault();
         setActionLoading(true);
         try {
-            const res = await axios.post(`${API_URL}/quotations/${id}/convert`, convertData);
+            const res = await api.post(`/quotations/${id}/convert`, convertData);
             alert('Quotation converted to sale successfully!');
             navigate(`/sales-history`); // Redirect to sales history
         } catch (error) {
@@ -122,8 +122,8 @@ const QuotationDetailPage = () => {
                                             <p className="text-[10px] text-gray-400 font-mono italic">{item.product_code}</p>
                                         </td>
                                         <td className="py-5 text-center font-bold text-gray-600 dark:text-gray-400">{item.quantity}</td>
-                                        <td className="py-5 text-right font-bold text-gray-600 dark:text-gray-400">₦{parseFloat(item.unit_price).toLocaleString()}</td>
-                                        <td className="py-5 text-right font-black text-gray-900 dark:text-white">₦{parseFloat(item.subtotal).toLocaleString()}</td>
+                                        <td className="py-5 text-right font-bold text-gray-600 dark:text-gray-400">{formatCurrency(item.unit_price)}</td>
+                                        <td className="py-5 text-right font-black text-gray-900 dark:text-white">{formatCurrency(item.subtotal)}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -138,7 +138,7 @@ const QuotationDetailPage = () => {
                         </div>
                         <div className="text-center md:text-right">
                             <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Grand Total</p>
-                            <p className="text-4xl font-black text-blue-600">₦{parseFloat(quotation.total_amount).toLocaleString()}</p>
+                            <p className="text-4xl font-black text-blue-600">{formatCurrency(quotation.total_amount)}</p>
                         </div>
                     </div>
                 </div>

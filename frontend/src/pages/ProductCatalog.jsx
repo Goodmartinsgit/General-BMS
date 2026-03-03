@@ -1,82 +1,46 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Plus,
-  Download,
-  Upload,
-  Filter,
-  Star,
-  Package,
-  Grid,
-  List,
-  Search,
-} from 'lucide-react';
-import {
-  Button,
-  SearchBar,
-  ViewModeToggle,
-  Badge,
-  LoadingSpinner,
-  EmptyState,
-  ConfirmDialog,
-} from '../components/ui';
-import {
-  ProductGrid,
-  ProductCard,
-  ProductListItem,
-  ProductFormModal,
-  ProductDetailView,
-} from '../components/product';
+import { Plus, Download, Filter, Star, Package, LayoutGrid, List, Search, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import Modal from '../components/ui/Modal';
+import PageHeader from '../components/common/PageHeader';
+import { ProductGrid, ProductListItem, ProductFormModal, ProductDetailView } from '../components/product';
+import { useCurrency } from '../context/CurrencyContext';
+import api from '../api/axios';
+import { toast } from 'react-toastify';
 
-/**
- * ProductCatalog Page
- * Main product listing page with filtering, search, and view modes
- */
+const inputClass = 'w-full px-3 py-2.5 bg-theme-primary border border-theme rounded-lg text-sm text-theme-primary placeholder-theme-muted focus:outline-none focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 transition-all';
+const labelClass = 'block text-sm font-medium text-theme-secondary mb-1';
+const PAGE_SIZE = 24;
+
 const ProductCatalog = () => {
-  // State
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [viewMode, setViewMode] = useState('grid'); // grid, list, compact, detailed
-  const [searchQuery, setSearchQuery] = useState('');
-  const [filters, setFilters] = useState({
-    product_type: '',
-    brand_id: '',
-    category_id: '',
-    is_active: 'all',
-    is_featured: false,
-    low_stock_only: false,
-    price_min: '',
-    price_max: '',
-  });
-  const [showFilters, setShowFilters] = useState(false);
-  const [showProductForm, setShowProductForm] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [showProductDetail, setShowProductDetail] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [productToDelete, setProductToDelete] = useState(null);
+  const { formatCurrency } = useCurrency();
 
-  // Filter options (these would come from API)
-  const [brands, setBrands] = useState([]);
+  const [products, setProducts]     = useState([]);
+  const [loading, setLoading]       = useState(false);
+  const [viewMode, setViewMode]     = useState('grid');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [filters, setFilters]       = useState({
+    product_type: '', brand_id: '', category_id: '',
+    is_active: 'all', is_featured: false, low_stock_only: false,
+  });
+
+  const [showForm, setShowForm]           = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [showDetail, setShowDetail]       = useState(false);
+  const [deleteModal, setDeleteModal]     = useState({ open: false, product: null });
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  const [brands, setBrands]         = useState([]);
   const [categories, setCategories] = useState([]);
 
-  // Pagination
-  const [page, setPage] = useState(1);
+  const [page, setPage]           = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
 
-  // Statistics
-  const [stats, setStats] = useState({
-    total_products: 0,
-    active_products: 0,
-    low_stock_count: 0,
-    total_value: 0,
-  });
+  const [stats, setStats] = useState({ total_products: 0, active_products: 0, low_stock_count: 0, total_value: 0 });
 
-  // Fetch products
-  useEffect(() => {
-    fetchProducts();
-  }, [page, searchQuery, filters]);
+  useEffect(() => { fetchProducts(); }, [page, searchQuery, filters]);
 
-  // Fetch filter options
   useEffect(() => {
     fetchBrands();
     fetchCategories();
@@ -86,335 +50,232 @@ const ProductCatalog = () => {
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      // TODO: Replace with actual API call
-      // Build query params
-      // const params = new URLSearchParams({
-      //   page,
-      //   limit: 20,
-      //   search: searchQuery,
-      //   ...filters,
-      // });
-      // const response = await fetch(`/api/products?${params}`);
-      // const data = await response.json();
+      const params = { page, limit: PAGE_SIZE };
+      if (searchQuery) params.search = searchQuery;
+      if (filters.product_type) params.product_type = filters.product_type;
+      if (filters.brand_id)     params.brand_id     = filters.brand_id;
+      if (filters.category_id)  params.category_id  = filters.category_id;
+      if (filters.is_active !== 'all') params.is_active = filters.is_active;
+      if (filters.is_featured)  params.is_featured  = true;
+      if (filters.low_stock_only) params.low_stock_only = true;
 
-      // Mock data for now
-      const mockData = [
-        {
-          id: '1',
-          product_name: 'Wireless Mouse',
-          product_code: 'PRD-0001',
-          product_type: 'physical',
-          selling_price: 29.99,
-          cost_price: 15.00,
-          quantity_on_hand: 45,
-          reorder_level: 20,
-          is_active: true,
-          is_featured: true,
-          brand_name: 'Logitech',
-          category_name: 'Electronics',
-          image_url: '',
-          has_variants: false,
-        },
-        {
-          id: '2',
-          product_name: 'USB-C Cable',
-          product_code: 'PRD-0002',
-          product_type: 'physical',
-          selling_price: 12.99,
-          cost_price: 5.00,
-          quantity_on_hand: 8,
-          reorder_level: 15,
-          is_active: true,
-          is_featured: false,
-          brand_name: 'Anker',
-          category_name: 'Electronics',
-          image_url: '',
-          has_variants: true,
-        },
-        {
-          id: '3',
-          product_name: 'Office Chair',
-          product_code: 'PRD-0003',
-          product_type: 'physical',
-          selling_price: 199.99,
-          cost_price: 120.00,
-          quantity_on_hand: 12,
-          reorder_level: 5,
-          is_active: true,
-          is_featured: false,
-          brand_name: 'Herman Miller',
-          category_name: 'Furniture',
-          image_url: '',
-          has_variants: false,
-        },
-      ];
-
-      setProducts(mockData);
-      setTotalCount(mockData.length);
-      setTotalPages(1);
-    } catch (error) {
-      console.error('Error fetching products:', error);
+      const res = await api.get('/products', { params });
+      const data = res.data;
+      setProducts(data.products || data.data || []);
+      setTotalCount(data.total || data.total_count || 0);
+      setTotalPages(Math.ceil((data.total || data.total_count || 0) / PAGE_SIZE) || 1);
+    } catch {
+      toast.error('Failed to load products');
     } finally {
       setLoading(false);
     }
   };
 
   const fetchBrands = async () => {
-    // TODO: Replace with actual API call
-    setBrands([
-      { id: '1', brand_name: 'Logitech' },
-      { id: '2', brand_name: 'Anker' },
-      { id: '3', brand_name: 'Herman Miller' },
-    ]);
+    try {
+      const res = await api.get('/products/brands');
+      setBrands(res.data?.brands || res.data || []);
+    } catch { /* silent */ }
   };
 
   const fetchCategories = async () => {
-    // TODO: Replace with actual API call
-    setCategories([
-      { id: '1', category_name: 'Electronics' },
-      { id: '2', category_name: 'Furniture' },
-      { id: '3', category_name: 'Office Supplies' },
-    ]);
+    try {
+      const res = await api.get('/products/categories');
+      setCategories(res.data?.categories || res.data || []);
+    } catch { /* silent */ }
   };
 
   const fetchStats = async () => {
-    // TODO: Replace with actual API call
-    setStats({
-      total_products: 156,
-      active_products: 142,
-      low_stock_count: 12,
-      total_value: 45678.90,
-    });
+    try {
+      const res = await api.get('/products/statistics');
+      setStats(res.data?.statistics || res.data || stats);
+    } catch { /* silent */ }
   };
 
-  const handleCreateProduct = async (productData) => {
+  const handleCreate = async (productData) => {
     try {
-      // TODO: Replace with actual API call
-      // const response = await fetch('/api/products', {
-      //   method: 'POST',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(productData),
-      // });
-      // const newProduct = await response.json();
-
-      await fetchProducts();
-      setShowProductForm(false);
-      setSelectedProduct(null);
-    } catch (error) {
-      console.error('Error creating product:', error);
+      await api.post('/products', productData);
+      toast.success('Product created');
+      setShowForm(false); setSelectedProduct(null);
+      fetchProducts(); fetchStats();
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Failed to create product');
     }
   };
 
-  const handleUpdateProduct = async (productData) => {
+  const handleUpdate = async (productData) => {
     try {
-      // TODO: Replace with actual API call
-      // const response = await fetch(`/api/products/${selectedProduct.id}`, {
-      //   method: 'PUT',
-      //   headers: { 'Content-Type': 'application/json' },
-      //   body: JSON.stringify(productData),
-      // });
-
-      await fetchProducts();
-      setShowProductForm(false);
-      setSelectedProduct(null);
-    } catch (error) {
-      console.error('Error updating product:', error);
+      await api.put(`/products/${selectedProduct.id}`, productData);
+      toast.success('Product updated');
+      setShowForm(false); setSelectedProduct(null);
+      fetchProducts(); fetchStats();
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Failed to update product');
     }
   };
 
-  const handleDeleteProduct = async () => {
-    if (!productToDelete) return;
-
+  const handleDelete = async () => {
+    if (!deleteModal.product) return;
+    setDeleteLoading(true);
     try {
-      // TODO: Replace with actual API call
-      // await fetch(`/api/products/${productToDelete.id}`, {
-      //   method: 'DELETE',
-      // });
-
-      await fetchProducts();
-      setShowDeleteConfirm(false);
-      setProductToDelete(null);
-    } catch (error) {
-      console.error('Error deleting product:', error);
+      await api.delete(`/products/${deleteModal.product.id}`);
+      toast.success('Product deleted');
+      setDeleteModal({ open: false, product: null });
+      fetchProducts(); fetchStats();
+    } catch (e) {
+      toast.error(e.response?.data?.message || 'Failed to delete product');
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
   const handleExport = () => {
-    // TODO: Implement export to CSV
-    console.log('Export products to CSV');
-  };
-
-  const handleImport = () => {
-    // TODO: Implement import from CSV
-    console.log('Import products from CSV');
+    try {
+      const headers = ['Name', 'Code', 'Type', 'Price', 'Cost', 'Stock', 'Brand', 'Category', 'Active'];
+      const rows = products.map(p => [
+        p.product_name, p.product_code, p.product_type,
+        p.selling_price, p.cost_price, p.quantity_on_hand,
+        p.brand_name || '', p.category_name || '',
+        p.is_active ? 'Yes' : 'No',
+      ]);
+      const csv = [headers, ...rows].map(r => r.map(c => `"${c ?? ''}"`).join(',')).join('\n');
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href = url; a.download = `products-${new Date().toISOString().split('T')[0]}.csv`;
+      a.click(); URL.revokeObjectURL(url);
+      toast.success('Products exported');
+    } catch {
+      toast.error('Failed to export products');
+    }
   };
 
   const clearFilters = () => {
-    setFilters({
-      product_type: '',
-      brand_id: '',
-      category_id: '',
-      is_active: 'all',
-      is_featured: false,
-      low_stock_only: false,
-      price_min: '',
-      price_max: '',
-    });
+    setFilters({ product_type: '', brand_id: '', category_id: '', is_active: 'all', is_featured: false, low_stock_only: false });
     setSearchQuery('');
+    setPage(1);
   };
 
-  const activeFilterCount = Object.values(filters).filter((v) => v && v !== 'all').length;
+  const openEdit   = (p) => { setSelectedProduct(p); setShowForm(true); };
+  const openCreate = ()  => { setSelectedProduct(null); setShowForm(true); };
+  const openView   = (p) => { setSelectedProduct(p); setShowDetail(true); };
+  const openDelete = (p) => setDeleteModal({ open: true, product: p });
+
+  const activeFilterCount = Object.values(filters).filter(v => v && v !== 'all').length;
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-theme-primary mb-2">Product Catalog</h1>
-        <p className="text-theme-secondary">Manage your product inventory and pricing</p>
-      </div>
+    <div className="p-6 max-w-7xl mx-auto space-y-6">
+      <PageHeader
+        title="Product Catalog"
+        subtitle="Manage your product inventory and pricing"
+        icon={Package}
+        badge={totalCount > 0 ? `${totalCount} products` : null}
+        actions={
+          <div className="flex items-center gap-2">
+            <button onClick={handleExport}
+              className="flex items-center gap-1.5 px-3 py-2 text-sm font-medium text-theme-secondary bg-theme-primary hover:bg-theme-tertiary border border-theme rounded-lg transition-colors">
+              <Download className="w-4 h-4" /> Export
+            </button>
+            <button onClick={openCreate}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-accent-gold rounded-lg hover:bg-accent-goldDark transition-colors">
+              <Plus className="w-4 h-4" /> Add Product
+            </button>
+          </div>
+        }
+      />
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <StatCard
-          label="Total Products"
-          value={stats.total_products}
-          icon={Package}
-          variant="primary"
-        />
-        <StatCard
-          label="Active Products"
-          value={stats.active_products}
-          icon={Package}
-          variant="success"
-        />
-        <StatCard
-          label="Low Stock"
-          value={stats.low_stock_count}
-          icon={Package}
-          variant="warning"
-        />
-        <StatCard
-          label="Total Value"
-          value={`$${stats.total_value.toLocaleString()}`}
-          icon={Package}
-          variant="info"
-        />
+      {/* Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {[
+          { label: 'Total Products',  value: stats.total_products,  color: 'text-blue-500',   bg: 'bg-blue-500/10',   border: 'border-blue-500/20' },
+          { label: 'Active Products', value: stats.active_products, color: 'text-green-500',  bg: 'bg-green-500/10',  border: 'border-green-500/20' },
+          { label: 'Low Stock',       value: stats.low_stock_count, color: 'text-red-500',    bg: 'bg-red-500/10',    border: 'border-red-500/20' },
+          { label: 'Total Value',     value: formatCurrency(stats.total_value || 0), color: 'text-accent-gold', bg: 'bg-accent-gold/10', border: 'border-accent-gold/20' },
+        ].map(({ label, value, color, bg, border }) => (
+          <div key={label} className="bg-theme-secondary border border-theme rounded-xl p-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-medium text-theme-muted">{label}</span>
+              <div className={`w-8 h-8 ${bg} border ${border} rounded-lg flex items-center justify-center`}>
+                <Package className={`w-4 h-4 ${color}`} />
+              </div>
+            </div>
+            <p className="text-2xl font-bold text-theme-primary">{value}</p>
+          </div>
+        ))}
       </div>
 
       {/* Toolbar */}
-      <div className="bg-theme-secondary rounded-2xl shadow-theme-sm border border-theme p-4 mb-6">
-        <div className="flex flex-col md:flex-row gap-4">
+      <div className="bg-theme-secondary border border-theme rounded-xl p-4 space-y-4">
+        <div className="flex flex-col sm:flex-row gap-3">
           {/* Search */}
-          <div className="flex-1">
-            <SearchBar
-              value={searchQuery}
-              onChange={setSearchQuery}
-              placeholder="Search products by name, code, or SKU..."
+          <div className="flex-1 relative">
+            <Search className="w-4 h-4 text-theme-muted absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <input
+              type="text" value={searchQuery} onChange={e => { setSearchQuery(e.target.value); setPage(1); }}
+              placeholder="Search by name, code, or SKU..."
+              className={`${inputClass} pl-9 pr-8`}
             />
+            {searchQuery && (
+              <button onClick={() => { setSearchQuery(''); setPage(1); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-theme-muted hover:text-theme-primary">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <Button
-              variant="outline"
-              icon={Filter}
-              onClick={() => setShowFilters(!showFilters)}
-              className={activeFilterCount > 0 ? 'border-blue-600 text-blue-600' : ''}
+          {/* Controls */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowFilters(f => !f)}
+              className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium rounded-lg border transition-colors ${activeFilterCount > 0 ? 'bg-accent-gold/10 text-accent-gold border-accent-gold/30' : 'text-theme-secondary bg-theme-primary border-theme hover:bg-theme-tertiary'}`}
             >
-              Filters {activeFilterCount > 0 && `(${activeFilterCount})`}
-            </Button>
+              <Filter className="w-4 h-4" />
+              Filters {activeFilterCount > 0 && <span className="w-4 h-4 flex items-center justify-center bg-accent-gold text-white text-[10px] font-bold rounded-full">{activeFilterCount}</span>}
+            </button>
 
-            <ViewModeToggle
-              value={viewMode}
-              onChange={setViewMode}
-              modes={['grid', 'list']}
-            />
-
-            <Button variant="outline" icon={Download} onClick={handleExport}>
-              Export
-            </Button>
-
-            <Button variant="outline" icon={Upload} onClick={handleImport}>
-              Import
-            </Button>
-
-            <Button
-              variant="primary"
-              icon={Plus}
-              onClick={() => {
-                setSelectedProduct(null);
-                setShowProductForm(true);
-              }}
-            >
-              Add Product
-            </Button>
+            <div className="flex items-center border border-theme rounded-lg overflow-hidden">
+              <button onClick={() => setViewMode('grid')}
+                className={`p-2 transition-colors ${viewMode === 'grid' ? 'bg-accent-gold text-white' : 'bg-theme-primary text-theme-muted hover:bg-theme-tertiary'}`}>
+                <LayoutGrid className="w-4 h-4" />
+              </button>
+              <button onClick={() => setViewMode('list')}
+                className={`p-2 transition-colors ${viewMode === 'list' ? 'bg-accent-gold text-white' : 'bg-theme-primary text-theme-muted hover:bg-theme-tertiary'}`}>
+                <List className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Filters Panel */}
+        {/* Filters */}
         {showFilters && (
-          <div className="mt-4 pt-4 border-t border-theme">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              {/* Product Type */}
+          <div className="pt-4 border-t border-theme space-y-4">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
-                <label className="block text-sm font-medium text-theme-secondary mb-1">
-                  Product Type
-                </label>
-                <select
-                  value={filters.product_type}
-                  onChange={(e) => setFilters({ ...filters, product_type: e.target.value })}
-                  className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="" className="bg-theme-secondary">All Types</option>
-                  <option value="physical" className="bg-theme-secondary">Physical</option>
-                  <option value="service" className="bg-theme-secondary">Service</option>
-                  <option value="digital" className="bg-theme-secondary">Digital</option>
-                  <option value="bundle" className="bg-theme-secondary">Bundle</option>
+                <label className={labelClass}>Product Type</label>
+                <select value={filters.product_type} onChange={e => setFilters(f => ({ ...f, product_type: e.target.value }))} className={inputClass}>
+                  <option value="">All Types</option>
+                  <option value="physical">Physical</option>
+                  <option value="service">Service</option>
+                  <option value="digital">Digital</option>
+                  <option value="bundle">Bundle</option>
                 </select>
               </div>
-
-              {/* Brand */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Brand</label>
-                <select
-                  value={filters.brand_id}
-                  onChange={(e) => setFilters({ ...filters, brand_id: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
+                <label className={labelClass}>Brand</label>
+                <select value={filters.brand_id} onChange={e => setFilters(f => ({ ...f, brand_id: e.target.value }))} className={inputClass}>
                   <option value="">All Brands</option>
-                  {brands.map((brand) => (
-                    <option key={brand.id} value={brand.id}>
-                      {brand.brand_name}
-                    </option>
-                  ))}
+                  {brands.map(b => <option key={b.id} value={b.id}>{b.brand_name}</option>)}
                 </select>
               </div>
-
-              {/* Category */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
-                <select
-                  value={filters.category_id}
-                  onChange={(e) => setFilters({ ...filters, category_id: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
+                <label className={labelClass}>Category</label>
+                <select value={filters.category_id} onChange={e => setFilters(f => ({ ...f, category_id: e.target.value }))} className={inputClass}>
                   <option value="">All Categories</option>
-                  {categories.map((category) => (
-                    <option key={category.id} value={category.id}>
-                      {category.category_name}
-                    </option>
-                  ))}
+                  {categories.map(c => <option key={c.id} value={c.id}>{c.category_name}</option>)}
                 </select>
               </div>
-
-              {/* Status */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                <select
-                  value={filters.is_active}
-                  onChange={(e) => setFilters({ ...filters, is_active: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
+                <label className={labelClass}>Status</label>
+                <select value={filters.is_active} onChange={e => setFilters(f => ({ ...f, is_active: e.target.value }))} className={inputClass}>
                   <option value="all">All Status</option>
                   <option value="true">Active</option>
                   <option value="false">Inactive</option>
@@ -422,32 +283,25 @@ const ProductCatalog = () => {
               </div>
             </div>
 
-            {/* Additional Filters */}
-            <div className="flex items-center gap-4 mt-4">
+            <div className="flex items-center gap-4">
               <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={filters.is_featured}
-                  onChange={(e) => setFilters({ ...filters, is_featured: e.target.checked })}
-                  className="w-4 h-4 text-theme-primary rounded focus:ring-blue-500"
-                />
-                <Star className="w-4 h-4 text-yellow-500" />
+                <input type="checkbox" checked={filters.is_featured}
+                  onChange={e => setFilters(f => ({ ...f, is_featured: e.target.checked }))}
+                  className="w-4 h-4 rounded" />
+                <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />
                 <span className="text-sm text-theme-secondary">Featured Only</span>
               </label>
-
               <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={filters.low_stock_only}
-                  onChange={(e) => setFilters({ ...filters, low_stock_only: e.target.checked })}
-                  className="w-4 h-4 text-theme-primary rounded focus:ring-blue-500"
-                />
+                <input type="checkbox" checked={filters.low_stock_only}
+                  onChange={e => setFilters(f => ({ ...f, low_stock_only: e.target.checked }))}
+                  className="w-4 h-4 rounded" />
                 <span className="text-sm text-theme-secondary">Low Stock Only</span>
               </label>
-
-              <Button variant="ghost" size="sm" onClick={clearFilters}>
-                Clear All Filters
-              </Button>
+              {activeFilterCount > 0 && (
+                <button onClick={clearFilters} className="text-xs text-theme-muted hover:text-theme-primary underline">
+                  Clear all filters
+                </button>
+              )}
             </div>
           </div>
         )}
@@ -456,149 +310,109 @@ const ProductCatalog = () => {
       {/* Product List */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
-          <LoadingSpinner size="lg" />
+          <div className="w-8 h-8 border-2 border-theme border-t-accent-gold rounded-full animate-spin" />
         </div>
       ) : products.length === 0 ? (
-        <EmptyState
-          icon={Package}
-          title="No products found"
-          description="Try adjusting your filters or create your first product"
-          action={
-            <Button
-              variant="primary"
-              icon={Plus}
-              onClick={() => {
-                setSelectedProduct(null);
-                setShowProductForm(true);
-              }}
-            >
-              Add Product
-            </Button>
-          }
-        />
+        <div className="flex flex-col items-center justify-center py-16 text-center bg-theme-secondary border border-theme rounded-xl">
+          <div className="w-14 h-14 bg-accent-gold/10 border border-accent-gold/20 rounded-xl flex items-center justify-center mb-4">
+            <Package className="w-7 h-7 text-accent-gold" />
+          </div>
+          <p className="text-base font-semibold text-theme-primary mb-1">No products found</p>
+          <p className="text-sm text-theme-muted mb-4">
+            {searchQuery || activeFilterCount > 0 ? 'Try adjusting your search or filters' : 'Create your first product to get started'}
+          </p>
+          {!searchQuery && activeFilterCount === 0 && (
+            <button onClick={openCreate}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-accent-gold rounded-lg hover:bg-accent-goldDark transition-colors">
+              <Plus className="w-4 h-4" /> Add Product
+            </button>
+          )}
+        </div>
       ) : viewMode === 'grid' ? (
-        <ProductGrid
-          products={products}
-          onEdit={(product) => {
-            setSelectedProduct(product);
-            setShowProductForm(true);
-          }}
-          onDelete={(product) => {
-            setProductToDelete(product);
-            setShowDeleteConfirm(true);
-          }}
-          onView={(product) => {
-            setSelectedProduct(product);
-            setShowProductDetail(true);
-          }}
-        />
+        <ProductGrid products={products} onEdit={openEdit} onDelete={openDelete} onView={openView} />
       ) : (
-        <div className="space-y-3">
-          {products.map((product) => (
-            <ProductListItem
-              key={product.id}
-              product={product}
-              onEdit={(product) => {
-                setSelectedProduct(product);
-                setShowProductForm(true);
-              }}
-              onDelete={(product) => {
-                setProductToDelete(product);
-                setShowDeleteConfirm(true);
-              }}
-              onView={(product) => {
-                setSelectedProduct(product);
-                setShowProductDetail(true);
-              }}
-            />
+        <div className="space-y-2">
+          {products.map(p => (
+            <ProductListItem key={p.id} product={p} onEdit={openEdit} onDelete={openDelete} onView={openView} />
           ))}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalPages > 1 && !loading && (
+        <div className="flex items-center justify-between">
+          <p className="text-sm text-theme-muted">
+            Showing {((page - 1) * PAGE_SIZE) + 1}–{Math.min(page * PAGE_SIZE, totalCount)} of {totalCount} products
+          </p>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1}
+              className="p-2 text-theme-secondary border border-theme rounded-lg hover:bg-theme-tertiary disabled:opacity-40 transition-colors">
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="px-3 py-1 text-sm text-theme-primary font-medium">{page} / {totalPages}</span>
+            <button onClick={() => setPage(p => Math.min(totalPages, p + 1))} disabled={page === totalPages}
+              className="p-2 text-theme-secondary border border-theme rounded-lg hover:bg-theme-tertiary disabled:opacity-40 transition-colors">
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
 
       {/* Product Form Modal */}
       <ProductFormModal
-        isOpen={showProductForm}
-        onClose={() => {
-          setShowProductForm(false);
-          setSelectedProduct(null);
-        }}
-        onSubmit={selectedProduct ? handleUpdateProduct : handleCreateProduct}
+        isOpen={showForm}
+        onClose={() => { setShowForm(false); setSelectedProduct(null); }}
+        onSubmit={selectedProduct ? handleUpdate : handleCreate}
         product={selectedProduct}
         brands={brands}
         categories={categories}
       />
 
       {/* Product Detail Modal */}
-      {showProductDetail && selectedProduct && (
+      {showDetail && selectedProduct && (
         <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-theme-secondary rounded-2xl shadow-theme-xl max-w-5xl w-full max-h-[90vh] overflow-y-auto border border-theme">
             <ProductDetailView
               product={selectedProduct}
-              onEdit={(product) => {
-                setShowProductDetail(false);
-                setSelectedProduct(product);
-                setShowProductForm(true);
-              }}
-              onDelete={(product) => {
-                setShowProductDetail(false);
-                setProductToDelete(product);
-                setShowDeleteConfirm(true);
-              }}
-              onClose={() => {
-                setShowProductDetail(false);
-                setSelectedProduct(null);
-              }}
+              onEdit={(p) => { setShowDetail(false); openEdit(p); }}
+              onDelete={(p) => { setShowDetail(false); openDelete(p); }}
+              onClose={() => { setShowDetail(false); setSelectedProduct(null); }}
             />
-            <div className="p-6 border-t border-theme">
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setShowProductDetail(false);
-                  setSelectedProduct(null);
-                }}
-                className="w-full"
-              >
+            <div className="p-4 border-t border-theme">
+              <button onClick={() => { setShowDetail(false); setSelectedProduct(null); }}
+                className="w-full px-4 py-2 text-sm font-medium text-theme-secondary bg-theme-primary hover:bg-theme-tertiary border border-theme rounded-lg transition-colors">
                 Close
-              </Button>
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Delete Confirmation */}
-      <ConfirmDialog
-        isOpen={showDeleteConfirm}
-        onClose={() => {
-          setShowDeleteConfirm(false);
-          setProductToDelete(null);
-        }}
-        onConfirm={handleDeleteProduct}
+      {/* Delete Confirm Modal */}
+      <Modal
+        isOpen={deleteModal.open}
+        onClose={() => setDeleteModal({ open: false, product: null })}
         title="Delete Product"
-        message={`Are you sure you want to delete "${productToDelete?.product_name}"? This action can be undone from the Recycle Bin.`}
-        confirmText="Delete Product"
-        variant="danger"
-      />
-    </div>
-  );
-};
-
-// Stat Card Component
-const StatCard = ({ label, value, icon: Icon, variant = 'default' }) => {
-  const variants = {
-    default: 'bg-theme-tertiary text-theme-primary border border-theme',
-    primary: 'bg-blue-50 text-blue-900 border border-blue-100 dark:bg-blue-900/20 dark:text-blue-200 dark:border-blue-800',
-    success: 'bg-green-50 text-green-900 border border-green-100 dark:bg-green-900/20 dark:text-green-200 dark:border-green-800',
-    warning: 'bg-yellow-50 text-yellow-900 border border-yellow-100 dark:bg-yellow-900/20 dark:text-yellow-200 dark:border-yellow-800',
-    info: 'bg-cyan-50 text-cyan-900 border border-cyan-100 dark:bg-cyan-900/20 dark:text-cyan-200 dark:border-cyan-800',
-  };
-
-  return (
-    <div className={`p-4 rounded-2xl ${variants[variant]} shadow-sm`}>
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-sm font-medium opacity-75">{label}</span>
-        <Icon className="w-5 h-5 opacity-50" />
-      </div>
-      <p className="text-2xl font-bold">{value}</p>
+        size="sm"
+        footer={
+          <div className="flex items-center gap-3">
+            <button onClick={() => setDeleteModal({ open: false, product: null })} disabled={deleteLoading}
+              className="px-4 py-2 text-sm font-medium text-theme-secondary bg-theme-primary hover:bg-theme-tertiary border border-theme rounded-lg transition-colors">
+              Cancel
+            </button>
+            <button onClick={handleDelete} disabled={deleteLoading}
+              className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-red-500 rounded-lg hover:bg-red-600 transition-colors disabled:opacity-50">
+              {deleteLoading && <div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
+              Delete Product
+            </button>
+          </div>
+        }
+      >
+        <p className="text-sm text-theme-secondary">
+          Are you sure you want to delete <span className="font-semibold text-theme-primary">"{deleteModal.product?.product_name}"</span>?
+          This action can be undone from the Recycle Bin.
+        </p>
+      </Modal>
     </div>
   );
 };

@@ -1,8 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
-import { Plus, Edit, Trash2, Banknote, Landmark, Wallet, List, ArrowUpRight, ArrowDownLeft, Search, Filter } from 'lucide-react';
+import api from '../api/axios';
+import { Plus, Edit, Landmark, Wallet, List, Search, X, DollarSign } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import PageHeader from '../components/common/PageHeader';
+import { useCurrency } from '../context/CurrencyContext';
 
 const BankChannelsPage = () => {
+    const { formatCurrency, symbol } = useCurrency();
+    const navigate = useNavigate();
     const [channels, setChannels] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -17,15 +22,13 @@ const BankChannelsPage = () => {
         is_active: true
     });
 
-    const API_URL = 'http://localhost:5000/api';
-
     useEffect(() => {
         fetchChannels();
     }, []);
 
     const fetchChannels = async () => {
         try {
-            const response = await axios.get(`${API_URL}/banks/channels`);
+            const response = await api.get(`/banks/channels`);
             setChannels(response.data);
             setLoading(false);
         } catch (error) {
@@ -50,9 +53,9 @@ const BankChannelsPage = () => {
         e.preventDefault();
         try {
             if (selectedChannel) {
-                await axios.put(`${API_URL}/banks/channels/${selectedChannel.id}`, formData);
+                await api.put(`/banks/channels/${selectedChannel.id}`, formData);
             } else {
-                await axios.post(`${API_URL}/banks/channels`, formData);
+                await api.post(`/banks/channels`, formData);
             }
             setIsModalOpen(false);
             fetchChannels();
@@ -74,59 +77,72 @@ const BankChannelsPage = () => {
         });
     };
 
-    const filteredChannels = channels.filter(c => 
+    const filteredChannels = channels.filter(c =>
         c.channel_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (c.bank_name && c.bank_name.toLowerCase().includes(searchTerm.toLowerCase()))
     );
 
     const totalBalance = channels.reduce((sum, c) => sum + parseFloat(c.current_balance), 0);
+    const activeChannels = channels.filter(c => c.is_active).length;
+
+    const actions = (
+        <button
+            onClick={() => { resetForm(); setIsModalOpen(true); }}
+            className="bg-accent-gold text-white px-4 py-2 rounded-lg font-semibold text-sm hover:bg-accent-goldDark transition flex items-center gap-2"
+        >
+            <Plus className="w-4 h-4" /> Add Channel
+        </button>
+    );
 
     return (
-        <div className="p-4 md:p-8 bg-slate-50 min-h-screen">
-            {/* Header */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-                <div>
-                    <h1 className="text-3xl font-black text-slate-900 tracking-tight">BANK CHANNELS</h1>
-                    <p className="text-slate-500 font-medium">Manage bank accounts and cash drawers</p>
+        <div className="space-y-6 max-w-[1700px] mx-auto pb-10">
+            <PageHeader
+                title="Bank Channels"
+                subtitle="Manage bank accounts and cash drawers"
+                badge={`${channels.length} Channels`}
+                icon={Landmark}
+                actions={actions}
+            />
+
+            {/* Stats Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                <div className="bg-theme-secondary p-6 rounded-lg border border-theme shadow-theme-sm flex items-center gap-4">
+                    <div className="p-3 bg-blue-100 text-blue-600 dark:bg-blue-900/20 dark:text-blue-400 rounded-lg">
+                        <DollarSign size={24} />
+                    </div>
+                    <div>
+                        <div className="text-sm text-theme-muted font-medium">Total Balance</div>
+                        <div className="text-2xl font-semibold text-theme-primary">{formatCurrency(totalBalance)}</div>
+                    </div>
                 </div>
-                <button 
-                    onClick={() => { resetForm(); setIsModalOpen(true); }}
-                    className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-2xl font-black shadow-lg shadow-blue-100 flex items-center gap-2 transition active:scale-95"
-                >
-                    <Plus size={20} /> ADD NEW CHANNEL
-                </button>
+                <div className="bg-theme-secondary p-6 rounded-lg border border-theme shadow-theme-sm flex items-center gap-4">
+                    <div className="p-3 bg-green-100 text-green-600 dark:bg-green-900/20 dark:text-green-400 rounded-lg">
+                        <Landmark size={24} />
+                    </div>
+                    <div>
+                        <div className="text-sm text-theme-muted font-medium">Active Channels</div>
+                        <div className="text-2xl font-semibold text-theme-primary">{activeChannels}</div>
+                    </div>
+                </div>
+                <div className="bg-theme-secondary p-6 rounded-lg border border-theme shadow-theme-sm flex items-center gap-4">
+                    <div className="p-3 bg-amber-100 text-amber-600 dark:bg-amber-900/20 dark:text-amber-400 rounded-lg">
+                        <Wallet size={24} />
+                    </div>
+                    <div>
+                        <div className="text-sm text-theme-muted font-medium">Total Channels</div>
+                        <div className="text-2xl font-semibold text-theme-primary">{channels.length}</div>
+                    </div>
+                </div>
             </div>
 
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-                    <div className="flex justify-between items-start mb-4">
-                        <div className="p-3 bg-blue-50 rounded-2xl text-blue-600">
-                            <Wallet size={24} />
-                        </div>
-                    </div>
-                    <div className="text-3xl font-black text-slate-900">₦{totalBalance.toLocaleString()}</div>
-                    <div className="text-sm font-bold text-slate-400 uppercase tracking-wider">Total Liquidity</div>
-                </div>
-                <div className="bg-white p-6 rounded-3xl shadow-sm border border-slate-100">
-                    <div className="flex justify-between items-start mb-4">
-                        <div className="p-3 bg-green-50 rounded-2xl text-green-600">
-                            <Landmark size={24} />
-                        </div>
-                    </div>
-                    <div className="text-3xl font-black text-slate-900">{channels.length}</div>
-                    <div className="text-sm font-bold text-slate-400 uppercase tracking-wider">Active Channels</div>
-                </div>
-            </div>
-
-            {/* Search & Filter */}
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 mb-6 flex gap-4">
-                <div className="flex-1 relative">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={20} />
-                    <input 
-                        type="text" 
+            {/* Search Bar */}
+            <div className="bg-theme-secondary p-4 rounded-lg border border-theme shadow-theme-sm">
+                <div className="relative w-full">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-theme-muted w-5 h-5 pointer-events-none" />
+                    <input
+                        type="text"
                         placeholder="Search by channel name or bank..."
-                        className="w-full pl-12 pr-4 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-medium"
+                        className="w-full pl-10 pr-4 py-2.5 bg-theme-primary border border-theme rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none transition-all text-sm text-theme-primary placeholder-theme-muted"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -134,168 +150,214 @@ const BankChannelsPage = () => {
             </div>
 
             {/* Channels Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {filteredChannels.map(channel => (
-                    <div key={channel.id} className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden hover:shadow-md transition group">
-                        <div className="p-6">
-                            <div className="flex justify-between items-start mb-6">
-                                <div>
-                                    <h3 className="text-xl font-black text-slate-900 uppercase">{channel.channel_name}</h3>
-                                    <p className="text-slate-400 font-bold text-xs uppercase tracking-widest">{channel.bank_name || 'INTERNAL'}</p>
-                                </div>
-                                <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${channel.is_active ? 'bg-green-100 text-green-600' : 'bg-slate-100 text-slate-500'}`}>
-                                    {channel.is_active ? 'Active' : 'Inactive'}
-                                </div>
+            {loading ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {Array(3).fill(0).map((_, i) => (
+                        <div key={i} className="bg-theme-secondary p-6 rounded-lg border border-theme shadow-theme-sm animate-pulse">
+                            <div className="flex justify-between mb-4">
+                                <div className="h-5 w-40 bg-theme-tertiary rounded"></div>
+                                <div className="h-5 w-16 bg-theme-tertiary rounded-full"></div>
                             </div>
-
-                            <div className="mb-6">
-                                <div className="text-sm text-slate-400 font-bold uppercase mb-1">Available Balance</div>
-                                <div className="text-3xl font-black text-blue-600 tracking-tight">
-                                    ₦{parseFloat(channel.current_balance).toLocaleString()}
-                                </div>
-                            </div>
-
-                            {channel.account_number && (
-                                <div className="bg-slate-50 p-4 rounded-2xl mb-6">
-                                    <div className="flex justify-between text-xs font-bold text-slate-400 uppercase mb-1">
-                                        <span>Account No</span>
-                                        <span className="text-slate-900">{channel.account_number}</span>
-                                    </div>
-                                    <div className="flex justify-between text-xs font-bold text-slate-400 uppercase">
-                                        <span>Account Name</span>
-                                        <span className="text-slate-900">{channel.account_name}</span>
-                                    </div>
-                                </div>
-                            )}
-
+                            <div className="h-8 w-48 bg-theme-tertiary rounded mb-2"></div>
+                            <div className="h-4 w-24 bg-theme-tertiary rounded mb-6"></div>
+                            <div className="h-16 bg-theme-tertiary rounded-lg mb-4"></div>
                             <div className="flex gap-2">
-                                <button 
+                                <div className="flex-1 h-10 bg-theme-tertiary rounded-lg"></div>
+                                <div className="flex-1 h-10 bg-theme-tertiary rounded-lg"></div>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            ) : filteredChannels.length === 0 ? (
+                <div className="bg-theme-secondary p-12 rounded-lg border border-theme shadow-theme-sm text-center">
+                    <Landmark className="w-16 h-16 text-theme-muted mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-theme-primary mb-2">No Channels Found</h3>
+                    <p className="text-theme-muted mb-6">
+                        {searchTerm ? 'Try adjusting your search term.' : 'Get started by adding your first bank channel.'}
+                    </p>
+                    {!searchTerm && (
+                        <button
+                            onClick={() => { resetForm(); setIsModalOpen(true); }}
+                            className="bg-accent-gold text-white px-6 py-2 rounded-lg font-semibold hover:bg-accent-goldDark transition inline-flex items-center gap-2"
+                        >
+                            <Plus className="w-4 h-4" /> Add Channel
+                        </button>
+                    )}
+                </div>
+            ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    {filteredChannels.map(channel => (
+                        <div key={channel.id} className="bg-theme-secondary rounded-lg border border-theme shadow-theme-sm hover:shadow-theme-md transition-shadow flex flex-col">
+                            <div className="p-6 flex-1">
+                                <div className="flex justify-between items-start mb-4">
+                                    <div>
+                                        <h3 className="text-lg font-bold text-theme-primary">{channel.channel_name}</h3>
+                                        <p className="text-xs text-theme-muted mt-0.5">{channel.bank_name || 'Internal'}</p>
+                                    </div>
+                                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                                        channel.is_active
+                                            ? 'bg-green-200 text-green-900 dark:bg-green-900/30 dark:text-green-300'
+                                            : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                                    }`}>
+                                        {channel.is_active ? 'Active' : 'Inactive'}
+                                    </span>
+                                </div>
+
+                                <div className="mb-5">
+                                    <div className="text-xs text-theme-muted font-medium mb-1">Available Balance</div>
+                                    <div className="text-2xl font-bold text-theme-primary">
+                                        {formatCurrency(channel.current_balance)}
+                                    </div>
+                                </div>
+
+                                {channel.account_number && (
+                                    <div className="bg-theme-primary p-4 rounded-lg border border-theme mb-5 space-y-2">
+                                        <div className="flex justify-between text-xs">
+                                            <span className="text-theme-muted font-medium">Account No</span>
+                                            <span className="text-theme-primary font-semibold">{channel.account_number}</span>
+                                        </div>
+                                        <div className="flex justify-between text-xs">
+                                            <span className="text-theme-muted font-medium">Account Name</span>
+                                            <span className="text-theme-primary font-semibold">{channel.account_name}</span>
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="px-6 pb-6 flex gap-2">
+                                <button
                                     onClick={() => handleEdit(channel)}
-                                    className="flex-1 flex items-center justify-center gap-2 py-3 bg-slate-50 hover:bg-slate-100 text-slate-600 font-bold rounded-xl transition"
+                                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-theme-primary border border-theme text-theme-secondary font-medium text-sm rounded-lg hover:bg-theme-tertiary transition"
                                 >
-                                    <Edit size={16} /> EDIT
+                                    <Edit size={15} /> Edit
                                 </button>
-                                <button 
-                                    className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-50 hover:bg-blue-100 text-blue-600 font-bold rounded-xl transition"
-                                    onClick={() => window.location.href = `/cash-flow?channelId=${channel.id}`}
+                                <button
+                                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-accent-gold/10 border border-accent-gold/20 text-accent-gold font-medium text-sm rounded-lg hover:bg-accent-gold/20 transition"
+                                    onClick={() => navigate(`/cash-flow?channelId=${channel.id}`)}
                                 >
-                                    <List size={16} /> HISTORY
+                                    <List size={15} /> History
                                 </button>
                             </div>
                         </div>
-                    </div>
-                ))}
-            </div>
+                    ))}
+                </div>
+            )}
 
             {/* Modal */}
             {isModalOpen && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
-                        <div className="bg-slate-900 p-6 text-white flex justify-between items-center">
-                            <div>
-                                <h3 className="text-xl font-black uppercase tracking-tight">
-                                    {selectedChannel ? 'Edit Channel' : 'New Bank Channel'}
-                                </h3>
-                                <p className="text-slate-400 text-xs font-bold uppercase">Financial Account Configuration</p>
+                <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={() => setIsModalOpen(false)}>
+                    <div className="bg-theme-secondary rounded-xl max-w-md w-full shadow-2xl border border-theme" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-between p-6 border-b border-theme">
+                            <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-accent-gold text-white flex items-center justify-center">
+                                    <Landmark size={20} />
+                                </div>
+                                <div>
+                                    <h2 className="text-xl font-bold text-theme-primary">
+                                        {selectedChannel ? 'Edit Channel' : 'New Bank Channel'}
+                                    </h2>
+                                    <p className="text-xs text-theme-muted mt-0.5">Financial account configuration</p>
+                                </div>
                             </div>
-                            <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-white transition">
-                                <Plus size={24} className="rotate-45" />
+                            <button onClick={() => setIsModalOpen(false)} className="p-1.5 text-theme-muted hover:text-theme-primary hover:bg-theme-tertiary rounded-lg transition-colors">
+                                <X size={20} />
                             </button>
                         </div>
 
                         <form onSubmit={handleSubmit} className="p-6 space-y-4">
                             <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Channel Name (e.g., POS ZENITH)</label>
-                                <input 
+                                <label className="block text-sm font-medium text-theme-primary mb-2">Channel Name</label>
+                                <input
                                     type="text"
                                     value={formData.channel_name}
                                     onChange={(e) => setFormData({ ...formData, channel_name: e.target.value })}
-                                    className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold"
-                                    placeholder="Enter channel name"
+                                    className="w-full bg-theme-primary border border-theme rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none transition-all text-theme-primary placeholder-theme-muted text-sm"
+                                    placeholder="e.g. POS Zenith, Cash Drawer"
                                     required
                                 />
                             </div>
 
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Bank Name</label>
-                                    <input 
+                                    <label className="block text-sm font-medium text-theme-primary mb-2">Bank Name</label>
+                                    <input
                                         type="text"
                                         value={formData.bank_name}
                                         onChange={(e) => setFormData({ ...formData, bank_name: e.target.value })}
-                                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold"
+                                        className="w-full bg-theme-primary border border-theme rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none transition-all text-theme-primary placeholder-theme-muted text-sm"
                                         placeholder="e.g. Zenith Bank"
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Account Type</label>
-                                    <select className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold">
-                                        <option>Savings</option>
-                                        <option>Current</option>
-                                        <option>Internal Cash</option>
-                                    </select>
-                                </div>
-                            </div>
-
-                            {!selectedChannel && (
-                                <div>
-                                    <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Initial Balance (₦)</label>
-                                    <input 
-                                        type="number"
-                                        value={formData.initial_balance}
-                                        onChange={(e) => setFormData({ ...formData, initial_balance: e.target.value })}
-                                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold text-blue-600"
-                                        placeholder="0.00"
+                                    <label className="block text-sm font-medium text-theme-primary mb-2">Account Number</label>
+                                    <input
+                                        type="text"
+                                        value={formData.account_number}
+                                        onChange={(e) => setFormData({ ...formData, account_number: e.target.value })}
+                                        className="w-full bg-theme-primary border border-theme rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none transition-all text-theme-primary placeholder-theme-muted text-sm"
+                                        placeholder="1234567890"
                                     />
                                 </div>
-                            )}
-
-                            <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Account Number</label>
-                                <input 
-                                    type="text"
-                                    value={formData.account_number}
-                                    onChange={(e) => setFormData({ ...formData, account_number: e.target.value })}
-                                    className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold"
-                                    placeholder="1234567890"
-                                />
                             </div>
 
                             <div>
-                                <label className="block text-[10px] font-black text-slate-400 uppercase mb-1 tracking-widest">Account Name</label>
-                                <input 
+                                <label className="block text-sm font-medium text-theme-primary mb-2">Account Name</label>
+                                <input
                                     type="text"
                                     value={formData.account_name}
                                     onChange={(e) => setFormData({ ...formData, account_name: e.target.value })}
-                                    className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-blue-500 outline-none font-bold"
+                                    className="w-full bg-theme-primary border border-theme rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none transition-all text-theme-primary placeholder-theme-muted text-sm"
                                     placeholder="Business Name"
                                 />
                             </div>
 
-                            <div className="flex items-center gap-2 py-2">
-                                <input 
-                                    type="checkbox" 
-                                    id="is_active"
-                                    checked={formData.is_active}
-                                    onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                                    className="w-5 h-5 accent-blue-600"
-                                />
-                                <label htmlFor="is_active" className="text-sm font-bold text-slate-700">Account is Active</label>
+                            {!selectedChannel && (
+                                <div>
+                                    <label className="block text-sm font-medium text-theme-primary mb-2">Initial Balance ({symbol})</label>
+                                    <input
+                                        type="number"
+                                        value={formData.initial_balance}
+                                        onChange={(e) => setFormData({ ...formData, initial_balance: e.target.value })}
+                                        className="w-full bg-theme-primary border border-theme rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none transition-all text-theme-primary placeholder-theme-muted text-sm"
+                                        placeholder="0.00"
+                                        min="0"
+                                        step="0.01"
+                                    />
+                                </div>
+                            )}
+
+                            <div className="flex items-center gap-3">
+                                <button
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={formData.is_active}
+                                    onClick={() => setFormData({ ...formData, is_active: !formData.is_active })}
+                                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                                        formData.is_active ? 'bg-accent-gold' : 'bg-theme-tertiary'
+                                    }`}
+                                >
+                                    <span className={`inline-block h-4 w-4 rounded-full bg-white transition-transform ${
+                                        formData.is_active ? 'translate-x-6' : 'translate-x-1'
+                                    }`} />
+                                </button>
+                                <label className="text-sm font-medium text-theme-primary">
+                                    {formData.is_active ? 'Active' : 'Inactive'}
+                                </label>
                             </div>
 
-                            <div className="pt-4 flex gap-3">
-                                <button 
-                                    type="button" 
+                            <div className="flex gap-3 pt-4 border-t border-theme">
+                                <button
+                                    type="button"
                                     onClick={() => setIsModalOpen(false)}
-                                    className="flex-1 px-6 py-3 text-slate-600 font-bold hover:bg-slate-100 rounded-xl transition"
+                                    className="flex-1 px-4 py-2.5 bg-theme-secondary border border-theme text-theme-secondary rounded-lg hover:bg-theme-tertiary transition font-medium"
                                 >
-                                    CANCEL
+                                    Cancel
                                 </button>
-                                <button 
+                                <button
                                     type="submit"
-                                    className="flex-2 px-8 py-3 bg-blue-600 text-white font-black rounded-xl hover:bg-blue-700 shadow-lg shadow-blue-200 transition active:scale-95"
+                                    className="flex-1 px-4 py-2.5 bg-accent-gold text-white rounded-lg hover:bg-accent-goldDark transition font-semibold"
                                 >
-                                    SAVE CHANNEL
+                                    {selectedChannel ? 'Update Channel' : 'Create Channel'}
                                 </button>
                             </div>
                         </form>

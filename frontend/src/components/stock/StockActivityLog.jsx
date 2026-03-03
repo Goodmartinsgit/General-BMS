@@ -1,97 +1,69 @@
 import React from 'react';
 import {
-  Package,
-  TruckIcon,
-  ShoppingCart,
-  RotateCcw,
-  AlertTriangle,
-  Plus,
-  Minus,
-  ArrowRight,
-  Calendar,
-  User,
+  Package, TruckIcon, ShoppingCart, RotateCcw,
+  AlertTriangle, Plus, ArrowRight, Calendar, User, Warehouse,
 } from 'lucide-react';
-import { Badge } from '../ui';
 
-/**
- * StockActivityLog Component
- * Display stock movement history
- */
-const StockActivityLog = ({ activities = [], loading = false }) => {
-  const activityTypeConfig = {
-    sale: {
-      icon: ShoppingCart,
-      label: 'Sale',
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-100',
-      badge: 'info',
-      sign: '-',
-    },
-    purchase: {
-      icon: Plus,
-      label: 'Purchase',
-      color: 'text-green-600',
-      bgColor: 'bg-green-100',
-      badge: 'success',
-      sign: '+',
-    },
-    return: {
-      icon: RotateCcw,
-      label: 'Return',
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-100',
-      badge: 'primary',
-      sign: '+',
-    },
-    transfer_out: {
-      icon: TruckIcon,
-      label: 'Transfer Out',
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-100',
-      badge: 'warning',
-      sign: '-',
-    },
-    transfer_in: {
-      icon: TruckIcon,
-      label: 'Transfer In',
-      color: 'text-teal-600',
-      bgColor: 'bg-teal-100',
-      badge: 'info',
-      sign: '+',
-    },
-    damage: {
-      icon: AlertTriangle,
-      label: 'Damage',
-      color: 'text-red-600',
-      bgColor: 'bg-red-100',
-      badge: 'danger',
-      sign: '-',
-    },
-    adjustment: {
-      icon: Package,
-      label: 'Adjustment',
-      color: 'text-gray-600',
-      bgColor: 'bg-gray-100',
-      badge: 'default',
-      sign: '±',
-    },
-  };
+const TYPE_CONFIG = {
+  sale: {
+    icon: ShoppingCart,
+    label: 'Sale',
+    color: 'text-blue-500',
+    bg: 'bg-blue-500/10',
+    border: 'border-blue-500/20',
+  },
+  receipt: {
+    icon: Plus,
+    label: 'Receipt',
+    color: 'text-green-500',
+    bg: 'bg-green-500/10',
+    border: 'border-green-500/20',
+  },
+  return: {
+    icon: RotateCcw,
+    label: 'Return',
+    color: 'text-purple-500',
+    bg: 'bg-purple-500/10',
+    border: 'border-purple-500/20',
+  },
+  transfer_out: {
+    icon: TruckIcon,
+    label: 'Transfer Out',
+    color: 'text-orange-500',
+    bg: 'bg-orange-500/10',
+    border: 'border-orange-500/20',
+  },
+  transfer_in: {
+    icon: TruckIcon,
+    label: 'Transfer In',
+    color: 'text-teal-500',
+    bg: 'bg-teal-500/10',
+    border: 'border-teal-500/20',
+  },
+  damage: {
+    icon: AlertTriangle,
+    label: 'Damage',
+    color: 'text-red-500',
+    bg: 'bg-red-500/10',
+    border: 'border-red-500/20',
+  },
+  adjustment: {
+    icon: Package,
+    label: 'Adjustment',
+    color: 'text-accent-gold',
+    bg: 'bg-accent-gold/10',
+    border: 'border-accent-gold/20',
+  },
+};
 
-  if (loading) {
-    return (
-      <div className="space-y-3">
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="animate-pulse bg-gray-100 rounded-lg p-4 h-24" />
-        ))}
-      </div>
-    );
-  }
+const DEFAULT_CONFIG = TYPE_CONFIG.adjustment;
 
+const StockActivityLog = ({ activities = [] }) => {
   if (activities.length === 0) {
     return (
       <div className="text-center py-12">
-        <Package className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-        <p className="text-gray-500">No stock activity recorded</p>
+        <Package className="w-10 h-10 mx-auto mb-2 text-theme-muted opacity-40" />
+        <p className="text-theme-muted text-sm">No stock activity recorded</p>
       </div>
     );
   }
@@ -101,93 +73,103 @@ const StockActivityLog = ({ activities = [], loading = false }) => {
       {activities.map((activity, index) => {
         const {
           id,
-          activity_type,
+          movement_type,
           product_name,
-          variant_name,
+          product_code,
           quantity,
           branch_name,
           related_branch_name,
-          reference_number,
-          created_at,
-          created_by_name,
           notes,
+          performed_by_name,
+          created_at,
         } = activity;
 
-        const config = activityTypeConfig[activity_type] || activityTypeConfig.adjustment;
-        const Icon = config.icon;
+        const cfg = TYPE_CONFIG[movement_type] || DEFAULT_CONFIG;
+        const Icon = cfg.icon;
+
+        const qty = quantity ?? 0;
+        const isPositive = qty >= 0;
+        const qtyDisplay = isPositive ? `+${qty}` : `${qty}`;
+        const qtyColor = isPositive ? 'text-green-500' : 'text-red-500';
+
+        const isTransfer = movement_type === 'transfer_in' || movement_type === 'transfer_out';
 
         return (
           <div
-            key={id || index}
-            className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
+            key={id ?? index}
+            className="bg-theme-primary border border-theme rounded-xl p-4 hover:shadow-theme-sm transition-shadow"
           >
-            <div className="flex items-start gap-4">
-              {/* Icon */}
-              <div className={`w-12 h-12 ${config.bgColor} rounded-lg flex items-center justify-center flex-shrink-0`}>
-                <Icon className={`w-6 h-6 ${config.color}`} />
+            <div className="flex items-start gap-3 sm:gap-4">
+              {/* Type icon */}
+              <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-lg flex items-center justify-center flex-shrink-0 border ${cfg.bg} ${cfg.border}`}>
+                <Icon className={`w-5 h-5 ${cfg.color}`} />
               </div>
 
-              {/* Activity Details */}
+              {/* Details */}
               <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between mb-2">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h4 className="font-semibold text-gray-900 truncate">{product_name}</h4>
-                      <Badge variant={config.badge} size="sm">{config.label}</Badge>
+                {/* Product + type badge + quantity */}
+                <div className="flex items-start justify-between gap-3 mb-1.5">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-semibold text-theme-primary text-sm leading-tight truncate">
+                        {product_name}
+                      </p>
+                      <span className={`flex-shrink-0 px-2 py-0.5 text-[10px] font-bold rounded border uppercase ${cfg.bg} ${cfg.color} ${cfg.border}`}>
+                        {cfg.label}
+                      </span>
                     </div>
-                    {variant_name && (
-                      <p className="text-sm text-gray-600 mb-1">{variant_name}</p>
+                    {product_code && (
+                      <p className="text-xs font-mono text-theme-muted mt-0.5">{product_code}</p>
                     )}
                   </div>
 
                   {/* Quantity */}
-                  <div className="text-right flex-shrink-0 ml-4">
-                    <p className={`text-2xl font-bold ${config.color}`}>
-                      {config.sign}{quantity}
+                  <div className="text-right flex-shrink-0">
+                    <p className={`text-xl sm:text-2xl font-bold leading-tight ${qtyColor}`}>
+                      {qtyDisplay}
                     </p>
-                    <p className="text-xs text-gray-500">units</p>
+                    <p className="text-[10px] text-theme-muted">units</p>
                   </div>
                 </div>
 
-                {/* Branch Info */}
-                <div className="flex items-center gap-2 mb-2">
-                  {activity_type === 'transfer_out' || activity_type === 'transfer_in' ? (
-                    <div className="flex items-center gap-2 text-sm">
-                      <span className="text-gray-600">{branch_name}</span>
-                      <ArrowRight className="w-4 h-4 text-gray-400" />
-                      <span className="text-gray-600">{related_branch_name}</span>
-                    </div>
+                {/* Branch info */}
+                <div className="flex items-center gap-1.5 mb-1.5 text-xs text-theme-secondary">
+                  {isTransfer && related_branch_name ? (
+                    <>
+                      <Warehouse className="w-3.5 h-3.5 text-theme-muted flex-shrink-0" />
+                      <span className="truncate">{branch_name}</span>
+                      <ArrowRight className="w-3 h-3 text-accent-gold flex-shrink-0" />
+                      <Warehouse className="w-3.5 h-3.5 text-green-500 flex-shrink-0" />
+                      <span className="truncate">{related_branch_name}</span>
+                    </>
                   ) : (
-                    <div className="flex items-center gap-1 text-sm">
-                      <Package className="w-4 h-4 text-gray-400" />
-                      <span className="text-gray-600">{branch_name}</span>
-                    </div>
+                    <>
+                      <Warehouse className="w-3.5 h-3.5 text-theme-muted flex-shrink-0" />
+                      <span className="truncate">{branch_name}</span>
+                    </>
                   )}
                 </div>
 
-                {/* Reference & Date */}
-                <div className="flex items-center gap-4 text-sm text-gray-500">
-                  {reference_number && (
+                {/* Meta: date + user */}
+                <div className="flex items-center flex-wrap gap-x-3 gap-y-1 text-xs text-theme-muted">
+                  {created_at && (
                     <div className="flex items-center gap-1">
-                      <span className="font-mono text-xs">{reference_number}</span>
+                      <Calendar className="w-3 h-3 flex-shrink-0" />
+                      <span>{new Date(created_at).toLocaleString()}</span>
                     </div>
                   )}
-                  <div className="flex items-center gap-1">
-                    <Calendar className="w-3 h-3" />
-                    <span>{new Date(created_at).toLocaleString()}</span>
-                  </div>
-                  {created_by_name && (
+                  {performed_by_name && (
                     <div className="flex items-center gap-1">
-                      <User className="w-3 h-3" />
-                      <span>{created_by_name}</span>
+                      <User className="w-3 h-3 flex-shrink-0" />
+                      <span>{performed_by_name}</span>
                     </div>
                   )}
                 </div>
 
                 {/* Notes */}
                 {notes && (
-                  <div className="mt-2 text-sm text-gray-600 bg-gray-50 p-2 rounded border border-gray-200">
-                    <p className="line-clamp-2">{notes}</p>
+                  <div className="mt-2 px-2.5 py-1.5 bg-theme-tertiary border border-theme rounded-lg text-xs text-theme-secondary line-clamp-2">
+                    {notes}
                   </div>
                 )}
               </div>

@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
 
-import axios from 'axios';
+import api from '../api/axios';
+import { useCurrency } from '../context/CurrencyContext';
 import { Search, ShoppingCart, Trash2, Plus, Minus, CreditCard, Banknote, User, Package, MapPin } from 'lucide-react';
 
 const SalesPage = () => {
+    const { formatCurrency, symbol } = useCurrency();
     const [products, setProducts] = useState([]);
     const [branches, setBranches] = useState([]);
     const [customers, setCustomers] = useState([]);
@@ -19,8 +21,6 @@ const SalesPage = () => {
     const [loading, setLoading] = useState(false);
     const [paymentMethod, setPaymentMethod] = useState('Cash');
 
-    const API_URL = 'http://localhost:5000/api';
-
     useEffect(() => {
         fetchInitialData();
     }, []);
@@ -28,13 +28,13 @@ const SalesPage = () => {
     const fetchInitialData = async () => {
         try {
             const [prodRes, branchRes, custRes, refRes, channelRes] = await Promise.all([
-                axios.get(`${API_URL}/products`),
-                axios.get(`${API_URL}/branches`),
-                axios.get(`${API_URL}/customers`),
-                axios.get(`${API_URL}/referrers`),
-                axios.get(`${API_URL}/banks/channels`)
+                api.get('/products'),
+                api.get('/branches'),
+                api.get('/customers'),
+                api.get('/referrers'),
+                api.get('/banks/channels')
             ]);
-            setProducts(prodRes.data);
+            setProducts(prodRes.data?.products || []);
             setBranches(branchRes.data);
             setCustomers(custRes.data);
             setReferrers(refRes.data);
@@ -120,7 +120,7 @@ const SalesPage = () => {
 
 
         try {
-            await axios.post(`${API_URL}/sales`, payload);
+            await api.post('/sales', payload);
             alert('Sale completed successfully!');
             setCart([]);
             setSelectedCustomer('');
@@ -181,7 +181,7 @@ const SalesPage = () => {
                             <div className="font-bold text-theme-primary text-sm truncate">{p.product_name}</div>
                             <div className="text-[10px] text-theme-muted font-mono mb-2">{p.product_code}</div>
                             <div className="flex justify-between items-center mt-auto">
-                                <span className="text-blue-600 dark:text-blue-400 font-black">₦{parseFloat(p.base_price).toLocaleString()}</span>
+                                <span className="text-blue-600 dark:text-blue-400 font-black">{formatCurrency(p.base_price)}</span>
                                 <div className="p-1 bg-blue-50 dark:bg-blue-900/20 group-hover:bg-blue-600 rounded text-blue-600 dark:text-blue-400 group-hover:text-white transition">
                                     <Plus size={16} />
                                 </div>
@@ -212,7 +212,7 @@ const SalesPage = () => {
                             <div key={item.product_id} className="bg-theme-secondary p-3 rounded-lg shadow-sm border border-theme flex items-center gap-3">
                                 <div className="flex-1 min-w-0">
                                     <div className="font-bold text-theme-primary text-sm truncate">{item.product_name}</div>
-                                    <div className="text-blue-600 dark:text-blue-400 text-xs font-bold">₦{item.unit_price.toLocaleString()}</div>
+                                    <div className="text-blue-600 dark:text-blue-400 text-xs font-bold">{formatCurrency(item.unit_price)}</div>
                                 </div>
                                 <div className="flex items-center gap-2 bg-theme-tertiary rounded-lg p-1">
                                     <button onClick={() => updateQuantity(item.product_id, -1)} className="p-1 hover:bg-theme-secondary rounded shadow-sm text-theme-secondary"><Minus size={14} /></button>
@@ -272,7 +272,7 @@ const SalesPage = () => {
                                 onChange={(e) => setSelectedChannel(e.target.value)}
                             >
                                 {channels.map(c => (
-                                    <option key={c.id} value={c.id} className="bg-theme-secondary text-theme-primary">{c.channel_name} (₦{parseFloat(c.current_balance).toLocaleString()})</option>
+                                    <option key={c.id} value={c.id} className="bg-theme-secondary text-theme-primary">{c.channel_name} ({formatCurrency(c.current_balance)})</option>
                                 ))}
                             </select>
                         </div>
@@ -281,15 +281,15 @@ const SalesPage = () => {
                     <div className="space-y-1 text-sm">
                         <div className="flex justify-between text-theme-secondary">
                             <span>Subtotal</span>
-                            <span>₦{totals.subtotal.toLocaleString()}</span>
+                            <span>{formatCurrency(totals.subtotal)}</span>
                         </div>
                         <div className="flex justify-between text-theme-secondary">
                             <span>Tax (7.5%)</span>
-                            <span>₦{totals.tax.toLocaleString()}</span>
+                            <span>{formatCurrency(totals.tax)}</span>
                         </div>
                         <div className="flex justify-between text-lg font-black text-blue-600 dark:text-blue-400 pt-2 border-t border-theme mt-2">
                             <span>Total</span>
-                            <span>₦{totals.total.toLocaleString()}</span>
+                            <span>{formatCurrency(totals.total)}</span>
                         </div>
                     </div>
 
@@ -315,7 +315,7 @@ const SalesPage = () => {
                         disabled={loading || cart.length === 0}
                         className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 text-white font-black py-4 rounded-xl shadow-lg shadow-blue-200 dark:shadow-none transition active:scale-[0.98] flex items-center justify-center gap-2"
                     >
-                        {loading ? 'Processing...' : `COMPLETE PAYMENT • ₦${totals.total.toLocaleString()}`}
+                        {loading ? 'Processing...' : `COMPLETE PAYMENT • ${formatCurrency(totals.total)}`}
                     </button>
                 </div>
             </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { FiClock } from 'react-icons/fi';
+import { Clock } from 'lucide-react';
 
 const CountdownTimer = ({ targetTime, mode = 'end', extendedTime = null, isPaused = false }) => {
     const [timeLeft, setTimeLeft] = useState(calculateTimeLeft());
@@ -39,10 +39,10 @@ const CountdownTimer = ({ targetTime, mode = 'end', extendedTime = null, isPause
 
         timerComponents.push(
             <div key={interval} className="flex flex-col items-center">
-                <span className="text-2xl font-bold bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded min-w-[50px] text-center">
+                <span className="text-2xl font-bold bg-theme-tertiary text-theme-primary px-2 py-1 rounded min-w-[50px] text-center">
                     {timeLeft[interval].toString().padStart(2, '0')}
                 </span>
-                <span className="text-[10px] uppercase font-semibold text-gray-500 mt-1">{interval}</span>
+                <span className="text-[10px] uppercase font-semibold text-theme-muted mt-1">{interval}</span>
             </div>
         );
     });
@@ -51,22 +51,22 @@ const CountdownTimer = ({ targetTime, mode = 'end', extendedTime = null, isPause
 
     return (
         <div className="flex flex-col items-center gap-4">
-            <div className="flex items-center gap-2 text-sm font-medium text-gray-600 dark:text-gray-400">
-                <FiClock />
+            <div className="flex items-center gap-2 text-sm font-medium text-theme-muted">
+                <Clock size={16} />
                 {isStarting ? 'STARTS IN' : 'ENDS IN'}
-                {extendedTime && <span className="text-blue-500 font-bold">(EXTENDED)</span>}
+                {extendedTime && <span className="text-accent-gold font-bold">(EXTENDED)</span>}
             </div>
-            
+
             <div className="flex gap-3">
                 {timerComponents.length > 0 ? timerComponents : (
-                    <span className="text-red-500 font-bold">
+                    <span className="text-red-500 dark:text-red-400 font-bold">
                         {isStarting ? 'READY TO START' : 'TIME EXPIRED'}
                     </span>
                 )}
             </div>
-            
+
             {isPaused && (
-                <div className="px-3 py-1 bg-amber-100 text-amber-800 rounded-full text-xs font-bold animate-pulse">
+                <div className="px-3 py-1 bg-amber-100 dark:bg-amber-900/20 text-amber-800 dark:text-amber-300 rounded-full text-xs font-bold animate-pulse">
                     TIMER PAUSED
                 </div>
             )}

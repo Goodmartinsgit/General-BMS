@@ -1,158 +1,115 @@
 import React from 'react';
-import { Edit, Trash2, Star, Package, AlertCircle } from 'lucide-react';
-import { Card, Badge, Button, Dropdown } from '../ui';
+import { Edit, Trash2, Eye, Star, AlertCircle, Package } from 'lucide-react';
+import { useCurrency } from '../../context/CurrencyContext';
 
-/**
- * ProductCard Component
- * Displays product information in a card format (grid view)
- */
-const ProductCard = ({
-  product,
-  onEdit,
-  onDelete,
-  onView,
-  showActions = true,
-  className = '',
-}) => {
+const TYPE_BADGE = {
+  physical: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
+  service:  'bg-sky-500/10 text-sky-500 border-sky-500/20',
+  digital:  'bg-purple-500/10 text-purple-500 border-purple-500/20',
+  bundle:   'bg-orange-500/10 text-orange-500 border-orange-500/20',
+};
+
+const ProductCard = ({ product, onEdit, onDelete, onView, showActions = true }) => {
+  const { formatCurrency } = useCurrency();
   const {
-    product_name,
-    product_code,
-    product_type,
-    selling_price,
-    cost_price,
-    quantity_on_hand,
-    reorder_level,
-    is_active,
-    is_featured,
-    image_url,
-    brand_name,
+    product_name, product_code, product_type, cost_price,
+    reorder_level, is_active, is_featured, image_url, brand_name,
   } = product;
 
-  const isLowStock = quantity_on_hand <= reorder_level;
-  const profitMargin = selling_price && cost_price
-    ? (((selling_price - cost_price) / selling_price) * 100).toFixed(1)
+  const stockQty     = product.total_stock ?? product.quantity_on_hand ?? 0;
+  const displayPrice = product.retail_price ?? product.selling_price ?? 0;
+  const isLowStock   = stockQty <= (reorder_level ?? 0);
+  const profitMargin = displayPrice && cost_price
+    ? (((displayPrice - cost_price) / displayPrice) * 100).toFixed(1)
     : null;
 
-  const productTypeColors = {
-    physical: 'primary',
-    service: 'info',
-    digital: 'purple',
-    bundle: 'warning',
-  };
-
-  const dropdownItems = [
-    { label: 'Edit', icon: Edit, onClick: () => onEdit(product) },
-    { label: 'View Details', icon: Package, onClick: () => onView(product) },
-    { divider: true },
-    { label: 'Delete', icon: Trash2, onClick: () => onDelete(product), danger: true },
-  ];
+  const typeBadgeCls = TYPE_BADGE[product_type] || 'bg-theme-tertiary text-theme-muted border-theme';
 
   return (
-    <Card
-      hoverable
+    <div
       onClick={() => onView(product)}
-      className={`h-full ${!is_active ? 'opacity-60' : ''} ${className}`.trim()}
+      className={`bg-theme-secondary border border-theme rounded-xl overflow-hidden hover:shadow-theme-md transition-shadow cursor-pointer flex flex-col ${!is_active ? 'opacity-60' : ''}`}
     >
       {/* Image */}
-      <div className="relative aspect-square bg-gray-100 rounded-t-lg overflow-hidden">
+      <div className="relative aspect-square bg-theme-tertiary">
         {image_url ? (
-          <img
-            src={image_url}
-            alt={product_name}
-            className="w-full h-full object-cover"
-          />
+          <img src={image_url} alt={product_name} className="w-full h-full object-cover" />
         ) : (
           <div className="w-full h-full flex items-center justify-center">
-            <Package className="w-16 h-16 text-gray-300" />
+            <Package className="w-14 h-14 text-theme-muted opacity-40" />
           </div>
         )}
 
-        {/* Badges overlay */}
-        <div className="absolute top-2 left-2 flex flex-col gap-2">
+        {/* Overlay badges */}
+        <div className="absolute top-2 left-2 flex flex-col gap-1.5">
           {is_featured && (
-            <Badge variant="warning" size="sm" icon={Star}>
-              Featured
-            </Badge>
+            <span className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded border uppercase bg-yellow-500/10 text-yellow-500 border-yellow-500/20">
+              <Star className="w-2.5 h-2.5" /> Featured
+            </span>
           )}
           {isLowStock && (
-            <Badge variant="danger" size="sm" icon={AlertCircle}>
-              Low Stock
-            </Badge>
+            <span className="flex items-center gap-1 px-2 py-0.5 text-[10px] font-bold rounded border uppercase bg-red-500/10 text-red-500 border-red-500/20">
+              <AlertCircle className="w-2.5 h-2.5" /> Low Stock
+            </span>
           )}
           {!is_active && (
-            <Badge variant="default" size="sm">
+            <span className="px-2 py-0.5 text-[10px] font-bold rounded border uppercase bg-theme-tertiary text-theme-muted border-theme">
               Inactive
-            </Badge>
+            </span>
           )}
         </div>
-
-        {/* Actions dropdown */}
-        {showActions && (
-          <div className="absolute top-2 right-2" onClick={(e) => e.stopPropagation()}>
-            <Dropdown
-              items={dropdownItems}
-              align="right"
-              trigger={
-                <button className="p-2 bg-white rounded-lg shadow-sm hover:bg-gray-50 transition-colors">
-                  <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                    <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
-                  </svg>
-                </button>
-              }
-            />
-          </div>
-        )}
       </div>
 
-      {/* Content */}
-      <div className="p-4 space-y-3">
-        {/* Header */}
+      {/* Info */}
+      <div className="p-4 flex flex-col gap-2 flex-1">
         <div>
-          <div className="flex items-start justify-between gap-2 mb-1">
-            <h3 className="font-semibold text-gray-900 line-clamp-2">{product_name}</h3>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500">{product_code}</span>
-            <Badge variant={productTypeColors[product_type] || 'default'} size="sm">
+          <p className="font-semibold text-theme-primary text-sm line-clamp-2 leading-tight mb-1">{product_name}</p>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-mono text-theme-muted">{product_code}</span>
+            <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded border uppercase ${typeBadgeCls}`}>
               {product_type}
-            </Badge>
+            </span>
           </div>
         </div>
 
-        {/* Brand */}
         {brand_name && (
-          <p className="text-sm text-gray-600">
-            <span className="font-medium">Brand:</span> {brand_name}
-          </p>
+          <p className="text-xs text-theme-muted truncate">Brand: <span className="text-theme-secondary">{brand_name}</span></p>
         )}
 
-        {/* Pricing */}
-        <div className="space-y-1">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600">Price:</span>
-            <span className="text-lg font-bold text-gray-900">
-              ${parseFloat(selling_price || 0).toFixed(2)}
-            </span>
+        <div className="flex items-center justify-between mt-auto pt-2 border-t border-theme">
+          <div>
+            <p className="text-lg font-bold text-accent-gold">{formatCurrency(displayPrice)}</p>
+            {profitMargin && <p className="text-[10px] text-green-500">{profitMargin}% margin</p>}
           </div>
-          {profitMargin && (
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-gray-500">Margin:</span>
-              <span className="text-green-600 font-medium">{profitMargin}%</span>
-            </div>
-          )}
-        </div>
-
-        {/* Stock */}
-        <div className="pt-3 border-t border-gray-100">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-600">Stock:</span>
-            <span className={`font-medium ${isLowStock ? 'text-red-600' : 'text-gray-900'}`}>
-              {quantity_on_hand || 0} units
-            </span>
+          <div className="text-right">
+            <p className={`text-sm font-medium ${isLowStock ? 'text-red-500' : 'text-theme-secondary'}`}>
+              {stockQty} units
+            </p>
+            <p className="text-[10px] text-theme-muted">In stock</p>
           </div>
         </div>
       </div>
-    </Card>
+
+      {/* Actions */}
+      {showActions && (
+        <div className="flex items-center border-t border-theme" onClick={e => e.stopPropagation()}>
+          <button onClick={() => onView(product)}
+            className="flex-1 flex items-center justify-center gap-1 py-2 text-xs text-theme-muted hover:text-theme-primary hover:bg-theme-tertiary transition-colors">
+            <Eye className="w-3.5 h-3.5" /> View
+          </button>
+          <div className="w-px h-4 bg-theme" />
+          <button onClick={() => onEdit(product)}
+            className="flex-1 flex items-center justify-center gap-1 py-2 text-xs text-theme-muted hover:text-theme-primary hover:bg-theme-tertiary transition-colors">
+            <Edit className="w-3.5 h-3.5" /> Edit
+          </button>
+          <div className="w-px h-4 bg-theme" />
+          <button onClick={() => onDelete(product)}
+            className="flex-1 flex items-center justify-center gap-1 py-2 text-xs text-red-500 hover:bg-red-500/10 transition-colors">
+            <Trash2 className="w-3.5 h-3.5" /> Delete
+          </button>
+        </div>
+      )}
+    </div>
   );
 };
 

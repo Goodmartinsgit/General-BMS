@@ -1,7 +1,9 @@
 import React from 'react';
 import { Printer, Download, Mail, X } from 'lucide-react';
+import { useCurrency } from '../context/CurrencyContext';
 
 const InvoicePrintModal = ({ isOpen, onClose, data }) => {
+    const { formatCurrency } = useCurrency();
     if (!isOpen || !data) return null;
 
     const handlePrint = () => {
@@ -73,8 +75,8 @@ const InvoicePrintModal = ({ isOpen, onClose, data }) => {
                                             <div className="text-[10px] text-gray-400">{item.product_code}</div>
                                         </td>
                                         <td className="px-4 py-4 text-center">{item.quantity}</td>
-                                        <td className="px-4 py-4 text-right">₦{parseFloat(item.unit_price).toLocaleString()}</td>
-                                        <td className="px-4 py-4 text-right font-black italic">₦{parseFloat(item.subtotal).toLocaleString()}</td>
+                                        <td className="px-4 py-4 text-right">{formatCurrency(item.unit_price)}</td>
+                                        <td className="px-4 py-4 text-right font-black italic">{formatCurrency(item.subtotal)}</td>
                                     </tr>
                                 ))}
                             </tbody>
@@ -85,15 +87,15 @@ const InvoicePrintModal = ({ isOpen, onClose, data }) => {
                         <div className="w-64 space-y-3">
                             <div className="flex justify-between text-xs text-gray-400 font-bold uppercase px-2">
                                 <span>Subtotal</span>
-                                <span>₦{parseFloat(data.subtotal || data.total_amount).toLocaleString()}</span>
+                                <span>{formatCurrency(data.subtotal || data.total_amount)}</span>
                             </div>
                             <div className="flex justify-between text-xs text-gray-400 font-bold uppercase px-2">
                                 <span>Tax (Vat 7.5%)</span>
-                                <span>₦{parseFloat(data.tax_amount || 0).toLocaleString()}</span>
+                                <span>{formatCurrency(data.tax_amount || 0)}</span>
                             </div>
                             <div className="flex justify-between text-xl font-black bg-slate-900 text-white p-3 rounded-lg">
                                 <span>TOTAL</span>
-                                <span>₦{parseFloat(data.total_amount).toLocaleString()}</span>
+                                <span>{formatCurrency(data.total_amount)}</span>
                             </div>
                         </div>
                     </div>

@@ -82,7 +82,7 @@ const BranchFormModal = ({ isOpen, onClose, onSubmit, branch, organizations, use
                             name="organization_id"
                             value={formData.organization_id}
                             onChange={handleChange}
-                            className="w-full px-4 py-2.5 border border-theme bg-theme-primary text-theme-primary rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                            className="w-full px-4 py-2.5 border border-theme bg-theme-primary text-theme-primary rounded-xl focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none"
                             required
                         >
                             <option value="" className="bg-theme-secondary">Select Organization</option>
@@ -99,7 +99,7 @@ const BranchFormModal = ({ isOpen, onClose, onSubmit, branch, organizations, use
                             value={formData.branch_code}
                             onChange={handleChange}
                             placeholder="e.g. LAG-01"
-                            className="w-full px-4 py-2.5 border border-theme bg-theme-primary text-theme-primary rounded-xl focus:ring-2 focus:ring-blue-500 outline-none placeholder-theme-muted"
+                            className="w-full px-4 py-2.5 border border-theme bg-theme-primary text-theme-primary rounded-xl focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none placeholder-theme-muted"
                             required
                             disabled={!!branch}
                         />
@@ -111,7 +111,7 @@ const BranchFormModal = ({ isOpen, onClose, onSubmit, branch, organizations, use
                             name="branch_name"
                             value={formData.branch_name}
                             onChange={handleChange}
-                            className="w-full px-4 py-2.5 border border-theme bg-theme-primary text-theme-primary rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                            className="w-full px-4 py-2.5 border border-theme bg-theme-primary text-theme-primary rounded-xl focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none"
                             required
                         />
                     </div>
@@ -122,7 +122,7 @@ const BranchFormModal = ({ isOpen, onClose, onSubmit, branch, organizations, use
                             value={formData.address}
                             onChange={handleChange}
                             rows="2"
-                            className="w-full px-4 py-2.5 border border-theme bg-theme-primary text-theme-primary rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                            className="w-full px-4 py-2.5 border border-theme bg-theme-primary text-theme-primary rounded-xl focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none"
                         ></textarea>
                     </div>
                     <div>
@@ -132,7 +132,7 @@ const BranchFormModal = ({ isOpen, onClose, onSubmit, branch, organizations, use
                             name="city"
                             value={formData.city}
                             onChange={handleChange}
-                            className="w-full px-4 py-2.5 border border-theme bg-theme-primary text-theme-primary rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                            className="w-full px-4 py-2.5 border border-theme bg-theme-primary text-theme-primary rounded-xl focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none"
                         />
                     </div>
                     <div>
@@ -142,7 +142,7 @@ const BranchFormModal = ({ isOpen, onClose, onSubmit, branch, organizations, use
                             name="state"
                             value={formData.state}
                             onChange={handleChange}
-                            className="w-full px-4 py-2.5 border border-theme bg-theme-primary text-theme-primary rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                            className="w-full px-4 py-2.5 border border-theme bg-theme-primary text-theme-primary rounded-xl focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none"
                         />
                     </div>
                     <div>
@@ -152,7 +152,7 @@ const BranchFormModal = ({ isOpen, onClose, onSubmit, branch, organizations, use
                             name="phone_number"
                             value={formData.phone_number}
                             onChange={handleChange}
-                            className="w-full px-4 py-2.5 border border-theme bg-theme-primary text-theme-primary rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                            className="w-full px-4 py-2.5 border border-theme bg-theme-primary text-theme-primary rounded-xl focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none"
                         />
                     </div>
                     <div>
@@ -162,7 +162,7 @@ const BranchFormModal = ({ isOpen, onClose, onSubmit, branch, organizations, use
                             name="email"
                             value={formData.email}
                             onChange={handleChange}
-                            className="w-full px-4 py-2.5 border border-theme bg-theme-primary text-theme-primary rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                            className="w-full px-4 py-2.5 border border-theme bg-theme-primary text-theme-primary rounded-xl focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none"
                         />
                     </div>
                     <div>
@@ -171,7 +171,7 @@ const BranchFormModal = ({ isOpen, onClose, onSubmit, branch, organizations, use
                             name="manager_user_id"
                             value={formData.manager_user_id}
                             onChange={handleChange}
-                            className="w-full px-4 py-2.5 border border-theme bg-theme-primary text-theme-primary rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                            className="w-full px-4 py-2.5 border border-theme bg-theme-primary text-theme-primary rounded-xl focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none"
                         >
                             <option value="" className="bg-theme-secondary">Select Manager</option>
                             {users.map(user => (
@@ -187,7 +187,7 @@ const BranchFormModal = ({ isOpen, onClose, onSubmit, branch, organizations, use
                                 id="is_warehouse"
                                 checked={formData.is_warehouse}
                                 onChange={handleChange}
-                                className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                                className="w-5 h-5 text-accent-gold rounded focus:ring-accent-gold/20"
                             />
                             <span className="text-sm font-medium text-theme-primary">Central Warehouse</span>
                         </label>
@@ -198,7 +198,7 @@ const BranchFormModal = ({ isOpen, onClose, onSubmit, branch, organizations, use
                                 id="is_active_branch"
                                 checked={formData.is_active}
                                 onChange={handleChange}
-                                className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500"
+                                className="w-5 h-5 text-accent-gold rounded focus:ring-accent-gold/20"
                             />
                             <span className="text-sm font-medium text-theme-primary">Active</span>
                         </label>
@@ -213,7 +213,7 @@ const BranchFormModal = ({ isOpen, onClose, onSubmit, branch, organizations, use
                         </button>
                         <button
                             type="submit"
-                            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-bold shadow-lg shadow-blue-600/20"
+                            className="px-6 py-2 bg-accent-gold text-white rounded-lg hover:bg-accent-goldDark font-bold shadow-lg shadow-accent-gold/20"
                         >
                             {branch ? 'Update Branch' : 'Create Branch'}
                         </button>

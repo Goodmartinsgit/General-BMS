@@ -1,207 +1,363 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useAuth } from '../context/AuthContext';
+import { useCurrency } from '../context/CurrencyContext';
 import api from '../api/axios';
-import { TrendingUp, ShoppingBag, AlertTriangle, CreditCard, ArrowUpRight, ArrowDownRight, Package, Users, BarChart3, Activity } from 'lucide-react';
+import PeriodFilter from '../components/common/PeriodFilter';
+import {
+  ShoppingCart, Package, Users, DollarSign, TrendingUp,
+  AlertTriangle, Box, Wallet, RefreshCw
+} from 'lucide-react';
+
+// Dashboard Components
+import KPICard from '../components/dashboard/KPICard';
+import SalesTrendChart from '../components/dashboard/SalesTrendChart';
+import RevenuePieChart from '../components/dashboard/RevenuePieChart';
+import TopProductsChart from '../components/dashboard/TopProductsChart';
+import QuickActions from '../components/dashboard/QuickActions';
+import ActivityFeed from '../components/dashboard/ActivityFeed';
+
+const formatNumber = (n) => {
+  if (n == null) return '0';
+  return Number(n).toLocaleString();
+};
+
+const formatPercentage = (n) => {
+  if (n == null) return '0%';
+  return `${Number(n).toFixed(1)}%`;
+};
 
 const Dashboard = () => {
-    const [stats, setStats] = useState({
-        monthlySales: 0,
-        activeOrders: 0,
-        lowStockAlerts: 0,
-        monthlyExpenses: 0
-    });
-    const [trend, setTrend] = useState([]);
-    const [loading, setLoading] = useState(true);
+  const { auth } = useAuth();
+  const user = auth?.user;
+  const { formatCurrency } = useCurrency();
 
-    useEffect(() => {
-        fetchStats();
-    }, []);
+  const [loading, setLoading] = useState(true);
+  const [dashboardData, setDashboardData] = useState(null);
+  const [error, setError] = useState(null);
+  const [dateRange, setDateRange] = useState(null);
+  const [dateRangeReady, setDateRangeReady] = useState(false);
 
-    const fetchStats = async () => {
-        try {
-            setLoading(true);
-            const response = await api.get('/reports/dashboard-stats');
-            if (response.data) {
-                setStats(prev => ({ ...prev, ...response.data.stats }));
-                setTrend(response.data.salesTrend || []);
-            }
-        } catch (error) {
-            console.error('Error fetching dashboard stats:', error);
-        } finally {
-            setLoading(false);
-        }
+  const fetchDashboardData = useCallback(async () => {
+    if (!user) return;
+    try {
+      setLoading(true);
+      setError(null);
+
+      const params = {};
+      if (dateRange?.start_date) params.start_date = dateRange.start_date;
+      if (dateRange?.end_date) params.end_date = dateRange.end_date;
+
+      const response = await api.get('/dashboard/stats', { params });
+
+      if (response.data?.success) {
+        setDashboardData(response.data.data.dashboard || {});
+      } else {
+        setError('Failed to load dashboard data.');
+      }
+    } catch (err) {
+      console.error('Dashboard fetch error:', err);
+      setError('Failed to load dashboard data. Please refresh.');
+    } finally {
+      setLoading(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id, dateRange?.start_date, dateRange?.end_date]);
+
+  // Fetch when user is available and PeriodFilter has provided the initial range
+  useEffect(() => {
+    if (user?.id && dateRangeReady) {
+      fetchDashboardData();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fetchDashboardData, user?.id, dateRangeReady]);
+
+  const handlePeriodChange = useCallback((range) => {
+    setDateRange(range);
+    setDateRangeReady(true);
+  }, []);
+
+  const roleName = (user?.role_name || user?.role || '').toLowerCase().replace(/\s+/g, '_');
+  const isStaff = ['staff', 'branch_staff'].includes(roleName);
+
+  const getRoleDisplay = (role) => {
+    const map = {
+      super_admin: 'Super Administrator',
+      admin: 'Administrator',
+      staff: 'Staff Member',
+      branch_staff: 'Branch Staff',
+      branch_admin: 'Branch Admin',
     };
+    return map[role] || role;
+  };
 
-    const AreaChart = ({ data }) => {
-        if (data.length < 2) return (
-            <div className="h-full flex flex-col items-center justify-center text-gray-300 italic text-xs gap-2">
-                <BarChart3 size={32} className="opacity-20" />
-                No velocity data available
-            </div>
-        );
-        
-        const max = Math.max(...data.map(d => parseFloat(d.amount)), 1);
-        const pad = data.length > 1 ? (data.length - 1) : 1;
-        const points = data.map((d, i) => `${(i / pad) * 100},${100 - (parseFloat(d.amount) / max) * 70}`).join(' ');
-
-        return (
-            <svg viewBox="0 0 100 100" className="w-full h-full overflow-visible" preserveAspectRatio="none">
-                <defs>
-                    <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="#3b82f6" stopOpacity="0.4" />
-                        <stop offset="100%" stopColor="#3b82f6" stopOpacity="0" />
-                    </linearGradient>
-                </defs>
-                <path
-                    d={`M 0,100 L ${points} L 100,100 Z`}
-                    fill="url(#chartFill)"
-                    className="transition-all duration-700 ease-in-out"
-                />
-                <polyline
-                    fill="none"
-                    stroke="#3b82f6"
-                    strokeWidth="3"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    points={points}
-                    className="transition-all duration-700 ease-in-out"
-                />
-                {/* Dots at peaks */}
-                {data.map((d, i) => (
-                    <circle 
-                        key={i} 
-                        cx={(i / pad) * 100} 
-                        cy={100 - (parseFloat(d.amount) / max) * 70} 
-                        r="2" 
-                        fill="white" 
-                        stroke="#3b82f6" 
-                        strokeWidth="1.5" 
-                    />
-                ))}
-            </svg>
-        );
+  const getRoleBadgeColor = (role) => {
+    const map = {
+      super_admin: 'bg-accent-gold text-black',
+      admin: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+      staff: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+      branch_staff: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300',
+      branch_admin: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
     };
+    return map[role] || 'bg-gray-100 text-gray-800';
+  };
 
-    const StatCard = ({ title, value, icon: Icon, colorClass, trendVal, label }) => (
-        <div className="bg-theme-secondary p-7 rounded-[2rem] border border-theme shadow-theme-sm hover:shadow-theme-md transition-all duration-300 group">
-            <div className="flex justify-between items-start mb-6">
-                <div className={`p-4 rounded-2xl ${colorClass}`}>
-                    <Icon size={24} className="text-white" />
-                </div>
-                {trendVal && (
-                    <div className={`flex items-center gap-1 text-[11px] font-bold px-3 py-1.5 rounded-full ${trendVal > 0 ? 'bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-400' : 'bg-red-50 text-red-600 dark:bg-red-900/30 dark:text-red-400'} border ${trendVal > 0 ? 'border-green-100 dark:border-green-800' : 'border-red-100 dark:border-red-800'}`}>
-                        {trendVal > 0 ? <ArrowUpRight size={14} /> : <ArrowDownRight size={14} />}
-                        {Math.abs(trendVal)}%
-                    </div>
-                )}
-            </div>
-            <div className="space-y-1">
-                <div className="text-theme-muted text-xs font-bold uppercase tracking-widest">{title}</div>
-                <div className="text-3xl font-black text-theme-primary tracking-tight">{value}</div>
-                <div className="text-[10px] text-theme-muted font-semibold flex items-center gap-2 mt-3">
-                    <span className="w-1.5 h-1.5 rounded-full bg-gray-200 dark:bg-gray-700"></span> {label}
-                </div>
-            </div>
-        </div>
-    );
+  // ─────────────────────────── ADMIN DASHBOARD ───────────────────────────
+  const renderAdminDashboard = () => {
+    const { overview, charts } = dashboardData || {};
+    const { sales, customers, inventory, financial_health } = overview || {};
 
     return (
-        <div className="space-y-10 max-w-[1600px] mx-auto animate-in fade-in slide-in-from-bottom-4 duration-700">
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                <StatCard 
-                    title="Gross Revenue" 
-                    value={`₦${parseFloat(stats.monthlySales).toLocaleString()}`} 
-                    icon={TrendingUp} 
-                    colorClass="bg-blue-600 shadow-lg shadow-blue-200 dark:shadow-blue-900/20"
-                    trendVal={14.2}
-                    label="Last 30 days performance"
-                />
-                <StatCard 
-                    title="Active Workflow" 
-                    value={stats.activeOrders} 
-                    icon={ShoppingBag} 
-                    colorClass="bg-purple-600 shadow-lg shadow-purple-200 dark:shadow-purple-900/20"
-                    label="Orders currently in progress"
-                />
-                <StatCard 
-                    title="Safety Alerts" 
-                    value={stats.lowStockAlerts} 
-                    icon={AlertTriangle} 
-                    colorClass="bg-orange-500 shadow-lg shadow-orange-200 dark:shadow-orange-900/20"
-                    label="Inventory below threshold"
-                />
-                <StatCard 
-                    title="Operating Expenses" 
-                    value={`₦${parseFloat(stats.monthlyExpenses).toLocaleString()}`} 
-                    icon={CreditCard} 
-                    colorClass="bg-rose-500 shadow-lg shadow-rose-200 dark:shadow-rose-900/20"
-                    trendVal={-2.4}
-                    label="Total operational burn"
-                />
-            </div>
-
-            {/* Main Visuals */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 bg-theme-secondary p-10 rounded-[2.5rem] border border-theme shadow-theme-sm flex flex-col hover:shadow-theme-md transition-shadow duration-500">
-                    <div className="flex justify-between items-center mb-10">
-                        <div>
-                            <h3 className="font-black text-theme-primary uppercase tracking-widest text-xs">Sales Velocity</h3>
-                            <p className="text-[10px] text-theme-muted font-bold mt-1 uppercase tracking-wider">Revenue flow over the past cycle</p>
-                        </div>
-                        <div className="flex items-center gap-6">
-                            <div className="flex items-center gap-2 text-[10px] font-bold text-theme-muted">
-                                <span className="w-3 h-3 rounded-full bg-blue-600 shadow-sm shadow-blue-200"></span> Current Cycle
-                            </div>
-                        </div>
-                    </div>
-                    <div className="flex-1 min-h-[300px] relative px-2">
-                        <AreaChart data={trend} />
-                    </div>
-                </div>
-
-                <div className="bg-gray-900 dark:bg-black p-10 rounded-[2.5rem] shadow-2xl shadow-blue-900/10 text-white flex flex-col justify-between overflow-hidden relative group">
-                    <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
-                        <Activity size={120} />
-                    </div>
-                    
-                    <div>
-                        <h3 className="font-bold text-blue-400 uppercase tracking-widest text-[10px] mb-8 border-b border-white/10 pb-4">Real-time Insights</h3>
-                        <div className="space-y-8 relative z-10">
-                            <div className="flex items-start gap-5">
-                                <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-md border border-white/10">
-                                    <Package size={22} className="text-blue-400" />
-                                </div>
-                                <div>
-                                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Inventory Health</div>
-                                    <div className="text-lg font-black mt-1">{stats.lowStockAlerts > 0 ? 'Optimization Required' : 'Optimal Balance'}</div>
-                                    <div className="text-[10px] text-blue-400/60 font-bold mt-1 uppercase tracking-tighter">Verified across {stats.branchesCount || 1} branches</div>
-                                </div>
-                            </div>
-
-                            <div className="flex items-start gap-5">
-                                <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-md border border-white/10">
-                                    <Users size={22} className="text-purple-400" />
-                                </div>
-                                <div>
-                                    <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Engagement Level</div>
-                                    <div className="text-lg font-black mt-1">High Activity Pattern</div>
-                                    <div className="text-[10px] text-purple-400/60 font-bold mt-1 uppercase tracking-tighter">78% Retention efficiency detected</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <button className="mt-12 relative z-10 w-full bg-white text-gray-900 font-black py-4 rounded-2xl text-xs hover:bg-blue-50 transition-all active:scale-[0.98] shadow-xl shadow-black/20 flex items-center justify-center gap-3 group/btn">
-                         Explore Analytics Matrix <ArrowUpRight size={18} className="group-hover/btn:translate-x-1 group-hover/btn:-translate-y-1 transition-transform" />
-                    </button>
-                    
-                    {/* Decorative blobs */}
-                    <div className="absolute -bottom-12 -left-12 w-48 h-48 bg-blue-600/20 rounded-full blur-[80px]"></div>
-                    <div className="absolute -top-12 -right-12 w-48 h-48 bg-purple-600/10 rounded-full blur-[80px]"></div>
-                </div>
-            </div>
+      <>
+        {/* Primary KPIs */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6">
+          <KPICard
+            title="Total Revenue"
+            value={formatCurrency(sales?.total_revenue || 0)}
+            change={`Today: ${formatCurrency(sales?.today?.revenue || 0)}`}
+            changeType="neutral"
+            icon={DollarSign}
+            iconColor="bg-accent-gold"
+            loading={loading}
+            error={error}
+          />
+          <KPICard
+            title="Total Sales"
+            value={formatNumber(sales?.total_sales_count || 0)}
+            change={`Today: ${sales?.today?.sales_count || 0}`}
+            changeType="neutral"
+            icon={ShoppingCart}
+            iconColor="bg-blue-500"
+            loading={loading}
+            error={error}
+          />
+          <KPICard
+            title="Total Customers"
+            value={formatNumber(customers?.total_customers || 0)}
+            change={`New: ${customers?.new_customers_30_days || 0}`}
+            changeType="positive"
+            icon={Users}
+            iconColor="bg-purple-500"
+            loading={loading}
+            error={error}
+          />
+          <KPICard
+            title="Net Profit"
+            value={formatCurrency(financial_health?.net_profit || 0)}
+            change={formatPercentage(financial_health?.profit_margin || 0)}
+            changeType={financial_health?.net_profit >= 0 ? 'positive' : 'negative'}
+            valueColorType={financial_health?.net_profit >= 0 ? 'positive' : 'negative'}
+            icon={TrendingUp}
+            iconColor={financial_health?.net_profit >= 0 ? 'bg-green-500' : 'bg-red-500'}
+            loading={loading}
+            error={error}
+          />
         </div>
+
+        {/* Secondary KPIs */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6">
+          <KPICard
+            title="Inventory Value"
+            value={formatCurrency(inventory?.total_inventory_value || 0)}
+            change={`${inventory?.total_products || 0} Products`}
+            changeType="neutral"
+            icon={Box}
+            iconColor="bg-indigo-500"
+            loading={loading}
+            error={error}
+          />
+          <KPICard
+            title="Low Stock Items"
+            value={formatNumber(inventory?.low_stock_count || 0)}
+            change={inventory?.low_stock_count > 0 ? 'Action Required' : 'All stocked'}
+            changeType={inventory?.low_stock_count > 0 ? 'negative' : 'neutral'}
+            icon={AlertTriangle}
+            iconColor={inventory?.low_stock_count > 0 ? 'bg-orange-500' : 'bg-gray-400'}
+            loading={loading}
+            error={error}
+          />
+          <KPICard
+            title="Gross Profit"
+            value={formatCurrency(financial_health?.gross_profit || 0)}
+            change={`Margin: ${
+              financial_health?.gross_profit && sales?.total_revenue
+                ? ((financial_health.gross_profit / sales.total_revenue) * 100).toFixed(1)
+                : 0
+            }%`}
+            changeType="neutral"
+            icon={TrendingUp}
+            iconColor="bg-emerald-500"
+            loading={loading}
+            error={error}
+          />
+          <KPICard
+            title="Total Expenses"
+            value={formatCurrency(financial_health?.total_expenses || 0)}
+            change="Current month"
+            changeType="negative"
+            icon={Wallet}
+            iconColor="bg-orange-500"
+            loading={loading}
+            error={error}
+          />
+        </div>
+
+        {/* Charts Row 1 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-6">
+          <SalesTrendChart data={charts?.sales_trend || []} loading={loading} />
+          <RevenuePieChart data={charts?.revenue_by_category || []} loading={loading} />
+        </div>
+
+        {/* Charts Row 2 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-6">
+          <TopProductsChart data={charts?.top_products || []} loading={loading} />
+          <ActivityFeed />
+        </div>
+
+        {/* Quick Actions */}
+        <QuickActions />
+      </>
     );
+  };
+
+  // ─────────────────────────── STAFF DASHBOARD ───────────────────────────
+  const renderStaffDashboard = () => {
+    const { personal_stats, recent_sales } = dashboardData || {};
+    const salesList = Array.isArray(recent_sales) ? recent_sales : [];
+
+    return (
+      <>
+        {/* Personal KPIs */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6 mb-6">
+          <KPICard
+            title="My Total Sales"
+            value={formatNumber(personal_stats?.my_sales_count || 0)}
+            change={`Today: ${personal_stats?.today_sales || 0}`}
+            changeType="neutral"
+            icon={ShoppingCart}
+            iconColor="bg-blue-500"
+            loading={loading}
+            error={error}
+          />
+          <KPICard
+            title="Items Sold"
+            value={formatNumber(personal_stats?.items_sold || 0)}
+            change="Total units"
+            changeType="neutral"
+            icon={Package}
+            iconColor="bg-purple-500"
+            loading={loading}
+            error={error}
+          />
+          <KPICard
+            title="Customers Served"
+            value={formatNumber(personal_stats?.customers_served || 0)}
+            change="Unique customers"
+            changeType="neutral"
+            icon={Users}
+            iconColor="bg-green-500"
+            loading={loading}
+            error={error}
+          />
+        </div>
+
+        {/* Recent Sales Table */}
+        <div className="bg-theme-secondary rounded-lg shadow-theme-md p-4 md:p-6 mb-6 border border-theme">
+          <h3 className="text-base md:text-lg font-semibold text-theme-primary mb-4">My Recent Sales</h3>
+          {salesList.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-theme">
+                <thead className="bg-theme-tertiary">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-theme-muted uppercase">Receipt #</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-theme-muted uppercase">Date</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-theme-muted uppercase">Customer</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-theme-muted uppercase">Items</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-theme-muted uppercase">Payment</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-theme-muted uppercase">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-theme-secondary divide-y divide-theme">
+                  {salesList.map((sale) => (
+                    <tr key={sale.id} className="hover:bg-theme-tertiary transition">
+                      <td className="px-4 py-3 text-sm font-medium text-accent-gold">{sale.receipt_number}</td>
+                      <td className="px-4 py-3 text-sm text-theme-secondary">
+                        {new Date(sale.sale_date).toLocaleDateString()}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-theme-primary">{sale.customer_name || 'Walk-in'}</td>
+                      <td className="px-4 py-3 text-sm text-theme-primary">{sale.item_count || '-'}</td>
+                      <td className="px-4 py-3 text-sm text-theme-secondary capitalize">{sale.payment_method}</td>
+                      <td className="px-4 py-3">
+                        <span className={`px-2 py-1 text-xs rounded-full ${
+                          sale.payment_status === 'paid'
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300'
+                            : sale.payment_status === 'partial'
+                              ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300'
+                              : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                        }`}>
+                          {sale.payment_status || 'Paid'}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-theme-muted text-center py-8">No sales recorded yet</p>
+          )}
+        </div>
+
+        {/* Activity + Quick Actions */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-6">
+          <ActivityFeed />
+          <QuickActions />
+        </div>
+      </>
+    );
+  };
+
+  return (
+    <div className="min-h-screen">
+      {/* Header */}
+      <div className="bg-theme-secondary shadow-theme-sm mb-4 border-b border-theme">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-4 md:py-6">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3">
+            <div>
+              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-theme-primary">Dashboard</h1>
+              <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-theme-secondary">
+                Welcome back, {user?.full_name}!
+              </p>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
+              <PeriodFilter storageKey="dashboard" onChange={handlePeriodChange} />
+              <button
+                onClick={fetchDashboardData}
+                className="inline-flex items-center gap-2 px-3 py-2 text-sm text-theme-secondary bg-theme-tertiary border border-theme rounded-lg hover:bg-theme-secondary transition"
+              >
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 md:px-6 lg:px-8 py-3 sm:py-4 md:py-8">
+        {/* Error Banner */}
+        {error && (
+          <div className="bg-red-50 dark:bg-red-900/20 border-2 border-red-400 dark:border-red-800 p-4 mb-6 rounded-lg">
+            <div className="flex items-center gap-3">
+              <AlertTriangle className="h-5 w-5 text-red-500 flex-shrink-0" />
+              <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Render based on role */}
+        {isStaff ? renderStaffDashboard() : renderAdminDashboard()}
+      </div>
+    </div>
+  );
 };
 
 export default Dashboard;

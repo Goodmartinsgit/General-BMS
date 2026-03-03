@@ -1,6 +1,7 @@
 import React from 'react';
 import { RotateCcw, DollarSign, Package, Calendar, User, Eye, Check, X, FileText } from 'lucide-react';
 import { Card, Badge, Button } from '../ui';
+import { useCurrency } from '../../context/CurrencyContext';
 
 /**
  * ReturnCard Component
@@ -15,6 +16,7 @@ const ReturnCard = ({
   showActions = true,
   className = '',
 }) => {
+  const { formatCurrency } = useCurrency();
   const {
     return_number,
     sale_number,
@@ -56,14 +58,20 @@ const ReturnCard = ({
     refund: {
       icon: DollarSign,
       label: 'Refund',
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-100',
+      color: 'text-accent-gold',
+      bgColor: 'bg-accent-gold/10',
     },
     exchange: {
       icon: RotateCcw,
       label: 'Exchange',
-      color: 'text-green-600',
-      bgColor: 'bg-green-100',
+      color: 'text-emerald-600',
+      bgColor: 'bg-emerald-50',
+    },
+    store_credit: {
+      icon: Package,
+      label: 'Store Credit',
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-50',
     },
   };
 
@@ -82,12 +90,12 @@ const ReturnCard = ({
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-start gap-3">
-          <div className={`w-12 h-12 ${typeInfo.bgColor} rounded-lg flex items-center justify-center`}>
+          <div className={`w-12 h-12 ${typeInfo.bgColor} rounded-lg flex items-center justify-center border border-theme`}>
             <TypeIcon className={`w-6 h-6 ${typeInfo.color}`} />
           </div>
           <div>
-            <h3 className="font-semibold text-gray-900">{return_number}</h3>
-            <p className="text-sm text-gray-600">Sale: {sale_number}</p>
+            <h3 className="font-semibold text-theme-primary font-mono">{return_number}</h3>
+            <p className="text-sm text-theme-muted">Sale: {sale_number}</p>
           </div>
         </div>
 
@@ -98,12 +106,12 @@ const ReturnCard = ({
       </div>
 
       {/* Return Amount - Prominent Display */}
-      <div className={`p-4 ${typeInfo.bgColor} rounded-lg mb-4`}>
-        <p className="text-sm text-gray-700 mb-1">Return Amount</p>
+      <div className={`p-4 ${typeInfo.bgColor} rounded-lg mb-4 border border-theme`}>
+        <p className="text-sm text-theme-secondary mb-1">Return Amount</p>
         <p className={`text-3xl font-bold ${typeInfo.color}`}>
-          ${parseFloat(total_amount || 0).toFixed(2)}
+          {formatCurrency(total_amount || 0)}
         </p>
-        <p className="text-xs text-gray-600 mt-1">{total_items} items</p>
+        <p className="text-xs text-theme-muted mt-1">{total_items} item{total_items !== 1 ? 's' : ''}</p>
       </div>
 
       {/* Details */}
@@ -111,25 +119,25 @@ const ReturnCard = ({
         {/* Customer */}
         {customer_name && (
           <div className="flex items-center gap-2 text-sm">
-            <User className="w-4 h-4 text-gray-400 flex-shrink-0" />
-            <span className="text-gray-600">Customer:</span>
-            <span className="font-medium text-gray-900">{customer_name}</span>
+            <User className="w-4 h-4 text-theme-muted flex-shrink-0" />
+            <span className="text-theme-muted">Customer:</span>
+            <span className="font-medium text-theme-primary">{customer_name}</span>
           </div>
         )}
 
         {/* Reason */}
         <div className="flex items-start gap-2 text-sm">
-          <FileText className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" />
+          <FileText className="w-4 h-4 text-theme-muted flex-shrink-0 mt-0.5" />
           <div className="flex-1">
-            <span className="text-gray-600">Reason:</span>
-            <p className="font-medium text-gray-900 mt-0.5">{reason}</p>
+            <span className="text-theme-muted">Reason:</span>
+            <p className="font-medium text-theme-primary mt-0.5">{reason}</p>
           </div>
         </div>
 
         {/* Created */}
         <div className="flex items-center gap-2 text-sm">
-          <Calendar className="w-4 h-4 text-gray-400 flex-shrink-0" />
-          <span className="text-gray-600">
+          <Calendar className="w-4 h-4 text-theme-muted flex-shrink-0" />
+          <span className="text-theme-muted">
             Created: {new Date(created_at).toLocaleDateString()}
             {created_by_name && ` by ${created_by_name}`}
           </span>
@@ -138,8 +146,8 @@ const ReturnCard = ({
         {/* Approved */}
         {approved_at && (
           <div className="flex items-center gap-2 text-sm">
-            <Check className="w-4 h-4 text-green-600 flex-shrink-0" />
-            <span className="text-gray-600">
+            <Check className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+            <span className="text-theme-muted">
               Approved: {new Date(approved_at).toLocaleDateString()}
               {approved_by_name && ` by ${approved_by_name}`}
             </span>
@@ -149,8 +157,8 @@ const ReturnCard = ({
         {/* Processed */}
         {processed_at && (
           <div className="flex items-center gap-2 text-sm">
-            <Package className="w-4 h-4 text-blue-600 flex-shrink-0" />
-            <span className="text-gray-600">
+            <Package className="w-4 h-4 text-accent-gold flex-shrink-0" />
+            <span className="text-theme-muted">
               Processed: {new Date(processed_at).toLocaleDateString()}
             </span>
           </div>
@@ -159,7 +167,7 @@ const ReturnCard = ({
 
       {/* Actions */}
       {showActions && (
-        <div className="flex items-center gap-2 pt-4 border-t border-gray-200">
+        <div className="flex items-center gap-2 pt-4 border-t border-theme">
           <Button
             size="sm"
             variant="outline"

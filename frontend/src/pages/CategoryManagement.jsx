@@ -1,507 +1,394 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Edit, Trash2, Tag, Briefcase, Ruler, Package } from 'lucide-react';
-import {
-  Button,
-  Tabs,
-  DataTable,
-  Modal,
-  Input,
-  ConfirmDialog,
-  Badge,
-  EmptyState,
-  LoadingSpinner,
-} from '../components/ui';
+import { Plus, Edit, Trash2, Tag, Briefcase, RefreshCw, AlertCircle } from 'lucide-react';
+import api from '../api/axios';
 
-/**
- * CategoryManagement Page
- * Manage all product categorization: brands, categories, sizes, use cases, etc.
- */
+const inputClass =
+  'w-full px-3 py-2.5 bg-theme-primary border border-theme rounded-lg text-sm text-theme-primary placeholder-theme-muted focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none transition-all';
+const labelClass = 'block text-sm font-medium text-theme-secondary mb-1';
+
+// ── helpers ────────────────────────────────────────────────────────────────────
+const TABS = [
+  { key: 'brands',     label: 'Brands',     icon: Briefcase, nameField: 'brand_name',    singular: 'Brand'    },
+  { key: 'categories', label: 'Categories', icon: Tag,        nameField: 'category_name', singular: 'Category' },
+];
+
+// ── main page ──────────────────────────────────────────────────────────────────
 const CategoryManagement = () => {
-  const [activeTab, setActiveTab] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('brands');
+  const [data, setData]           = useState({ brands: [], categories: [] });
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState(null);
 
-  // Category types data
-  const [brands, setBrands] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [sizes, setSizes] = useState([]);
-  const [useCases, setUseCases] = useState([]);
+  // modal
+  const [showModal, setShowModal]   = useState(false);
+  const [editItem, setEditItem]     = useState(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  // Modal states
-  const [showModal, setShowModal] = useState(false);
-  const [selectedItem, setSelectedItem] = useState(null);
-  const [currentCategoryType, setCurrentCategoryType] = useState('brands');
+  // delete confirm
+  const [deleteItem, setDeleteItem]   = useState(null);
+  const [deleting, setDeleting]       = useState(false);
 
-  // Delete confirmation
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [itemToDelete, setItemToDelete] = useState(null);
+  const tab = TABS.find(t => t.key === activeTab);
 
-  // Fetch all categories on mount
-  useEffect(() => {
-    fetchAllCategories();
-  }, []);
+  useEffect(() => { fetchAll(); }, []);
 
-  const fetchAllCategories = async () => {
+  const fetchAll = async () => {
     setLoading(true);
+    setError(null);
     try {
-      await Promise.all([
-        fetchBrands(),
-        fetchCategories(),
-        fetchSizes(),
-        fetchUseCases(),
+      const [brandsRes, catsRes] = await Promise.all([
+        api.get('/products/brands'),
+        api.get('/products/categories'),
       ]);
-    } catch (error) {
-      console.error('Error fetching categories:', error);
+      setData({
+        brands:     Array.isArray(brandsRes.data)  ? brandsRes.data  : [],
+        categories: Array.isArray(catsRes.data)    ? catsRes.data    : [],
+      });
+    } catch {
+      setError('Failed to load data. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchBrands = async () => {
-    // TODO: Replace with actual API call
-    // const response = await fetch('/api/categories/brands');
-    // const data = await response.json();
-    setBrands([
-      { id: '1', brand_name: 'Samsung', description: 'Electronics manufacturer', product_count: 45, is_active: true, created_at: '2026-01-15' },
-      { id: '2', brand_name: 'Apple', description: 'Technology company', product_count: 32, is_active: true, created_at: '2026-01-16' },
-      { id: '3', brand_name: 'Dell', description: 'Computer hardware', product_count: 28, is_active: true, created_at: '2026-01-17' },
-    ]);
-  };
-
-  const fetchCategories = async () => {
-    // TODO: Replace with actual API call
-    setCategories([
-      { id: '1', category_name: 'Electronics', description: 'Electronic devices and accessories', product_count: 78, is_active: true, created_at: '2026-01-10' },
-      { id: '2', category_name: 'Furniture', description: 'Office and home furniture', product_count: 34, is_active: true, created_at: '2026-01-11' },
-      { id: '3', category_name: 'Office Supplies', description: 'Stationery and supplies', product_count: 56, is_active: true, created_at: '2026-01-12' },
-    ]);
-  };
-
-  const fetchSizes = async () => {
-    // TODO: Replace with actual API call
-    setSizes([
-      { id: '1', size_name: 'Small', description: 'Small size products', product_count: 23, is_active: true, created_at: '2026-01-18' },
-      { id: '2', size_name: 'Medium', description: 'Medium size products', product_count: 45, is_active: true, created_at: '2026-01-19' },
-      { id: '3', size_name: 'Large', description: 'Large size products', product_count: 18, is_active: true, created_at: '2026-01-20' },
-    ]);
-  };
-
-  const fetchUseCases = async () => {
-    // TODO: Replace with actual API call
-    setUseCases([
-      { id: '1', use_case_name: 'Indoor', description: 'Indoor use products', product_count: 67, is_active: true, created_at: '2026-01-21' },
-      { id: '2', use_case_name: 'Outdoor', description: 'Outdoor use products', product_count: 34, is_active: true, created_at: '2026-01-22' },
-      { id: '3', use_case_name: 'Industrial', description: 'Industrial use products', product_count: 12, is_active: true, created_at: '2026-01-23' },
-    ]);
-  };
-
-  const handleCreate = (categoryType) => {
-    setCurrentCategoryType(categoryType);
-    setSelectedItem(null);
-    setShowModal(true);
-  };
-
-  const handleEdit = (item, categoryType) => {
-    setCurrentCategoryType(categoryType);
-    setSelectedItem(item);
-    setShowModal(true);
-  };
-
-  const handleDelete = (item, categoryType) => {
-    setCurrentCategoryType(categoryType);
-    setItemToDelete(item);
-    setShowDeleteConfirm(true);
-  };
+  const handleOpenAdd = () => { setEditItem(null); setShowModal(true); };
+  const handleOpenEdit = (item) => { setEditItem(item); setShowModal(true); };
+  const handleCloseModal = () => { setShowModal(false); setEditItem(null); };
 
   const handleSubmit = async (formData) => {
+    setSubmitting(true);
     try {
-      if (selectedItem) {
-        // Update
-        // TODO: Replace with actual API call
-        // await fetch(`/api/categories/${currentCategoryType}/${selectedItem.id}`, {
-        //   method: 'PUT',
-        //   headers: { 'Content-Type': 'application/json' },
-        //   body: JSON.stringify(formData),
-        // });
+      if (editItem) {
+        await api.put(`/products/${activeTab}/${editItem.id}`, formData);
       } else {
-        // Create
-        // TODO: Replace with actual API call
-        // await fetch(`/api/categories/${currentCategoryType}`, {
-        //   method: 'POST',
-        //   headers: { 'Content-Type': 'application/json' },
-        //   body: JSON.stringify(formData),
-        // });
+        await api.post(`/products/${activeTab}`, formData);
       }
-
-      await fetchAllCategories();
-      setShowModal(false);
-      setSelectedItem(null);
-    } catch (error) {
-      console.error('Error saving category:', error);
+      handleCloseModal();
+      fetchAll();
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Failed to save. Please try again.';
+      alert(msg);
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const confirmDelete = async () => {
+  const handleDelete = async () => {
+    if (!deleteItem) return;
+    setDeleting(true);
     try {
-      // TODO: Replace with actual API call
-      // await fetch(`/api/categories/${currentCategoryType}/${itemToDelete.id}`, {
-      //   method: 'DELETE',
-      // });
-
-      await fetchAllCategories();
-      setShowDeleteConfirm(false);
-      setItemToDelete(null);
-    } catch (error) {
-      console.error('Error deleting category:', error);
+      await api.delete(`/products/${activeTab}/${deleteItem.id}`);
+      setDeleteItem(null);
+      fetchAll();
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Failed to delete.';
+      alert(msg);
+    } finally {
+      setDeleting(false);
     }
   };
 
-  // Tab configuration
-  const tabs = [
-    {
-      label: 'Brands',
-      icon: Briefcase,
-      content: (
-        <CategorySection
-          title="Brands"
-          description="Manage product brands and manufacturers"
-          data={brands}
-          categoryType="brands"
-          nameField="brand_name"
-          onAdd={() => handleCreate('brands')}
-          onEdit={(item) => handleEdit(item, 'brands')}
-          onDelete={(item) => handleDelete(item, 'brands')}
-          loading={loading}
-        />
-      ),
-    },
-    {
-      label: 'Categories',
-      icon: Tag,
-      content: (
-        <CategorySection
-          title="Product Categories"
-          description="Manage product categories and classifications"
-          data={categories}
-          categoryType="categories"
-          nameField="category_name"
-          onAdd={() => handleCreate('categories')}
-          onEdit={(item) => handleEdit(item, 'categories')}
-          onDelete={(item) => handleDelete(item, 'categories')}
-          loading={loading}
-        />
-      ),
-    },
-    {
-      label: 'Sizes',
-      icon: Ruler,
-      content: (
-        <CategorySection
-          title="Product Sizes"
-          description="Manage product size classifications"
-          data={sizes}
-          categoryType="sizes"
-          nameField="size_name"
-          onAdd={() => handleCreate('sizes')}
-          onEdit={(item) => handleEdit(item, 'sizes')}
-          onDelete={(item) => handleDelete(item, 'sizes')}
-          loading={loading}
-        />
-      ),
-    },
-    {
-      label: 'Use Cases',
-      icon: Package,
-      content: (
-        <CategorySection
-          title="Product Use Cases"
-          description="Manage product use case classifications"
-          data={useCases}
-          categoryType="use_cases"
-          nameField="use_case_name"
-          onAdd={() => handleCreate('use_cases')}
-          onEdit={(item) => handleEdit(item, 'use_cases')}
-          onDelete={(item) => handleDelete(item, 'use_cases')}
-          loading={loading}
-        />
-      ),
-    },
-  ];
+  const rows = data[activeTab] || [];
 
   return (
-    <div className="p-6 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">Category Management</h1>
-        <p className="text-gray-600">Organize your products with brands, categories, and classifications</p>
-      </div>
-
-      {/* Tabs */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <Tabs tabs={tabs} />
-      </div>
-
-      {/* Category Form Modal */}
-      <CategoryFormModal
-        isOpen={showModal}
-        onClose={() => {
-          setShowModal(false);
-          setSelectedItem(null);
-        }}
-        onSubmit={handleSubmit}
-        item={selectedItem}
-        categoryType={currentCategoryType}
-      />
-
-      {/* Delete Confirmation */}
-      <ConfirmDialog
-        isOpen={showDeleteConfirm}
-        onClose={() => {
-          setShowDeleteConfirm(false);
-          setItemToDelete(null);
-        }}
-        onConfirm={confirmDelete}
-        title={`Delete ${currentCategoryType.slice(0, -1)}`}
-        message={`Are you sure you want to delete this ${currentCategoryType.slice(0, -1)}? This may affect ${itemToDelete?.product_count || 0} products.`}
-        confirmText="Delete"
-        variant="danger"
-      />
-    </div>
-  );
-};
-
-// Category Section Component
-const CategorySection = ({
-  title,
-  description,
-  data,
-  categoryType,
-  nameField,
-  onAdd,
-  onEdit,
-  onDelete,
-  loading,
-}) => {
-  const columns = [
-    {
-      key: nameField,
-      label: 'Name',
-      render: (item) => (
-        <div className="flex items-center gap-2">
-          <span className="font-medium text-gray-900">{item[nameField]}</span>
-          {!item.is_active && <Badge variant="default" size="sm">Inactive</Badge>}
-        </div>
-      ),
-    },
-    {
-      key: 'description',
-      label: 'Description',
-      render: (item) => (
-        <span className="text-sm text-gray-600">{item.description || '—'}</span>
-      ),
-    },
-    {
-      key: 'product_count',
-      label: 'Products',
-      render: (item) => (
-        <Badge variant="primary">{item.product_count || 0}</Badge>
-      ),
-    },
-    {
-      key: 'created_at',
-      label: 'Created',
-      render: (item) => (
-        <span className="text-sm text-gray-600">
-          {new Date(item.created_at).toLocaleDateString()}
-        </span>
-      ),
-    },
-    {
-      key: 'actions',
-      label: 'Actions',
-      render: (item) => (
-        <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            variant="ghost"
-            icon={Edit}
-            onClick={() => onEdit(item)}
-            title="Edit"
-          />
-          <Button
-            size="sm"
-            variant="ghost"
-            icon={Trash2}
-            onClick={() => onDelete(item)}
-            className="text-red-600 hover:bg-red-50"
-            title="Delete"
-          />
-        </div>
-      ),
-    },
-  ];
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <LoadingSpinner size="lg" />
-      </div>
-    );
-  }
-
-  return (
-    <div className="p-6">
-      {/* Section Header */}
-      <div className="flex items-center justify-between mb-6">
+    <div className="space-y-6 max-w-5xl mx-auto pb-10">
+      {/* Page Header */}
+      <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-xl font-semibold text-gray-900">{title}</h2>
-          <p className="text-sm text-gray-600 mt-1">{description}</p>
+          <h1 className="text-xl font-semibold text-theme-primary">Category Management</h1>
+          <p className="text-sm text-theme-muted mt-0.5">Manage product brands and categories</p>
         </div>
-        <Button variant="primary" icon={Plus} onClick={onAdd}>
-          Add {categoryType.slice(0, -1)}
-        </Button>
+        <button
+          onClick={handleOpenAdd}
+          className="flex items-center gap-2 px-4 py-2 bg-accent-gold text-white rounded-lg text-sm font-semibold hover:bg-yellow-600 transition-colors shadow-sm"
+        >
+          <Plus size={15} />
+          Add {tab.singular}
+        </button>
       </div>
 
-      {/* Data Table */}
-      {data.length === 0 ? (
-        <EmptyState
-          icon={Tag}
-          title={`No ${categoryType} found`}
-          description={`Create your first ${categoryType.slice(0, -1)} to get started`}
-          action={
-            <Button variant="primary" icon={Plus} onClick={onAdd}>
-              Add {categoryType.slice(0, -1)}
-            </Button>
-          }
+      {/* Tab Bar */}
+      <div className="flex gap-1 p-1 bg-theme-tertiary/50 rounded-lg border border-theme w-fit">
+        {TABS.map(t => (
+          <button
+            key={t.key}
+            onClick={() => setActiveTab(t.key)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+              activeTab === t.key
+                ? 'bg-theme-secondary text-accent-gold shadow-sm'
+                : 'text-theme-muted hover:text-theme-primary'
+            }`}
+          >
+            <t.icon size={14} className={activeTab === t.key ? 'text-accent-gold' : 'opacity-50'} />
+            {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Content */}
+      <div className="bg-theme-secondary border border-theme rounded-xl shadow-theme-sm overflow-hidden">
+        {loading ? (
+          <div className="flex items-center justify-center py-20 gap-3 text-theme-muted">
+            <RefreshCw size={18} className="animate-spin" />
+            <span className="text-sm">Loading…</span>
+          </div>
+        ) : error ? (
+          <div className="flex items-center justify-center py-20 gap-3 text-red-500">
+            <AlertCircle size={18} />
+            <span className="text-sm">{error}</span>
+          </div>
+        ) : rows.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-4 text-theme-muted">
+            <tab.icon size={40} className="opacity-20" />
+            <div className="text-center">
+              <p className="text-sm font-medium text-theme-primary">No {tab.label.toLowerCase()} yet</p>
+              <p className="text-xs mt-1">Click "Add {tab.singular}" to create the first one.</p>
+            </div>
+            <button
+              onClick={handleOpenAdd}
+              className="flex items-center gap-2 px-4 py-2 bg-accent-gold text-white rounded-lg text-sm font-semibold hover:bg-yellow-600 transition-colors"
+            >
+              <Plus size={14} /> Add {tab.singular}
+            </button>
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-theme bg-theme-tertiary/30">
+                <th className="px-4 py-3 text-left text-xs font-semibold text-theme-muted uppercase tracking-wider">Name</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-theme-muted uppercase tracking-wider">Description</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-theme-muted uppercase tracking-wider">Products</th>
+                <th className="px-4 py-3 text-center text-xs font-semibold text-theme-muted uppercase tracking-wider">Status</th>
+                <th className="px-4 py-3 text-right text-xs font-semibold text-theme-muted uppercase tracking-wider">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-theme">
+              {rows.map(row => (
+                <tr key={row.id} className="hover:bg-theme-tertiary/20 transition-colors">
+                  <td className="px-4 py-3 font-medium text-theme-primary">
+                    {row[tab.nameField]}
+                  </td>
+                  <td className="px-4 py-3 text-theme-muted max-w-xs truncate">
+                    {row.description || <span className="italic opacity-40">—</span>}
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-full text-xs font-medium bg-accent-gold/10 text-accent-gold">
+                      {row.product_count ?? 0}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-center">
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                      row.is_active
+                        ? 'bg-emerald-500/10 text-emerald-500'
+                        : 'bg-theme-tertiary text-theme-muted'
+                    }`}>
+                      {row.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <button
+                        onClick={() => handleOpenEdit(row)}
+                        className="p-1.5 text-theme-muted hover:text-accent-gold hover:bg-accent-gold/10 rounded-lg transition-colors"
+                        title="Edit"
+                      >
+                        <Edit size={14} />
+                      </button>
+                      <button
+                        onClick={() => setDeleteItem(row)}
+                        className="p-1.5 text-theme-muted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+                        title="Delete"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* Add / Edit Modal */}
+      {showModal && (
+        <CategoryFormModal
+          tab={tab}
+          item={editItem}
+          onClose={handleCloseModal}
+          onSubmit={handleSubmit}
+          submitting={submitting}
         />
-      ) : (
-        <DataTable columns={columns} data={data} />
+      )}
+
+      {/* Delete Confirm */}
+      {deleteItem && (
+        <DeleteConfirmDialog
+          item={deleteItem}
+          tab={tab}
+          onClose={() => setDeleteItem(null)}
+          onConfirm={handleDelete}
+          deleting={deleting}
+        />
       )}
     </div>
   );
 };
 
-// Category Form Modal Component
-const CategoryFormModal = ({ isOpen, onClose, onSubmit, item, categoryType }) => {
-  const isEditMode = !!item;
-
-  const getNameField = () => {
-    const nameFields = {
-      brands: 'brand_name',
-      categories: 'category_name',
-      sizes: 'size_name',
-      use_cases: 'use_case_name',
-    };
-    return nameFields[categoryType] || 'name';
-  };
-
-  const nameField = getNameField();
-
+// ── form modal ─────────────────────────────────────────────────────────────────
+const CategoryFormModal = ({ tab, item, onClose, onSubmit, submitting }) => {
+  const isEdit = !!item;
   const [formData, setFormData] = useState({
-    [nameField]: '',
-    description: '',
-    is_active: true,
+    [tab.nameField]: item?.[tab.nameField] || '',
+    description: item?.description || '',
+    is_active: item?.is_active !== false,
   });
+  const [error, setError] = useState('');
 
-  const [errors, setErrors] = useState({});
-
-  useEffect(() => {
-    if (item) {
-      setFormData({
-        [nameField]: item[nameField] || '',
-        description: item.description || '',
-        is_active: item.is_active !== false,
-      });
-    } else {
-      setFormData({
-        [nameField]: '',
-        description: '',
-        is_active: true,
-      });
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!formData[tab.nameField].trim()) {
+      setError(`${tab.singular} name is required`);
+      return;
     }
-  }, [item, nameField]);
-
-  const validate = () => {
-    const newErrors = {};
-
-    if (!formData[nameField]?.trim()) {
-      newErrors[nameField] = 'Name is required';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = () => {
-    if (validate()) {
-      onSubmit(formData);
-    }
-  };
-
-  const getTitle = () => {
-    const singular = categoryType.slice(0, -1);
-    return isEditMode ? `Edit ${singular}` : `Add New ${singular}`;
-  };
-
-  const getLabel = () => {
-    const labels = {
-      brand_name: 'Brand Name',
-      category_name: 'Category Name',
-      size_name: 'Size Name',
-      use_case_name: 'Use Case Name',
-    };
-    return labels[nameField] || 'Name';
+    onSubmit(formData);
   };
 
   return (
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title={getTitle()}
-      size="md"
-      footer={
-        <>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button onClick={handleSubmit}>
-            {isEditMode ? 'Update' : 'Create'}
-          </Button>
-        </>
-      }
-    >
-      <div className="space-y-4">
-        <Input
-          label={getLabel()}
-          value={formData[nameField]}
-          onChange={(e) => setFormData({ ...formData, [nameField]: e.target.value })}
-          error={errors[nameField]}
-          required
-          placeholder={`Enter ${getLabel().toLowerCase()}`}
-        />
-
-        <div className="space-y-1">
-          <label className="block text-sm font-medium text-gray-700">Description</label>
-          <textarea
-            value={formData.description}
-            onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-            rows={3}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="Optional description"
-          />
+    <div className="fixed inset-0 z-60 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
+      <div
+        className="relative bg-theme-secondary rounded-xl border border-theme shadow-theme-xl w-full max-w-md"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-theme">
+          <h2 className="text-base font-semibold text-theme-primary">
+            {isEdit ? `Edit ${tab.singular}` : `Add ${tab.singular}`}
+          </h2>
+          <button
+            onClick={onClose}
+            className="p-1.5 text-theme-muted hover:text-theme-primary hover:bg-theme-tertiary rounded-lg transition-colors"
+          >
+            ✕
+          </button>
         </div>
 
-        <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            checked={formData.is_active}
-            onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-            className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-          />
-          <span className="text-sm font-medium text-gray-700">Active</span>
-        </label>
+        {/* Body */}
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <div>
+            <label className={labelClass}>
+              {tab.singular} Name <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              value={formData[tab.nameField]}
+              onChange={e => { setFormData(p => ({ ...p, [tab.nameField]: e.target.value })); setError(''); }}
+              placeholder={`Enter ${tab.singular.toLowerCase()} name`}
+              className={`${inputClass} ${error ? 'border-red-500/60' : ''}`}
+              autoFocus
+            />
+            {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+          </div>
+
+          <div>
+            <label className={labelClass}>Description</label>
+            <textarea
+              value={formData.description}
+              onChange={e => setFormData(p => ({ ...p, description: e.target.value }))}
+              rows={3}
+              placeholder="Optional description"
+              className={`${inputClass} resize-none`}
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setFormData(p => ({ ...p, is_active: !p.is_active }))}
+            className={`flex items-center justify-between w-full p-3 rounded-lg border transition-all ${
+              formData.is_active
+                ? 'bg-emerald-500/10 border-emerald-500/30'
+                : 'bg-theme-primary border-theme'
+            }`}
+          >
+            <span className={`text-sm font-medium ${formData.is_active ? 'text-emerald-500' : 'text-theme-muted'}`}>
+              Active
+            </span>
+            <div className={`w-4 h-4 rounded border flex items-center justify-center transition-all ${
+              formData.is_active ? 'bg-emerald-500 border-emerald-500' : 'border-theme bg-theme-primary'
+            }`}>
+              {formData.is_active && <span className="text-white text-[10px] font-bold">✓</span>}
+            </div>
+          </button>
+
+          {/* Footer */}
+          <div className="flex justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={submitting}
+              className="px-4 py-2 text-sm font-medium text-theme-secondary bg-theme-primary hover:bg-theme-tertiary border border-theme rounded-lg transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="flex items-center gap-2 px-6 py-2 text-sm font-semibold bg-accent-gold text-white rounded-lg hover:bg-yellow-600 transition-colors shadow-sm disabled:opacity-60"
+            >
+              {submitting && <RefreshCw size={13} className="animate-spin" />}
+              {isEdit ? 'Save Changes' : `Add ${tab.singular}`}
+            </button>
+          </div>
+        </form>
       </div>
-    </Modal>
+    </div>
   );
 };
+
+// ── delete confirm ─────────────────────────────────────────────────────────────
+const DeleteConfirmDialog = ({ item, tab, onClose, onConfirm, deleting }) => (
+  <div className="fixed inset-0 z-60 flex items-center justify-center p-4" onClick={onClose}>
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
+    <div
+      className="relative bg-theme-secondary rounded-xl border border-theme shadow-theme-xl w-full max-w-sm p-6 space-y-4"
+      onClick={e => e.stopPropagation()}
+    >
+      <div className="flex items-start gap-3">
+        <div className="w-9 h-9 rounded-full bg-red-500/10 flex items-center justify-center shrink-0">
+          <Trash2 size={16} className="text-red-500" />
+        </div>
+        <div>
+          <h3 className="text-sm font-semibold text-theme-primary">Delete {tab.singular}</h3>
+          <p className="text-sm text-theme-muted mt-1">
+            Are you sure you want to delete <span className="font-medium text-theme-primary">{item[tab.nameField]}</span>?
+            {(item.product_count > 0) && (
+              <span className="block mt-1 text-amber-500 text-xs">
+                This {tab.singular.toLowerCase()} has {item.product_count} product{item.product_count !== 1 ? 's' : ''} assigned to it.
+              </span>
+            )}
+          </p>
+        </div>
+      </div>
+      <div className="flex justify-end gap-3">
+        <button
+          onClick={onClose}
+          disabled={deleting}
+          className="px-4 py-2 text-sm font-medium text-theme-secondary bg-theme-primary hover:bg-theme-tertiary border border-theme rounded-lg transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={onConfirm}
+          disabled={deleting}
+          className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-60"
+        >
+          {deleting && <RefreshCw size={13} className="animate-spin" />}
+          Delete
+        </button>
+      </div>
+    </div>
+  </div>
+);
 
 export default CategoryManagement;

@@ -2,16 +2,22 @@ const { query } = require('../config/db');
 
 const getAllCustomers = async (req, res) => {
     try {
-        const { type } = req.query;
-        let q = `SELECT c.*, pt.tier_name 
-                 FROM customers c 
-                 LEFT JOIN price_tiers pt ON c.price_tier_id = pt.id 
+        const { type, source } = req.query;
+        let q = `SELECT c.*, pt.tier_name,
+                        ca.is_email_verified, ca.last_login_at
+                 FROM customers c
+                 LEFT JOIN price_tiers pt ON c.price_tier_id = pt.id
+                 LEFT JOIN customer_auth ca ON ca.customer_id = c.id
                  WHERE c.deleted_at IS NULL`;
         const params = [];
 
         if (type) {
             params.push(type);
             q += ` AND c.customer_type = $${params.length}`;
+        }
+        if (source && source !== 'all') {
+            params.push(source);
+            q += ` AND c.source = $${params.length}`;
         }
 
         q += ` ORDER BY c.created_at DESC`;

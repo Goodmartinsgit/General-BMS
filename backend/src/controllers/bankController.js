@@ -104,14 +104,14 @@ const getCashFlowSummary = async (req, res) => {
         const { branchId, startDate, endDate } = req.query;
         // Basic summary of inflows and outflows
         const result = await pool.query(`
-            SELECT 
+            SELECT
                 SUM(CASE WHEN type = 'inflow' THEN amount ELSE 0 END) as total_inflow,
                 SUM(CASE WHEN type = 'outflow' THEN amount ELSE 0 END) as total_outflow,
                 COUNT(*) as total_transactions
             FROM cash_flow
             WHERE created_at >= COALESCE($1, NOW() - INTERVAL '30 days')
               AND created_at <= COALESCE($2, NOW())
-        `, [startDate, endDate]);
+        `, [startDate || null, endDate || null]);
         
         res.json(result.rows[0]);
     } catch (err) {

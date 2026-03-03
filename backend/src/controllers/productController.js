@@ -180,24 +180,21 @@ const getAllProducts = async (req, res) => {
     const joins = view_mode === 'detailed' ? `
       LEFT JOIN brands b ON p.brand_id = b.id
       LEFT JOIN categories c ON p.category_id = c.id
-      LEFT JOIN tile_types tt ON p.tile_type_id = tt.id
-      LEFT JOIN sizes s ON p.size_id = s.id
-      LEFT JOIN use_cases uc ON p.use_case_id = uc.id
     ` : `
       LEFT JOIN brands b ON p.brand_id = b.id
       LEFT JOIN categories c ON p.category_id = c.id
     `;
 
+    // total_stock always included so every view mode shows correct stock
+    const stockSubquery = `(SELECT COALESCE(SUM(quantity_on_hand), 0) FROM inventory WHERE product_id = p.id) as total_stock`;
     const additionalFields = view_mode === 'detailed' ? `,
       b.brand_name,
       c.category_name,
-      tt.tile_type_name,
-      s.size_name,
-      uc.use_case_name,
-      (SELECT COALESCE(SUM(quantity_on_hand), 0) FROM inventory WHERE product_id = p.id) as total_stock
+      ${stockSubquery}
     ` : `,
       b.brand_name,
-      c.category_name
+      c.category_name,
+      ${stockSubquery}
     `;
 
     // Calculate offset for pagination
@@ -244,7 +241,7 @@ const getAllProducts = async (req, res) => {
     });
   } catch (err) {
     console.error('Error fetching products:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -260,9 +257,6 @@ const getProductById = async (req, res) => {
       SELECT p.*,
         b.brand_name,
         c.category_name,
-        tt.tile_type_name,
-        s.size_name, s.coverage_per_carton, s.pieces_per_carton,
-        uc.use_case_name,
         (SELECT COALESCE(SUM(quantity_on_hand), 0) FROM inventory WHERE product_id = p.id) as total_stock,
         (SELECT json_agg(json_build_object(
           'branch_id', i.branch_id,
@@ -278,9 +272,6 @@ const getProductById = async (req, res) => {
       FROM products p
       LEFT JOIN brands b ON p.brand_id = b.id
       LEFT JOIN categories c ON p.category_id = c.id
-      LEFT JOIN tile_types tt ON p.tile_type_id = tt.id
-      LEFT JOIN sizes s ON p.size_id = s.id
-      LEFT JOIN use_cases uc ON p.use_case_id = uc.id
       WHERE p.id = $1 AND p.deleted_at IS NULL
     `, [id]);
 
@@ -294,7 +285,7 @@ const getProductById = async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Error fetching product:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -329,6 +320,9 @@ const createProduct = async (req, res) => {
       is_wholesale_available = true,
       barcode,
       weight_per_unit,
+      is_online_available = false,
+      short_description,
+      slug: rawSlug,
       branch_stock_allocation = [] // Array of {branch_id, quantity, price_override}
     } = req.body;
 
@@ -346,6 +340,11 @@ const createProduct = async (req, res) => {
     // Generate product code
     const product_code = await generateProductCode(product_type);
 
+    // Auto-generate slug from product name if not provided
+    const slug = rawSlug ||
+      product_name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-') +
+      '-' + Date.now();
+
     // Begin transaction
     await query('BEGIN');
 
@@ -358,9 +357,10 @@ const createProduct = async (req, res) => {
           cost_price, tax_rate, reorder_level, max_stock_level, product_images,
           model_images, specifications, commission_amount, has_variants,
           track_serial_numbers, track_batches, is_featured,
-          is_retail_available, is_wholesale_available, barcode, weight_per_unit
+          is_retail_available, is_wholesale_available, barcode, weight_per_unit,
+          is_online_available, short_description, slug
         ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28
         ) RETURNING *
       `, [
         product_code, product_name, description, product_type,
@@ -369,7 +369,8 @@ const createProduct = async (req, res) => {
         JSON.stringify(product_images), JSON.stringify(model_images),
         JSON.stringify(specifications), commission_amount, has_variants,
         track_serial_numbers, track_batches, is_featured,
-        is_retail_available, is_wholesale_available, barcode, weight_per_unit
+        is_retail_available, is_wholesale_available, barcode, weight_per_unit,
+        is_online_available, short_description || null, slug
       ]);
 
       const product = productResult.rows[0];
@@ -407,7 +408,7 @@ const createProduct = async (req, res) => {
     }
   } catch (err) {
     console.error('Error creating product:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -431,7 +432,8 @@ const updateProduct = async (req, res) => {
       'reorder_level', 'max_stock_level', 'product_images', 'model_images',
       'specifications', 'commission_amount', 'has_variants', 'track_serial_numbers',
       'track_batches', 'is_featured', 'is_retail_available', 'is_wholesale_available',
-      'barcode', 'weight_per_unit'
+      'barcode', 'weight_per_unit',
+      'is_online_available', 'short_description', 'slug'
     ];
 
     for (const [key, value] of Object.entries(updates)) {
@@ -468,7 +470,7 @@ const updateProduct = async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Error updating product:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -519,7 +521,7 @@ const deleteProduct = async (req, res) => {
     }
   } catch (err) {
     console.error('Error deleting product:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -545,7 +547,7 @@ const toggleProductActive = async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Error toggling product active status:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -571,7 +573,7 @@ const toggleProductFeatured = async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Error toggling product featured status:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -600,7 +602,7 @@ const getFeaturedProducts = async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Error fetching featured products:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -638,7 +640,7 @@ const getLowStockProducts = async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Error fetching low stock products:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -679,7 +681,7 @@ const getProductStatistics = async (req, res) => {
     });
   } catch (err) {
     console.error('Error fetching product statistics:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -704,7 +706,145 @@ const getProductsWithVariants = async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Error fetching products with variants:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const getBrands = async (req, res) => {
+  try {
+    const result = await query(
+      `SELECT b.id, b.brand_name, b.description, b.logo_url, b.is_active, b.created_at,
+              COUNT(p.id)::int AS product_count
+       FROM brands b
+       LEFT JOIN products p ON p.brand_id = b.id AND p.deleted_at IS NULL
+       GROUP BY b.id ORDER BY b.brand_name`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching brands:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const createBrand = async (req, res) => {
+  try {
+    const { brand_name, description } = req.body;
+    if (!brand_name?.trim()) return res.status(400).json({ message: 'Brand name is required' });
+    const result = await query(
+      `INSERT INTO brands (brand_name, description) VALUES ($1, $2) RETURNING *`,
+      [brand_name.trim(), description || null]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    if (err.code === '23505') return res.status(400).json({ message: 'Brand name already exists' });
+    console.error('Error creating brand:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const updateBrand = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { brand_name, description, is_active } = req.body;
+    const result = await query(
+      `UPDATE brands SET
+         brand_name = COALESCE($1, brand_name),
+         description = $2,
+         is_active = COALESCE($3, is_active),
+         updated_at = NOW()
+       WHERE id = $4 RETURNING *`,
+      [brand_name?.trim() || null, description ?? null, is_active ?? null, id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ message: 'Brand not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    if (err.code === '23505') return res.status(400).json({ message: 'Brand name already exists' });
+    console.error('Error updating brand:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const deleteBrand = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const check = await query('SELECT COUNT(*) FROM products WHERE brand_id = $1 AND deleted_at IS NULL', [id]);
+    if (parseInt(check.rows[0].count) > 0) {
+      return res.status(400).json({ message: 'Cannot delete brand with assigned products' });
+    }
+    await query('DELETE FROM brands WHERE id = $1', [id]);
+    res.json({ message: 'Brand deleted' });
+  } catch (err) {
+    console.error('Error deleting brand:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const getCategories = async (req, res) => {
+  try {
+    const result = await query(
+      `SELECT c.id, c.category_name, c.description, c.is_active, c.created_at,
+              COUNT(p.id)::int AS product_count
+       FROM categories c
+       LEFT JOIN products p ON p.category_id = c.id AND p.deleted_at IS NULL
+       GROUP BY c.id ORDER BY c.category_name`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching categories:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const createCategory = async (req, res) => {
+  try {
+    const { category_name, description } = req.body;
+    if (!category_name?.trim()) return res.status(400).json({ message: 'Category name is required' });
+    const result = await query(
+      `INSERT INTO categories (category_name, description) VALUES ($1, $2) RETURNING *`,
+      [category_name.trim(), description || null]
+    );
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    if (err.code === '23505') return res.status(400).json({ message: 'Category name already exists' });
+    console.error('Error creating category:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const updateCategory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { category_name, description, is_active } = req.body;
+    const result = await query(
+      `UPDATE categories SET
+         category_name = COALESCE($1, category_name),
+         description = $2,
+         is_active = COALESCE($3, is_active),
+         updated_at = NOW()
+       WHERE id = $4 RETURNING *`,
+      [category_name?.trim() || null, description ?? null, is_active ?? null, id]
+    );
+    if (result.rows.length === 0) return res.status(404).json({ message: 'Category not found' });
+    res.json(result.rows[0]);
+  } catch (err) {
+    if (err.code === '23505') return res.status(400).json({ message: 'Category name already exists' });
+    console.error('Error updating category:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const deleteCategory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const check = await query('SELECT COUNT(*) FROM products WHERE category_id = $1 AND deleted_at IS NULL', [id]);
+    if (parseInt(check.rows[0].count) > 0) {
+      return res.status(400).json({ message: 'Cannot delete category with assigned products' });
+    }
+    await query('DELETE FROM categories WHERE id = $1', [id]);
+    res.json({ message: 'Category deleted' });
+  } catch (err) {
+    console.error('Error deleting category:', err);
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -719,5 +859,13 @@ module.exports = {
   getFeaturedProducts,
   getLowStockProducts,
   getProductStatistics,
-  getProductsWithVariants
+  getProductsWithVariants,
+  getBrands,
+  createBrand,
+  updateBrand,
+  deleteBrand,
+  getCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
 };

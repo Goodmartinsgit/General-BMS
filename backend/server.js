@@ -1,5 +1,8 @@
-const app = require('./src/app');
 require('dotenv').config();
+const validateEnv = require('./src/config/envValidator');
+validateEnv();
+
+const app = require('./src/app');
 
 const PORT = process.env.PORT || 5000;
 

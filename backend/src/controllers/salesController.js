@@ -111,7 +111,7 @@ const createSale = async (req, res) => {
             `INSERT INTO sales (
                 sale_number, branch_id, customer_id, subtotal, discount_amount,
                 tax_amount, total_amount, payment_method, amount_paid,
-                status, performed_by, referrer_id, commission_amount,
+                status, processed_by, referrer_id, commission_amount,
                 promotion_id, promotion_discount, coupon_code, cost_total, profit_total, notes
             )
              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
@@ -320,7 +320,7 @@ const createSale = async (req, res) => {
     } catch (err) {
         await client.query('ROLLBACK');
         console.error(err);
-        res.status(500).json({ message: err.message || 'Server error' });
+        res.status(500).json({ message: 'Server error' });
     } finally {
         client.release();
     }
@@ -331,12 +331,12 @@ const getAllSales = async (req, res) => {
     try {
         const { branchId, startDate, endDate, status, includeReversed } = req.query;
         let q = `SELECT s.*, b.branch_name, c.customer_name, u.full_name as salesperson,
-                 r.referrer_name, p.promotion_name,
+                 r.full_name as referrer_name, p.promotion_name,
                  CASE WHEN s.reversed_at IS NOT NULL THEN true ELSE false END as is_reversed
                  FROM sales s
                  JOIN branches b ON s.branch_id = b.id
                  LEFT JOIN customers c ON s.customer_id = c.id
-                 LEFT JOIN users u ON s.performed_by = u.id
+                 LEFT JOIN users u ON s.processed_by = u.id
                  LEFT JOIN referrers r ON s.referrer_id = r.id
                  LEFT JOIN promotions p ON s.promotion_id = p.id
                  WHERE 1=1`;
@@ -379,13 +379,13 @@ const getSaleById = async (req, res) => {
         const { id } = req.params;
         const saleResult = await pool.query(
             `SELECT s.*, b.branch_name, c.customer_name, c.phone_number, c.email,
-             u.full_name as salesperson, r.referrer_name, p.promotion_name,
+             u.full_name as salesperson, r.full_name as referrer_name, p.promotion_name,
              rv.full_name as reversed_by_name, un.full_name as unreversed_by_name,
              CASE WHEN s.reversed_at IS NOT NULL THEN true ELSE false END as is_reversed
              FROM sales s
              JOIN branches b ON s.branch_id = b.id
              LEFT JOIN customers c ON s.customer_id = c.id
-             LEFT JOIN users u ON s.performed_by = u.id
+             LEFT JOIN users u ON s.processed_by = u.id
              LEFT JOIN referrers r ON s.referrer_id = r.id
              LEFT JOIN promotions p ON s.promotion_id = p.id
              LEFT JOIN users rv ON s.reversed_by = rv.id
@@ -405,7 +405,7 @@ const getSaleById = async (req, res) => {
              FROM sale_items si
              JOIN products p ON si.product_id = p.id
              LEFT JOIN product_variants pv ON si.variant_id = pv.id
-             LEFT JOIN batches b ON si.batch_id = b.id
+             LEFT JOIN product_batches b ON si.batch_id = b.id
              WHERE si.sale_id = $1`,
             [id]
         );
@@ -588,7 +588,7 @@ const reverseSale = async (req, res) => {
     } catch (err) {
         await client.query('ROLLBACK');
         console.error(err);
-        res.status(500).json({ message: err.message || 'Server error' });
+        res.status(500).json({ message: 'Server error' });
     } finally {
         client.release();
     }
@@ -758,7 +758,7 @@ const unreverseSale = async (req, res) => {
     } catch (err) {
         await client.query('ROLLBACK');
         console.error(err);
-        res.status(500).json({ message: err.message || 'Server error' });
+        res.status(500).json({ message: 'Server error' });
     } finally {
         client.release();
     }
@@ -780,7 +780,7 @@ const addSaleComment = async (req, res) => {
         }
 
         const result = await pool.query(
-            `INSERT INTO sale_comments (sale_id, user_id, comment, attachments)
+            `INSERT INTO sale_comments (sale_id, created_by, comment_text, attachments)
              VALUES ($1, $2, $3, $4)
              RETURNING id, created_at`,
             [id, user_id, comment, attachments ? JSON.stringify(attachments) : null]
@@ -793,7 +793,7 @@ const addSaleComment = async (req, res) => {
         });
     } catch (err) {
         console.error(err);
-        res.status(500).json({ message: err.message || 'Server error' });
+        res.status(500).json({ message: 'Server error' });
     }
 };
 

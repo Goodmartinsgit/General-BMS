@@ -116,7 +116,7 @@ const getAllSerialNumbers = async (req, res) => {
     });
   } catch (err) {
     console.error('Error fetching serial numbers:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -164,7 +164,7 @@ const getSerialNumber = async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Error fetching serial number:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -225,7 +225,7 @@ const registerSerialNumber = async (req, res) => {
       return res.status(400).json({ message: 'Serial number already exists' });
     }
     console.error('Error registering serial number:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -290,7 +290,7 @@ const bulkRegisterSerialNumbers = async (req, res) => {
     }
   } catch (err) {
     console.error('Error bulk registering serial numbers:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -341,7 +341,7 @@ const updateSerialNumber = async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Error updating serial number:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -383,7 +383,7 @@ const markSerialAsSold = async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Error marking serial as sold:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -425,7 +425,7 @@ const getWarrantyExpiringSoon = async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Error fetching warranty expiring soon:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -536,7 +536,7 @@ const getAllBatches = async (req, res) => {
     });
   } catch (err) {
     console.error('Error fetching batches:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -584,7 +584,7 @@ const getBatch = async (req, res) => {
     res.json(batch);
   } catch (err) {
     console.error('Error fetching batch:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -641,7 +641,7 @@ const createBatch = async (req, res) => {
       return res.status(400).json({ message: 'Batch number already exists' });
     }
     console.error('Error creating batch:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -730,7 +730,7 @@ const adjustBatchQuantity = async (req, res) => {
     }
   } catch (err) {
     console.error('Error adjusting batch quantity:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -760,7 +760,7 @@ const getBatchesExpiringSoon = async (req, res) => {
     res.json(result.rows);
   } catch (err) {
     console.error('Error fetching expiring batches:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -789,7 +789,7 @@ const recallBatch = async (req, res) => {
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Error recalling batch:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 
@@ -831,7 +831,7 @@ const getSerialTrackingStatistics = async (req, res) => {
     });
   } catch (err) {
     console.error('Error fetching serial tracking statistics:', err);
-    res.status(500).json({ message: err.message });
+    res.status(500).json({ message: 'Server error' });
   }
 };
 

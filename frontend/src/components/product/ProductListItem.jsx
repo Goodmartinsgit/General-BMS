@@ -1,151 +1,103 @@
 import React from 'react';
 import { Edit, Trash2, Eye, Star, AlertCircle, Package } from 'lucide-react';
-import { Badge, Button } from '../ui';
+import { useCurrency } from '../../context/CurrencyContext';
 
-/**
- * ProductListItem Component
- * Displays product information in a list/table row format
- */
-const ProductListItem = ({
-  product,
-  onEdit,
-  onDelete,
-  onView,
-  showActions = true,
-  compact = false,
-}) => {
+const TYPE_BADGE = {
+  physical: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
+  service:  'bg-sky-500/10 text-sky-500 border-sky-500/20',
+  digital:  'bg-purple-500/10 text-purple-500 border-purple-500/20',
+  bundle:   'bg-orange-500/10 text-orange-500 border-orange-500/20',
+};
+
+const ProductListItem = ({ product, onEdit, onDelete, onView, showActions = true, compact = false }) => {
+  const { formatCurrency } = useCurrency();
   const {
-    product_name,
-    product_code,
-    product_type,
-    selling_price,
-    cost_price,
-    quantity_on_hand,
-    reorder_level,
-    is_active,
-    is_featured,
-    image_url,
-    brand_name,
+    product_name, product_code, product_type, cost_price,
+    reorder_level, is_active, is_featured, image_url, brand_name,
   } = product;
 
-  const isLowStock = quantity_on_hand <= reorder_level;
-  const profitMargin = selling_price && cost_price
-    ? (((selling_price - cost_price) / selling_price) * 100).toFixed(1)
+  const stockQty     = product.total_stock ?? product.quantity_on_hand ?? 0;
+  const displayPrice = product.retail_price ?? product.selling_price ?? 0;
+  const isLowStock   = stockQty <= (reorder_level ?? 0);
+  const profitMargin = displayPrice && cost_price
+    ? (((displayPrice - cost_price) / displayPrice) * 100).toFixed(1)
     : null;
 
-  const productTypeColors = {
-    physical: 'primary',
-    service: 'info',
-    digital: 'purple',
-    bundle: 'warning',
-  };
+  const typeBadgeCls = TYPE_BADGE[product_type] || 'bg-theme-tertiary text-theme-muted border-theme';
 
   return (
-    <div
-      className={`
-        bg-white border border-gray-200 rounded-lg hover:shadow-md transition-all
-        ${!is_active ? 'opacity-60' : ''}
-        ${compact ? 'p-3' : 'p-4'}
-      `.trim()}
-    >
+    <div className={`bg-theme-secondary border border-theme rounded-xl hover:shadow-theme-sm transition-shadow ${!is_active ? 'opacity-60' : ''} ${compact ? 'p-3' : 'p-4'}`}>
       <div className="flex items-center gap-4">
         {/* Image */}
-        <div className={`flex-shrink-0 ${compact ? 'w-12 h-12' : 'w-16 h-16'} bg-gray-100 rounded-lg overflow-hidden`}>
+        <div className={`flex-shrink-0 ${compact ? 'w-10 h-10' : 'w-14 h-14'} bg-theme-tertiary rounded-lg overflow-hidden`}>
           {image_url ? (
             <img src={image_url} alt={product_name} className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
-              <Package className={`${compact ? 'w-6 h-6' : 'w-8 h-8'} text-gray-300`} />
+              <Package className={`${compact ? 'w-5 h-5' : 'w-7 h-7'} text-theme-muted opacity-40`} />
             </div>
           )}
         </div>
 
-        {/* Product Info */}
+        {/* Info */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-start gap-2 mb-1">
-            <h3 className={`font-semibold text-gray-900 ${compact ? 'text-sm' : 'text-base'}`}>
+          <div className="flex items-center gap-2 mb-1">
+            <p className={`font-semibold text-theme-primary truncate ${compact ? 'text-sm' : 'text-base'}`}>
               {product_name}
-            </h3>
-            {is_featured && <Star className="w-4 h-4 text-yellow-500 fill-yellow-500 flex-shrink-0" />}
+            </p>
+            {is_featured && <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500 flex-shrink-0" />}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 mb-2">
-            <span className="text-xs text-gray-500">{product_code}</span>
-            <Badge variant={productTypeColors[product_type] || 'default'} size="sm">
+          <div className="flex flex-wrap items-center gap-1.5 mb-1">
+            <span className="text-[10px] font-mono text-theme-muted">{product_code}</span>
+            <span className={`px-1.5 py-0.5 text-[10px] font-bold rounded border uppercase ${typeBadgeCls}`}>
               {product_type}
-            </Badge>
+            </span>
             {!is_active && (
-              <Badge variant="default" size="sm">
+              <span className="px-1.5 py-0.5 text-[10px] font-bold rounded border uppercase bg-theme-tertiary text-theme-muted border-theme">
                 Inactive
-              </Badge>
+              </span>
             )}
             {isLowStock && (
-              <Badge variant="danger" size="sm" icon={AlertCircle}>
-                Low Stock
-              </Badge>
+              <span className="flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-bold rounded border uppercase bg-red-500/10 text-red-500 border-red-500/20">
+                <AlertCircle className="w-2.5 h-2.5" /> Low Stock
+              </span>
             )}
           </div>
 
           {!compact && brand_name && (
-            <p className="text-sm text-gray-600">
-              <span className="font-medium">Brand:</span> {brand_name}
-            </p>
+            <p className="text-xs text-theme-muted">Brand: <span className="text-theme-secondary">{brand_name}</span></p>
           )}
         </div>
 
         {/* Price & Stock */}
-        <div className={`flex-shrink-0 text-right ${compact ? 'space-y-1' : 'space-y-2'}`}>
-          <div>
-            <p className={`font-bold text-gray-900 ${compact ? 'text-base' : 'text-lg'}`}>
-              ${parseFloat(selling_price || 0).toFixed(2)}
-            </p>
-            {profitMargin && !compact && (
-              <p className="text-xs text-green-600">{profitMargin}% margin</p>
-            )}
-          </div>
-
-          <div className="text-sm">
-            <span className="text-gray-600">Stock: </span>
-            <span className={`font-medium ${isLowStock ? 'text-red-600' : 'text-gray-900'}`}>
-              {quantity_on_hand || 0}
-            </span>
-          </div>
+        <div className={`flex-shrink-0 text-right ${compact ? 'space-y-0.5' : 'space-y-1'}`}>
+          <p className={`font-bold text-accent-gold ${compact ? 'text-base' : 'text-lg'}`}>
+            {formatCurrency(displayPrice)}
+          </p>
+          {profitMargin && !compact && (
+            <p className="text-[10px] text-green-500">{profitMargin}% margin</p>
+          )}
+          <p className={`text-xs font-medium ${isLowStock ? 'text-red-500' : 'text-theme-secondary'}`}>
+            Stock: {stockQty}
+          </p>
         </div>
 
         {/* Actions */}
         {showActions && (
-          <div className="flex-shrink-0 flex items-center gap-2">
-            <Button
-              size="sm"
-              variant="ghost"
-              icon={Eye}
-              onClick={(e) => {
-                e.stopPropagation();
-                onView(product);
-              }}
-              title="View Details"
-            />
-            <Button
-              size="sm"
-              variant="ghost"
-              icon={Edit}
-              onClick={(e) => {
-                e.stopPropagation();
-                onEdit(product);
-              }}
-              title="Edit Product"
-            />
-            <Button
-              size="sm"
-              variant="ghost"
-              icon={Trash2}
-              onClick={(e) => {
-                e.stopPropagation();
-                onDelete(product);
-              }}
-              className="text-red-600 hover:bg-red-50"
-              title="Delete Product"
-            />
+          <div className="flex-shrink-0 flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
+            <button onClick={() => onView(product)} title="View"
+              className="p-1.5 text-theme-muted hover:text-theme-primary hover:bg-theme-tertiary rounded-lg border border-theme transition-colors">
+              <Eye className="w-4 h-4" />
+            </button>
+            <button onClick={() => onEdit(product)} title="Edit"
+              className="p-1.5 text-theme-muted hover:text-theme-primary hover:bg-theme-tertiary rounded-lg border border-theme transition-colors">
+              <Edit className="w-4 h-4" />
+            </button>
+            <button onClick={() => onDelete(product)} title="Delete"
+              className="p-1.5 text-red-500 bg-red-500/10 border border-red-500/20 rounded-lg hover:bg-red-500/20 transition-colors">
+              <Trash2 className="w-4 h-4" />
+            </button>
           </div>
         )}
       </div>
