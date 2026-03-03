@@ -773,7 +773,7 @@ function HomePageTab({ hs, setHs, onSave, saving, saved }) {
 
       {/* Why Choose Us */}
       <AccordionPanel title="Why Choose Us" icon={Sparkles} visible={hs.why_visible} onToggleVisible={v => upd('why_visible', v)}>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <FormField label="Section Heading">
             <TInput value={hs.why_heading} onChange={e => upd('why_heading', e.target.value)} placeholder="Why Choose Us" />
           </FormField>
@@ -863,7 +863,7 @@ function HomePageTab({ hs, setHs, onSave, saving, saved }) {
 
       {/* Mobile Promo */}
       <AccordionPanel title="Mobile Promo Banner" icon={Smartphone} visible={hs.mobile_promo_visible} onToggleVisible={v => upd('mobile_promo_visible', v)}>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <FormField label="Discount Label">
             <TInput value={hs.mobile_discount_label} onChange={e => upd('mobile_discount_label', e.target.value)} placeholder="Discount" />
           </FormField>
@@ -1153,7 +1153,7 @@ function SettingsTab({ hc, setHc, fc, setFc, onSave, saving, saved }) {
           <h3 className="text-sm font-semibold text-theme-primary">Footer Newsletter Block</h3>
           <p className="text-xs text-theme-muted">Text shown in the newsletter column of the footer</p>
         </div>
-        <div className="p-4 grid grid-cols-2 gap-4">
+        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
           <FormField label="Heading">
             <TInput value={fc.newsletter_heading} onChange={e => updFc('newsletter_heading', e.target.value)} placeholder="Newsletter" />
           </FormField>
@@ -1739,13 +1739,13 @@ function SidebarItem({ icon: Icon, label, active, onClick, badge, indent = false
   return (
     <button
       onClick={onClick}
-      className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors ${indent ? 'pl-5' : ''} ${
+      className={`w-full flex items-center gap-2.5 px-3 py-3 lg:py-2 text-left transition-colors min-h-[44px] lg:min-h-0 ${indent ? 'pl-5' : ''} ${
         active
           ? 'bg-accent-gold/10 text-accent-gold font-medium'
           : 'text-theme-primary hover:bg-theme-secondary'
       }`}
     >
-      <Icon className={`w-3.5 h-3.5 flex-shrink-0 ${active ? 'text-accent-gold' : 'text-theme-muted'}`} />
+      <Icon className={`w-4 h-4 lg:w-3.5 lg:h-3.5 flex-shrink-0 ${active ? 'text-accent-gold' : 'text-theme-muted'}`} />
       <span className="text-sm truncate flex-1">{label}</span>
       {badge && (
         <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-gray-200 text-gray-500 font-medium flex-shrink-0">
@@ -1992,6 +1992,11 @@ export default function WebsiteBuilderPage() {
   // type: 'home' | 'nav-item' | 'custom-page' | 'navigation' | 'settings'
   const [selected, setSelected] = useState({ type: 'home' });
 
+  // ── Mobile pages panel ─────────────────────────────────────────────────────
+  // On mobile the pages panel is a collapsible accordion above the editor
+  const [mobilePagesPanelOpen, setMobilePagesPanelOpen] = useState(true);
+  const selectAndEdit = (sel) => { setSelected(sel); };
+
   // ── Load store config ──────────────────────────────────────────────────────
   const loadConfig = useCallback(async () => {
     setLoading(true);
@@ -2085,7 +2090,7 @@ export default function WebsiteBuilderPage() {
   if (loading) return (
     <div className="flex flex-col h-full">
       <PageHeader title="App Builder" subtitle="Manage all storefront content and appearance" />
-      <div className="flex justify-center items-center flex-1 py-16"><LoadingSpinner /></div>
+      <div className="flex justify-center items-center flex-1 py-16 px-4"><LoadingSpinner /></div>
     </div>
   );
 
@@ -2108,32 +2113,48 @@ export default function WebsiteBuilderPage() {
       />
 
       {error && (
-        <div className="mx-6 mb-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 text-red-700">
+        <div className="mx-3 sm:mx-6 mb-4 p-4 bg-red-50 border border-red-200 rounded-xl flex items-center gap-3 text-red-700">
           <AlertCircle className="w-4 h-4 flex-shrink-0" />
           <span className="text-sm">{error}</span>
           <button onClick={loadConfig} className="ml-auto text-xs underline">Retry</button>
         </div>
       )}
 
-      <div className="flex-1 flex gap-0 px-6 pb-6 min-h-0 overflow-hidden">
+      <div className="flex flex-col gap-3 px-3 sm:px-6 pb-6 lg:flex-row lg:gap-0 lg:flex-1 lg:min-h-0 lg:overflow-hidden">
 
         {/* ══════════════════════════════════════════
             LEFT SIDEBAR — page tree
         ══════════════════════════════════════════ */}
-        <div className="w-52 flex-shrink-0 flex flex-col border border-theme rounded-l-xl overflow-hidden">
+        <div className="w-full lg:w-52 lg:flex-shrink-0 lg:flex lg:flex-col border border-theme rounded-xl lg:rounded-l-xl lg:rounded-r-none overflow-hidden">
 
-          {/* ── PAGES section ── */}
-          <div className="px-3 py-2.5 bg-theme-secondary border-b border-theme flex-shrink-0">
+          {/* ── Mobile: collapsible toggle header ── */}
+          <button
+            type="button"
+            className="lg:hidden w-full flex items-center justify-between px-4 py-3.5 bg-theme-secondary border-b border-theme cursor-pointer select-none"
+            onClick={() => setMobilePagesPanelOpen(v => !v)}
+          >
+            <div className="flex items-center gap-2.5">
+              <Layout className="w-4 h-4 text-theme-muted" />
+              <span className="text-sm font-semibold text-theme-primary">Pages & Navigation</span>
+            </div>
+            <ChevronDown className={`w-4 h-4 text-theme-muted transition-transform duration-200 ${mobilePagesPanelOpen ? 'rotate-180' : ''}`} />
+          </button>
+
+          {/* ── Desktop: static header ── */}
+          <div className="hidden lg:block px-3 py-2.5 bg-theme-secondary border-b border-theme flex-shrink-0">
             <p className="text-[10px] font-bold uppercase tracking-widest text-theme-muted">Pages</p>
           </div>
 
-          <div className="flex-1 overflow-y-auto py-1">
+          {/* ── Collapsible body (hidden on mobile when closed, always open on desktop) ── */}
+          <div className={`${mobilePagesPanelOpen ? '' : 'hidden'} lg:flex lg:flex-col lg:flex-1 lg:min-h-0`}>
+
+          <div className="lg:flex-1 lg:overflow-y-auto py-1">
             {/* Home — always first */}
             <SidebarItem
               icon={Home}
               label="Home"
               active={selected.type === 'home'}
-              onClick={() => setSelected({ type: 'home' })}
+              onClick={() => selectAndEdit({ type: 'home' })}
             />
 
             {/* Nav items */}
@@ -2146,7 +2167,7 @@ export default function WebsiteBuilderPage() {
                     icon={Globe}
                     label={item.label}
                     active={selected.type === 'nav-item' && selected.navItem?.url === item.url}
-                    onClick={() => setSelected({ type: 'nav-item', navItem: item })}
+                    onClick={() => selectAndEdit({ type: 'nav-item', navItem: item })}
                     badge={item.is_active === false ? 'hidden' : null}
                     indent
                   />
@@ -2168,10 +2189,10 @@ export default function WebsiteBuilderPage() {
                     }`}
                   >
                     <button
-                      className="flex-1 flex items-center gap-2 pl-5 py-2 text-left"
-                      onClick={() => setSelected({ type: 'custom-page', pageId: page.id })}
+                      className="flex-1 flex items-center gap-2 pl-5 py-3 lg:py-2 text-left min-h-[44px] lg:min-h-0"
+                      onClick={() => selectAndEdit({ type: 'custom-page', pageId: page.id })}
                     >
-                      <FileText className={`w-3.5 h-3.5 flex-shrink-0 ${selected.type === 'custom-page' && selected.pageId === page.id ? 'text-accent-gold' : 'text-theme-muted'}`} />
+                      <FileText className={`w-4 h-4 lg:w-3.5 lg:h-3.5 flex-shrink-0 ${selected.type === 'custom-page' && selected.pageId === page.id ? 'text-accent-gold' : 'text-theme-muted'}`} />
                       <span className={`text-sm truncate ${selected.type === 'custom-page' && selected.pageId === page.id ? 'text-accent-gold font-medium' : 'text-theme-primary'}`}>
                         {page.title}
                       </span>
@@ -2179,20 +2200,21 @@ export default function WebsiteBuilderPage() {
                         <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-gray-200 text-gray-500 font-medium flex-shrink-0">draft</span>
                       )}
                     </button>
-                    <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition-opacity pr-1">
+                    {/* Always visible on touch; hover-only on desktop */}
+                    <div className="flex items-center gap-1 lg:gap-0.5 pr-1 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
                       <button
                         onClick={e => { e.stopPropagation(); setShowPageForm(page); }}
-                        className="p-1 text-theme-muted hover:text-accent-gold transition"
+                        className="p-2 lg:p-1 text-theme-muted hover:text-accent-gold transition"
                         title="Page settings"
                       >
-                        <Edit3 className="w-3 h-3" />
+                        <Edit3 className="w-4 h-4 lg:w-3 lg:h-3" />
                       </button>
                       <button
                         onClick={e => { e.stopPropagation(); handleDeletePage(page.id); }}
-                        className="p-1 text-red-400 hover:text-red-600 transition"
+                        className="p-2 lg:p-1 text-red-400 hover:text-red-600 transition"
                         title="Delete page"
                       >
-                        <Trash2 className="w-3 h-3" />
+                        <Trash2 className="w-4 h-4 lg:w-3 lg:h-3" />
                       </button>
                     </div>
                   </div>
@@ -2219,21 +2241,23 @@ export default function WebsiteBuilderPage() {
               icon={Navigation}
               label="Nav Links"
               active={selected.type === 'navigation'}
-              onClick={() => setSelected({ type: 'navigation' })}
+              onClick={() => selectAndEdit({ type: 'navigation' })}
             />
             <SidebarItem
               icon={Settings2}
               label="Header & Footer"
               active={selected.type === 'settings'}
-              onClick={() => setSelected({ type: 'settings' })}
+              onClick={() => selectAndEdit({ type: 'settings' })}
             />
           </div>
+
+          </div>{/* end collapsible body */}
         </div>
 
         {/* ══════════════════════════════════════════
             RIGHT PANEL — content editor
         ══════════════════════════════════════════ */}
-        <div className="flex-1 overflow-y-auto border border-theme border-l-0 rounded-r-xl p-6 min-w-0">
+        <div className="lg:flex-1 lg:overflow-y-auto border border-theme lg:border-l-0 rounded-xl lg:rounded-l-none lg:rounded-r-xl p-4 sm:p-6 min-w-0">
 
           {/* Home page */}
           {selected.type === 'home' && (

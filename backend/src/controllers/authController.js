@@ -157,7 +157,8 @@ const login = async (req, res) => {
       {
         id: user.id, email: user.email,
         role_id: user.role_id, role_name: user.role_name,
-        role_level: user.role_level
+        role_level: user.role_level,
+        org_id: user.org_id,
       },
       process.env.JWT_SECRET,
       { expiresIn: '15m' }
@@ -209,7 +210,7 @@ const refresh = async (req, res) => {
 
     // Find all non-revoked, non-expired refresh tokens
     const tokensRes = await query(
-      `SELECT rt.*, u.email, u.full_name, u.role_id, r.role_name, r.role_level, r.permissions
+      `SELECT rt.*, u.email, u.full_name, u.org_id, u.role_id, r.role_name, r.role_level, r.permissions
        FROM refresh_tokens rt
        JOIN users u ON rt.user_id = u.id
        LEFT JOIN roles r ON u.role_id = r.id
@@ -235,7 +236,8 @@ const refresh = async (req, res) => {
       {
         id: matchedToken.user_id, email: matchedToken.email,
         role_id: matchedToken.role_id, role_name: matchedToken.role_name,
-        role_level: matchedToken.role_level
+        role_level: matchedToken.role_level,
+        org_id: matchedToken.org_id,
       },
       process.env.JWT_SECRET,
       { expiresIn: '15m' }

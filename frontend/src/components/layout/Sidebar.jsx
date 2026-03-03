@@ -147,6 +147,17 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, toggleCollapse }) => {
       standalone: true
     },
     {
+      id: 'online_store',
+      name: 'Online Store',
+      icon: Store,
+      roles: ['super_admin', 'admin'],
+      children: [
+        { name: 'Orders', href: '/online-orders', icon: ShoppingBag },
+        { name: 'App Builder', href: '/app-builder', icon: Monitor },
+        { name: 'Store Settings', href: '/store-settings', icon: Sliders },
+      ]
+    },
+    {
       id: 'branches',
       name: 'Branches',
       icon: Building2,
@@ -287,17 +298,6 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, toggleCollapse }) => {
         { name: 'Cash Flow', href: '/reports/cash-flow', icon: PieChart },
         { name: 'AR Aging', href: '/reports/ar-aging', icon: Users },
         { name: 'AP Aging', href: '/reports/ap-aging', icon: Truck },
-      ]
-    },
-    {
-      id: 'online_store',
-      name: 'Online Store',
-      icon: Store,
-      roles: ['super_admin', 'admin'],
-      children: [
-        { name: 'Orders', href: '/online-orders', icon: ShoppingBag },
-        { name: 'App Builder', href: '/app-builder', icon: Monitor },
-        { name: 'Store Settings', href: '/store-settings', icon: Sliders },
       ]
     },
     {

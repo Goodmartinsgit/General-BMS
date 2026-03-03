@@ -1,0 +1,46 @@
+services:
+  - type: web
+    name: general-bms-backend
+    runtime: node
+    plan: free
+    region: oregon
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # Render assigns PORT automatically — 10000 is the default
+      - key: PORT
+        value: 10000
+      # Neon connection string (Settings → Connection string in Neon console)
+      - key: DATABASE_URL
+        sync: false
+      # Auto-generated secrets — Render fills these in for you
+      - key: JWT_SECRET
+        generateValue: true
+      - key: REFRESH_TOKEN_SECRET
+        generateValue: true
+      - key: STORE_JWT_SECRET
+        generateValue: true
+      # Two Vercel frontends connect to this backend.
+      # Set to: https://general-bms.vercel.app,https://general-bms-store.vercel.app
+      # (comma-separated, no spaces, no trailing slashes)
+      - key: ALLOWED_ORIGINS
+        sync: false
+      # Cloudinary credentials (console.cloudinary.com → Settings → API Keys)
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      # Store storefront Vercel URL — used for CORS + customer password-reset links
+      # e.g. https://general-bms-store.vercel.app
+      - key: STORE_FRONTEND_URL
+        sync: false
+      # Paystack (dashboard.paystack.com → Settings → API Keys)
+      - key: PAYSTACK_SECRET_KEY
+        sync: false
+      - key: PAYSTACK_PUBLIC_KEY
+        sync: false
