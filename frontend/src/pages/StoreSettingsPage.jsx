@@ -1,14 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
     Store, Palette, Home, Phone, Search, ShoppingCart, Settings,
-    Plus, Trash2, Save, Upload, Image as ImageIcon, Loader2, Globe,
-    ToggleLeft, ToggleRight, CheckSquare, Square, 
-    Building2, Calculator, Receipt, CreditCard, Bell, Shield, Monitor,
-    Lock
+    Plus, Trash2, Save, Upload, Image as ImageIcon, Loader2,
+    CheckSquare, Square, Building2, Calculator, Receipt, CreditCard,
+    Bell, Shield, Monitor, Lock
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import PageHeader from '../components/common/PageHeader';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
+import SearchableSelect from '../components/ui/SearchableSelect';
+import { CURRENCIES, getCurrencySymbol } from '../utils/currency';
 import { getStoreConfig, updateStoreConfig, getCompanySettingsForStore } from '../api/storeConfig';
 import api from '../api/axios';
 
@@ -38,12 +39,10 @@ const FONT_FAMILIES = [
     'Nunito', 'Raleway', 'Ubuntu', 'Playfair Display', 'Merriweather',
 ];
 
-const CURRENCIES = ['NGN', 'USD', 'GBP', 'EUR', 'GHS', 'KES', 'ZAR', 'CAD', 'AUD'];
-
-const TIMEZONES = [
-    'UTC', 'Africa/Lagos', 'Africa/Accra', 'Africa/Nairobi', 'Africa/Johannesburg',
-    'Europe/London', 'America/New_York', 'America/Chicago', 'America/Los_Angeles'
-];
+const CURRENCY_OPTIONS = Object.values(CURRENCIES).map(c => ({
+    value: c.code,
+    label: `${c.code} — ${c.symbol} — ${c.name}`,
+}));
 
 const SectionLabel = ({ children }) => (
     <h3 className="text-sm font-semibold text-theme-primary mb-3 pb-2 border-b border-theme">{children}</h3>
@@ -516,18 +515,26 @@ const StoreSettingsPage = () => {
                             <FormField label="Company Email"><TextInput type="email" value={gen.company_email} onChange={e => setVal('general','company_email', e.target.value)} disabled={disGen} /></FormField>
                             <FormField label="Company Phone"><TextInput value={gen.company_phone} onChange={e => setVal('general','company_phone', e.target.value)} disabled={disGen} /></FormField>
                             <FormField label="Currency">
-                                <SelectInput value={gen.currency} onChange={e => setVal('general','currency', e.target.value)} disabled={disGen}>
-                                    {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
-                                </SelectInput>
+                                <div className={disGen ? 'opacity-60 pointer-events-none' : ''}>
+                                    <SearchableSelect
+                                        value={gen.currency}
+                                        onChange={val => setVal('general','currency', val)}
+                                        options={CURRENCY_OPTIONS}
+                                        placeholder="Select currency"
+                                        searchPlaceholder="Search currencies…"
+                                    />
+                                </div>
+                            </FormField>
+                            <FormField label="Currency Symbol">
+                                <TextInput
+                                    value={getCurrencySymbol(gen.currency)}
+                                    disabled
+                                    onChange={() => {}}
+                                />
                             </FormField>
                             <div className="md:col-span-2">
                                 <FormField label="Company Address"><TextArea value={gen.company_address} onChange={e => setVal('general','company_address', e.target.value)} disabled={disGen} /></FormField>
                             </div>
-                            <FormField label="Timezone">
-                                <SelectInput value={gen.timezone} onChange={e => setVal('general','timezone', e.target.value)} disabled={disGen}>
-                                    {TIMEZONES.map(c => <option key={c} value={c}>{c}</option>)}
-                                </SelectInput>
-                            </FormField>
                             <FormField label="Date Format">
                                 <SelectInput value={gen.date_format} onChange={e => setVal('general','date_format', e.target.value)} disabled={disGen}>
                                     <option value="MM/DD/YYYY">MM/DD/YYYY</option>
@@ -539,41 +546,102 @@ const StoreSettingsPage = () => {
                     </div>
                 );
 
-            case 'branding':
+            case 'branding': {
                 const br = data('branding');
                 const disBr = useCS('branding');
+                const brandingColorFields = [
+                    { key: 'primary_color',     label: 'Primary Color',      desc: 'Main brand colour' },
+                    { key: 'secondary_color',   label: 'Secondary Color',    desc: 'Background and panels' },
+                    { key: 'accent_color',      label: 'Accent Color',       desc: 'Highlights and active elements' },
+                    { key: 'hover_color',       label: 'Hover Color',        desc: 'Button and link hover state' },
+                    { key: 'active_text_color', label: 'Active Text Color',  desc: 'Text on active buttons and selected nav items' },
+                    { key: 'sidebar_bg_color',  label: 'Sidebar Background', desc: 'Sidebar background override' },
+                    { key: 'navbar_bg_color',   label: 'Navbar Background',  desc: 'Top navbar override' },
+                    { key: 'button_color',      label: 'Button Color',       desc: 'Primary button colour' },
+                    { key: 'background_color',  label: 'App Background',     desc: 'Main content background' },
+                ];
                 return (
                     <div className="space-y-6">
                         <CompanySettingsBanner isUsingCompanySettings={disBr} toggleSettings={(v) => handleToggleCompanySettings('branding', v)} sectionName="Branding" />
-                        <div>
-                            <SectionLabel>Logos</SectionLabel>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <LogoUploadField label="Primary Logo" value={br.logo_url} onChange={v => setVal('branding','logo_url', v)} disabled={disBr} />
-                            </div>
-                        </div>
-                        <div>
-                            <SectionLabel>Colors</SectionLabel>
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                <ColorField label="Primary Color" value={br.primary_color} onChange={v => setVal('branding','primary_color', v)} disabled={disBr} />
-                                <ColorField label="Secondary Color" value={br.secondary_color} onChange={v => setVal('branding','secondary_color', v)} disabled={disBr} />
-                                <ColorField label="Accent Color" value={br.accent_color} onChange={v => setVal('branding','accent_color', v)} disabled={disBr} />
-                                <ColorField label="Hover Color" value={br.hover_color} onChange={v => setVal('branding','hover_color', v)} disabled={disBr} />
-                                <ColorField label="Active Text" value={br.active_text_color} onChange={v => setVal('branding','active_text_color', v)} disabled={disBr} />
-                                <ColorField label="Background Color" value={br.background_color} onChange={v => setVal('branding','background_color', v)} disabled={disBr} />
-                            </div>
-                        </div>
-                        <div>
-                            <SectionLabel>Typography</SectionLabel>
-                            <div className="max-w-xs">
-                                <FormField label="Font Family">
-                                    <SelectInput value={br.font_family} onChange={e => setVal('branding','font_family', e.target.value)} disabled={disBr}>
-                                        {FONT_FAMILIES.map(f => <option key={f} value={f}>{f}</option>)}
+                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                            {/* Logo & Identity */}
+                            <div className="space-y-5">
+                                <h3 className="text-xs font-semibold text-theme-muted uppercase tracking-wider flex items-center gap-2">
+                                    <ImageIcon size={13} className="text-accent-gold" /> Logo &amp; Identity
+                                </h3>
+                                <FormField label="Logo Type">
+                                    <SelectInput value={br.logo_type || 'icon_text'} onChange={e => setVal('branding','logo_type', e.target.value)} disabled={disBr}>
+                                        <option value="icon_text">Icon + Company Name</option>
+                                        <option value="full">Full Logo Image</option>
+                                        <option value="none">Company Name Only</option>
+                                    </SelectInput>
+                                    <p className="text-xs text-theme-muted mt-1">
+                                        {(br.logo_type || 'icon_text') === 'icon_text' && 'Displays an icon alongside the company name.'}
+                                        {br.logo_type === 'full' && 'Displays only the uploaded logo image, no text.'}
+                                        {br.logo_type === 'none' && 'Displays only the company name from General Settings.'}
+                                    </p>
+                                </FormField>
+                                {br.logo_type !== 'none' && (
+                                    <LogoUploadField label="Logo Image" value={br.logo_url} onChange={v => setVal('branding','logo_url', v)} disabled={disBr} />
+                                )}
+                                {(br.logo_type === 'icon_text' || !br.logo_type) && (
+                                    <FormField label="Icon Text (shown when no logo uploaded)">
+                                        <TextInput
+                                            value={br.logo_icon_text || ''}
+                                            onChange={e => setVal('branding','logo_icon_text', e.target.value)}
+                                            placeholder="BMS"
+                                            disabled={disBr}
+                                        />
+                                        <p className="text-xs text-theme-muted mt-1">Up to 4 characters — used as icon placeholder</p>
+                                    </FormField>
+                                )}
+                                <FormField label="Sidebar Name Size">
+                                    <SelectInput value={br.sidebar_name_size || 'medium'} onChange={e => setVal('branding','sidebar_name_size', e.target.value)} disabled={disBr}>
+                                        <option value="small">Small</option>
+                                        <option value="medium">Medium</option>
+                                        <option value="large">Large</option>
                                     </SelectInput>
                                 </FormField>
+                                <FormField label="Font Family">
+                                    <SelectInput value={br.font_family || 'Inter'} onChange={e => setVal('branding','font_family', e.target.value)} disabled={disBr}>
+                                        {['Inter','Roboto','Poppins','Open Sans','Lato','Montserrat'].map(f => <option key={f} value={f}>{f}</option>)}
+                                    </SelectInput>
+                                </FormField>
+                            </div>
+                            {/* Colours */}
+                            <div className="space-y-4">
+                                <h3 className="text-xs font-semibold text-theme-muted uppercase tracking-wider flex items-center gap-2">
+                                    <Palette size={13} className="text-accent-gold" /> Colours
+                                </h3>
+                                {brandingColorFields.map(({ key, label, desc }) => (
+                                    <div key={key}>
+                                        <label className="block text-[10px] sm:text-xs font-medium text-theme-muted uppercase tracking-wider mb-1.5">{label}</label>
+                                        <div className="flex items-center gap-3">
+                                            <input
+                                                type="color"
+                                                value={br[key] || '#000000'}
+                                                onChange={e => !disBr && setVal('branding', key, e.target.value)}
+                                                disabled={disBr}
+                                                className="w-10 h-10 rounded-lg cursor-pointer border border-theme flex-shrink-0"
+                                                style={{ cursor: disBr ? 'not-allowed' : 'pointer' }}
+                                            />
+                                            <input
+                                                type="text"
+                                                value={br[key] || ''}
+                                                onChange={e => !disBr && setVal('branding', key, e.target.value)}
+                                                disabled={disBr}
+                                                placeholder="#000000"
+                                                className="flex-1 px-3 py-2.5 text-sm bg-theme-primary border border-theme rounded-lg text-theme-primary outline-none focus:ring-2 focus:ring-accent-gold/20 disabled:opacity-60"
+                                            />
+                                        </div>
+                                        <p className="text-xs text-theme-muted mt-0.5">{desc}</p>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     </div>
                 );
+            }
 
             case 'tax':
                 const tx = data('tax');
