@@ -111,6 +111,8 @@ const updateConfig = async (req, res) => {
       currency, shipping_methods, payment_methods, tax_rate,
       // App Builder extended fields
       home_sections, header_config, footer_config,
+      // Delivery page
+      delivery_config,
     } = req.body;
 
     // Check if config exists
@@ -129,11 +131,12 @@ const updateConfig = async (req, res) => {
           hero_banners, featured_category_ids, featured_product_ids,
           show_promo_bar, promo_bar_text, is_active, maintenance_mode, maintenance_message, custom_domain,
           currency, shipping_methods, payment_methods, tax_rate,
-          home_sections, header_config, footer_config
+          home_sections, header_config, footer_config,
+          delivery_config
         ) VALUES (
           $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,
           $17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,
-          $39,$40,$41
+          $39,$40,$41,$42
         ) RETURNING *`,
         [
           store_slug, store_name, tagline, description,
@@ -154,6 +157,7 @@ const updateConfig = async (req, res) => {
           home_sections ? JSON.stringify(home_sections) : '{}',
           header_config ? JSON.stringify(header_config) : '{}',
           footer_config ? JSON.stringify(footer_config) : '{}',
+          delivery_config ? JSON.stringify(delivery_config) : '{}',
         ]
       );
       return res.json(result.rows[0]);
@@ -195,8 +199,9 @@ const updateConfig = async (req, res) => {
         home_sections  = COALESCE($39::jsonb, home_sections),
         header_config  = COALESCE($40::jsonb, header_config),
         footer_config  = COALESCE($41::jsonb, footer_config),
+        delivery_config = COALESCE($42::jsonb, delivery_config),
         updated_at = NOW()
-      WHERE id = $42 RETURNING *`,
+      WHERE id = $43 RETURNING *`,
       [
         store_slug, store_name, tagline, description,
         logo_primary, logo_icon, logo_dark,
@@ -217,6 +222,7 @@ const updateConfig = async (req, res) => {
         home_sections ? JSON.stringify(home_sections) : null,
         header_config ? JSON.stringify(header_config) : null,
         footer_config ? JSON.stringify(footer_config) : null,
+        delivery_config ? JSON.stringify(delivery_config) : null,
         id,
       ]
     );
@@ -281,6 +287,7 @@ function formatConfig(row) {
     homeSections: row.home_sections || {},
     headerConfig: row.header_config || {},
     footerConfig: row.footer_config || {},
+    deliveryConfig: row.delivery_config || {},
   };
 }
 

@@ -6,7 +6,7 @@ import {
   Grid3X3, MessageSquare, HelpCircle, Mail, Code, Loader2,
   LayoutPanelLeft, Settings2, Store, Navigation, Monitor, Smartphone,
   ExternalLink, Check, AlertCircle, Copy, RefreshCw,
-  Home, BarChart3, Sparkles, Link as LinkIcon,
+  Home, BarChart3, Sparkles, Link as LinkIcon, Truck,
 } from 'lucide-react';
 import PageHeader from '../components/common/PageHeader';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
@@ -1125,6 +1125,163 @@ function NavEditModal({ item, title, showActive, onSave, onClose }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// DELIVERY TAB
+// ─────────────────────────────────────────────────────────────────────────────
+
+function DeliveryTab({ dc, setDc, onSave, saving, saved, currency }) {
+  const upd = (k, v) => setDc(prev => ({ ...prev, [k]: v }));
+  const updPolicy = (k, v) => setDc(prev => ({ ...prev, policies: { ...(prev.policies || {}), [k]: v } }));
+  const zones = dc.zones || [];
+
+  const addZone = () => {
+    setDc(prev => ({
+      ...prev,
+      zones: [...(prev.zones || []), { name: '', areas: '', fee: 0, est_days: '', is_active: true }],
+    }));
+  };
+
+  const updateZone = (i, k, v) => {
+    const updated = [...zones];
+    updated[i] = { ...updated[i], [k]: v };
+    setDc(prev => ({ ...prev, zones: updated }));
+  };
+
+  const removeZone = (i) => {
+    setDc(prev => ({ ...prev, zones: (prev.zones || []).filter((_, idx) => idx !== i) }));
+  };
+
+  const moveZone = (i, dir) => {
+    const j = i + dir;
+    if (j < 0 || j >= zones.length) return;
+    const updated = [...zones];
+    [updated[i], updated[j]] = [updated[j], updated[i]];
+    setDc(prev => ({ ...prev, zones: updated }));
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Enable toggle + page text */}
+      <div className="border border-theme rounded-xl overflow-hidden">
+        <div className="px-4 py-3 bg-theme-secondary">
+          <h3 className="text-sm font-semibold text-theme-primary">Delivery Page</h3>
+          <p className="text-xs text-theme-muted">Configure the public /delivery page shown to customers</p>
+        </div>
+        <div className="p-4 space-y-4">
+          <Toggle checked={!!dc.enabled} onChange={v => upd('enabled', v)} label="Enable delivery page & show link in header" />
+          <FormField label="Page Title">
+            <TInput value={dc.title || ''} onChange={e => upd('title', e.target.value)} placeholder="Delivery Information" />
+          </FormField>
+          <FormField label="Page Description" hint="Introductory text shown at the top of the delivery page">
+            <textarea
+              value={dc.description || ''}
+              onChange={e => upd('description', e.target.value)}
+              placeholder="We deliver to the following areas..."
+              rows={3}
+              className="w-full rounded-lg border border-theme bg-theme-primary text-theme-primary px-3 py-2 text-sm focus:ring-2 focus:ring-accent-gold/30 focus:border-accent-gold outline-none transition resize-y"
+            />
+          </FormField>
+        </div>
+      </div>
+
+      {/* Delivery Zones */}
+      <div className="border border-theme rounded-xl overflow-hidden">
+        <div className="px-4 py-3 bg-theme-secondary flex items-center justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-theme-primary">Delivery Zones</h3>
+            <p className="text-xs text-theme-muted">Define areas you deliver to, their fees and estimated delivery time</p>
+          </div>
+          <button
+            onClick={addZone}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium bg-accent-gold text-white rounded-lg hover:bg-accent-gold-dark transition"
+          >
+            <Plus className="w-3.5 h-3.5" /> Add Zone
+          </button>
+        </div>
+        <div className="p-4 space-y-3">
+          {zones.length === 0 && (
+            <p className="text-sm text-theme-muted text-center py-6">No delivery zones yet. Click "Add Zone" to create one.</p>
+          )}
+          {zones.map((zone, i) => (
+            <div key={i} className="border border-theme rounded-lg p-4 space-y-3 bg-theme-primary">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-semibold text-theme-muted uppercase tracking-wider">Zone {i + 1}</span>
+                  <Toggle checked={zone.is_active !== false} onChange={v => updateZone(i, 'is_active', v)} label="" />
+                </div>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => moveZone(i, -1)} disabled={i === 0} className="p-1 text-theme-muted hover:text-theme-primary disabled:opacity-30 transition"><ArrowUp className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => moveZone(i, 1)} disabled={i === zones.length - 1} className="p-1 text-theme-muted hover:text-theme-primary disabled:opacity-30 transition"><ArrowDown className="w-3.5 h-3.5" /></button>
+                  <button onClick={() => removeZone(i)} className="p-1 text-red-400 hover:text-red-600 transition"><Trash2 className="w-3.5 h-3.5" /></button>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <FormField label="Zone Name">
+                  <TInput value={zone.name} onChange={e => updateZone(i, 'name', e.target.value)} placeholder="e.g. City Center" />
+                </FormField>
+                <FormField label="Areas Covered">
+                  <TInput value={zone.areas} onChange={e => updateZone(i, 'areas', e.target.value)} placeholder="e.g. Downtown, Midtown, Uptown" />
+                </FormField>
+                <FormField label={`Delivery Fee (${currency})`}>
+                  <TInput type="number" value={zone.fee ?? ''} onChange={e => updateZone(i, 'fee', parseFloat(e.target.value) || 0)} placeholder="0" />
+                </FormField>
+                <FormField label="Estimated Delivery Time">
+                  <TInput value={zone.est_days || ''} onChange={e => updateZone(i, 'est_days', e.target.value)} placeholder="e.g. Same day, 1-2 days" />
+                </FormField>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Delivery Policies */}
+      <div className="border border-theme rounded-xl overflow-hidden">
+        <div className="px-4 py-3 bg-theme-secondary">
+          <h3 className="text-sm font-semibold text-theme-primary">Delivery Policies</h3>
+          <p className="text-xs text-theme-muted">Set rules and additional info for deliveries</p>
+        </div>
+        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <FormField label={`Minimum Order Amount (${currency})`} hint="0 = no minimum">
+            <TInput type="number" value={dc.policies?.min_order ?? ''} onChange={e => updPolicy('min_order', parseFloat(e.target.value) || 0)} placeholder="0" />
+          </FormField>
+          <FormField label={`Free Delivery Above (${currency})`} hint="0 = never free">
+            <TInput type="number" value={dc.policies?.free_delivery_above ?? ''} onChange={e => updPolicy('free_delivery_above', parseFloat(e.target.value) || 0)} placeholder="0" />
+          </FormField>
+          <FormField label="Delivery Hours">
+            <TInput value={dc.policies?.delivery_hours || ''} onChange={e => updPolicy('delivery_hours', e.target.value)} placeholder="e.g. 9:00 AM - 6:00 PM" />
+          </FormField>
+          <FormField label="Additional Notes" hint="Shown at the bottom of the delivery page">
+            <textarea
+              value={dc.policies?.notes || ''}
+              onChange={e => updPolicy('notes', e.target.value)}
+              placeholder="e.g. Deliveries are not available on public holidays..."
+              rows={3}
+              className="w-full rounded-lg border border-theme bg-theme-primary text-theme-primary px-3 py-2 text-sm focus:ring-2 focus:ring-accent-gold/30 focus:border-accent-gold outline-none transition resize-y"
+            />
+          </FormField>
+        </div>
+      </div>
+
+      {/* Save */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={onSave}
+          disabled={saving}
+          className="flex items-center gap-2 px-5 py-2.5 bg-accent-gold hover:bg-accent-gold-dark text-white text-sm font-semibold rounded-lg disabled:opacity-60 transition"
+        >
+          {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+          {saving ? 'Saving…' : 'Save Delivery Settings'}
+        </button>
+        {saved && (
+          <span className="flex items-center gap-1 text-green-500 text-sm">
+            <Check className="w-4 h-4" /> Saved
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // SETTINGS TAB (header appearance + footer newsletter)
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1143,7 +1300,6 @@ function SettingsTab({ hc, setHc, fc, setFc, onSave, saving, saved }) {
         <div className="p-4 space-y-4">
           <Toggle checked={!!hc.show_search} onChange={v => updHc('show_search', v)} label="Show search button" />
           <Toggle checked={!!hc.show_cart} onChange={v => updHc('show_cart', v)} label="Show cart button" />
-          <Toggle checked={!!hc.show_delivery_link} onChange={v => updHc('show_delivery_link', v)} label="Show delivery phone link in nav" />
         </div>
       </div>
 
@@ -1978,9 +2134,10 @@ export default function WebsiteBuilderPage() {
   const [rawConfig, setRawConfig]       = useState(null);
   const [loading, setLoading]           = useState(true);
   const [error, setError]               = useState('');
-  const [homeSections, setHomeSections] = useState({});
-  const [headerConfig, setHeaderConfig] = useState({});
-  const [footerConfig, setFooterConfig] = useState({});
+  const [homeSections, setHomeSections]     = useState({});
+  const [headerConfig, setHeaderConfig]     = useState({});
+  const [footerConfig, setFooterConfig]     = useState({});
+  const [deliveryConfig, setDeliveryConfig] = useState({});
   const [saving, setSaving]             = useState(false);
   const [saved, setSaved]               = useState(false);
 
@@ -2007,6 +2164,7 @@ export default function WebsiteBuilderPage() {
       setHomeSections(data.home_sections || {});
       setHeaderConfig(data.header_config || {});
       setFooterConfig(data.footer_config || {});
+      setDeliveryConfig(data.delivery_config || {});
     } catch (err) {
       console.error(err);
       setError('Failed to load store configuration. Make sure the store is configured.');
@@ -2036,6 +2194,7 @@ export default function WebsiteBuilderPage() {
         home_sections: homeSections,
         header_config: headerConfig,
         footer_config: footerConfig,
+        delivery_config: deliveryConfig,
       });
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);
@@ -2244,6 +2403,12 @@ export default function WebsiteBuilderPage() {
               onClick={() => selectAndEdit({ type: 'navigation' })}
             />
             <SidebarItem
+              icon={Truck}
+              label="Delivery"
+              active={selected.type === 'delivery'}
+              onClick={() => selectAndEdit({ type: 'delivery' })}
+            />
+            <SidebarItem
               icon={Settings2}
               label="Header & Footer"
               active={selected.type === 'settings'}
@@ -2304,6 +2469,18 @@ export default function WebsiteBuilderPage() {
               onSave={handleSave}
               saving={saving}
               saved={saved}
+            />
+          )}
+
+          {/* Delivery settings */}
+          {selected.type === 'delivery' && (
+            <DeliveryTab
+              dc={deliveryConfig}
+              setDc={setDeliveryConfig}
+              onSave={handleSave}
+              saving={saving}
+              saved={saved}
+              currency={rawConfig?.currency || 'NGN'}
             />
           )}
 
