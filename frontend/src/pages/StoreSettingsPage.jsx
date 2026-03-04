@@ -308,12 +308,19 @@ const StoreSettingsPage = () => {
                 logo_primary: d.logo_primary || '',
                 logo_icon: d.logo_icon || '',
                 logo_dark: d.logo_dark || '',
+                logo_type: d.logo_type || 'icon_text',
+                sidebar_name_size: d.sidebar_name_size || 'medium',
                 primary_color: d.primary_color || '#3B82F6',
                 secondary_color: d.secondary_color || '#1E40AF',
                 accent_color: d.accent_color || '#F59E0B',
                 background_color: d.background_color || '#FFFFFF',
                 text_color: d.text_color || '#111827',
                 font_family: d.font_family || 'Inter',
+                hover_color: d.hover_color || '',
+                active_text_color: d.active_text_color || '',
+                sidebar_bg_color: d.sidebar_bg_color || '',
+                navbar_bg_color: d.navbar_bg_color || '',
+                button_color: d.button_color || '',
 
                 // Homepage (mapped from flat columns)
                 homepage: {
@@ -421,16 +428,23 @@ const StoreSettingsPage = () => {
                 description: config.description,
                 currency: config.currency,
 
-                // Branding (store-specific storefront branding)
+                // Branding (store-specific storefront branding flat columns)
                 logo_primary: config.logo_primary,
                 logo_icon: config.logo_icon,
                 logo_dark: config.logo_dark,
+                logo_type: config.logo_type,
+                sidebar_name_size: config.sidebar_name_size,
                 primary_color: config.primary_color,
                 secondary_color: config.secondary_color,
                 accent_color: config.accent_color,
                 background_color: config.background_color,
                 text_color: config.text_color,
                 font_family: config.font_family,
+                hover_color: config.hover_color,
+                active_text_color: config.active_text_color,
+                sidebar_bg_color: config.sidebar_bg_color,
+                navbar_bg_color: config.navbar_bg_color,
+                button_color: config.button_color,
 
                 // Homepage
                 show_promo_bar: config.homepage.promo_bar_enabled,
@@ -547,8 +561,38 @@ const StoreSettingsPage = () => {
                 );
 
             case 'branding': {
-                const br = data('branding');
                 const disBr = useCS('branding');
+                // When toggle is OFF: read/write flat store_config columns directly so
+                // handleSave can persist them and formatConfig can return them to the store.
+                // When toggle is ON: show company settings (read-only) from getSectionData.
+                const br = disBr ? data('branding') : {
+                    logo_url:          config.logo_primary,
+                    logo_type:         config.logo_type,
+                    logo_icon_text:    config.logo_icon,
+                    sidebar_name_size: config.sidebar_name_size,
+                    font_family:       config.font_family,
+                    primary_color:     config.primary_color,
+                    secondary_color:   config.secondary_color,
+                    accent_color:      config.accent_color,
+                    hover_color:       config.hover_color,
+                    active_text_color: config.active_text_color,
+                    sidebar_bg_color:  config.sidebar_bg_color,
+                    navbar_bg_color:   config.navbar_bg_color,
+                    button_color:      config.button_color,
+                    background_color:  config.background_color,
+                };
+                // Write directly to flat config fields (not store_settings)
+                const setBr = (field, value) => {
+                    const flatMap = {
+                        logo_url:          'logo_primary',
+                        logo_type:         'logo_type',
+                        logo_icon_text:    'logo_icon',
+                        sidebar_name_size: 'sidebar_name_size',
+                        font_family:       'font_family',
+                    };
+                    const flatKey = flatMap[field] || field;
+                    set(flatKey, value);
+                };
                 const brandingColorFields = [
                     { key: 'primary_color',     label: 'Primary Color',      desc: 'Main brand colour' },
                     { key: 'secondary_color',   label: 'Secondary Color',    desc: 'Background and panels' },
@@ -570,7 +614,7 @@ const StoreSettingsPage = () => {
                                     <ImageIcon size={13} className="text-accent-gold" /> Logo &amp; Identity
                                 </h3>
                                 <FormField label="Logo Type">
-                                    <SelectInput value={br.logo_type || 'icon_text'} onChange={e => setVal('branding','logo_type', e.target.value)} disabled={disBr}>
+                                    <SelectInput value={br.logo_type || 'icon_text'} onChange={e => !disBr && setBr('logo_type', e.target.value)} disabled={disBr}>
                                         <option value="icon_text">Icon + Company Name</option>
                                         <option value="full">Full Logo Image</option>
                                         <option value="none">Company Name Only</option>
@@ -582,13 +626,13 @@ const StoreSettingsPage = () => {
                                     </p>
                                 </FormField>
                                 {br.logo_type !== 'none' && (
-                                    <LogoUploadField label="Logo Image" value={br.logo_url} onChange={v => setVal('branding','logo_url', v)} disabled={disBr} />
+                                    <LogoUploadField label="Logo Image" value={br.logo_url} onChange={v => !disBr && setBr('logo_url', v)} disabled={disBr} />
                                 )}
                                 {(br.logo_type === 'icon_text' || !br.logo_type) && (
                                     <FormField label="Icon Text (shown when no logo uploaded)">
                                         <TextInput
                                             value={br.logo_icon_text || ''}
-                                            onChange={e => setVal('branding','logo_icon_text', e.target.value)}
+                                            onChange={e => !disBr && setBr('logo_icon_text', e.target.value)}
                                             placeholder="BMS"
                                             disabled={disBr}
                                         />
@@ -596,14 +640,14 @@ const StoreSettingsPage = () => {
                                     </FormField>
                                 )}
                                 <FormField label="Sidebar Name Size">
-                                    <SelectInput value={br.sidebar_name_size || 'medium'} onChange={e => setVal('branding','sidebar_name_size', e.target.value)} disabled={disBr}>
+                                    <SelectInput value={br.sidebar_name_size || 'medium'} onChange={e => !disBr && setBr('sidebar_name_size', e.target.value)} disabled={disBr}>
                                         <option value="small">Small</option>
                                         <option value="medium">Medium</option>
                                         <option value="large">Large</option>
                                     </SelectInput>
                                 </FormField>
                                 <FormField label="Font Family">
-                                    <SelectInput value={br.font_family || 'Inter'} onChange={e => setVal('branding','font_family', e.target.value)} disabled={disBr}>
+                                    <SelectInput value={br.font_family || 'Inter'} onChange={e => !disBr && setBr('font_family', e.target.value)} disabled={disBr}>
                                         {['Inter','Roboto','Poppins','Open Sans','Lato','Montserrat'].map(f => <option key={f} value={f}>{f}</option>)}
                                     </SelectInput>
                                 </FormField>
@@ -620,7 +664,7 @@ const StoreSettingsPage = () => {
                                             <input
                                                 type="color"
                                                 value={br[key] || '#000000'}
-                                                onChange={e => !disBr && setVal('branding', key, e.target.value)}
+                                                onChange={e => !disBr && setBr(key, e.target.value)}
                                                 disabled={disBr}
                                                 className="w-10 h-10 rounded-lg cursor-pointer border border-theme flex-shrink-0"
                                                 style={{ cursor: disBr ? 'not-allowed' : 'pointer' }}
@@ -628,7 +672,7 @@ const StoreSettingsPage = () => {
                                             <input
                                                 type="text"
                                                 value={br[key] || ''}
-                                                onChange={e => !disBr && setVal('branding', key, e.target.value)}
+                                                onChange={e => !disBr && setBr(key, e.target.value)}
                                                 disabled={disBr}
                                                 placeholder="#000000"
                                                 className="flex-1 px-3 py-2.5 text-sm bg-theme-primary border border-theme rounded-lg text-theme-primary outline-none focus:ring-2 focus:ring-accent-gold/20 disabled:opacity-60"
