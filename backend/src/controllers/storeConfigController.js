@@ -1,4 +1,4 @@
-const { query } = require('../config/db');
+const { query, pool } = require('../config/db');
 
 // GET /api/store/config/:slug
 const getConfigBySlug = async (req, res) => {
@@ -88,7 +88,11 @@ const getAdminConfig = async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Store not configured yet' });
     }
-    res.json(result.rows[0]);
+    const row = result.rows[0];
+    // Parse JSONB fields that might come as strings
+    if (typeof row.use_company_settings === 'string') row.use_company_settings = JSON.parse(row.use_company_settings);
+    if (typeof row.store_settings === 'string') row.store_settings = JSON.parse(row.store_settings);
+    res.json(row);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -113,6 +117,8 @@ const updateConfig = async (req, res) => {
       home_sections, header_config, footer_config,
       // Delivery page
       delivery_config,
+      // Company settings integration
+      use_company_settings, store_settings,
     } = req.body;
 
     // Check if config exists
@@ -132,11 +138,12 @@ const updateConfig = async (req, res) => {
           show_promo_bar, promo_bar_text, is_active, maintenance_mode, maintenance_message, custom_domain,
           currency, shipping_methods, payment_methods, tax_rate,
           home_sections, header_config, footer_config,
-          delivery_config
+          delivery_config,
+          use_company_settings, store_settings
         ) VALUES (
           $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,
           $17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,
-          $39,$40,$41,$42
+          $39,$40,$41,$42,$43,$44
         ) RETURNING *`,
         [
           store_slug, store_name, tagline, description,
@@ -158,6 +165,8 @@ const updateConfig = async (req, res) => {
           header_config ? JSON.stringify(header_config) : '{}',
           footer_config ? JSON.stringify(footer_config) : '{}',
           delivery_config ? JSON.stringify(delivery_config) : '{}',
+          use_company_settings ? JSON.stringify(use_company_settings) : '{"general":true,"branding":true,"tax":true,"receipt":true,"payment":true,"notifications":true,"security":true,"display":true}',
+          store_settings ? JSON.stringify(store_settings) : '{}',
         ]
       );
       return res.json(result.rows[0]);
@@ -200,8 +209,10 @@ const updateConfig = async (req, res) => {
         header_config  = COALESCE($40::jsonb, header_config),
         footer_config  = COALESCE($41::jsonb, footer_config),
         delivery_config = COALESCE($42::jsonb, delivery_config),
+        use_company_settings = COALESCE($43::jsonb, use_company_settings),
+        store_settings = COALESCE($44::jsonb, store_settings),
         updated_at = NOW()
-      WHERE id = $43 RETURNING *`,
+      WHERE id = $45 RETURNING *`,
       [
         store_slug, store_name, tagline, description,
         logo_primary, logo_icon, logo_dark,
@@ -223,6 +234,8 @@ const updateConfig = async (req, res) => {
         header_config ? JSON.stringify(header_config) : null,
         footer_config ? JSON.stringify(footer_config) : null,
         delivery_config ? JSON.stringify(delivery_config) : null,
+        use_company_settings ? JSON.stringify(use_company_settings) : null,
+        store_settings ? JSON.stringify(store_settings) : null,
         id,
       ]
     );
@@ -291,4 +304,65 @@ function formatConfig(row) {
   };
 }
 
-module.exports = { getConfigBySlug, getConfigByDomain, getDefaultConfig, getAdminConfig, updateConfig };
+// GET /api/store-config/company-settings — returns company settings for store fallback
+const getCompanySettingsForStore = async (req, res) => {
+  try {
+    const orgRes = await pool.query('SELECT * FROM organizations LIMIT 1');
+    const org = orgRes.rows[0] || {};
+    const orgId = org.id || null;
+
+    let settingsMap = {};
+    if (orgId) {
+      const settingsRes = await pool.query(
+        'SELECT category, settings FROM settings WHERE organization_id = $1',
+        [orgId]
+      );
+      for (const row of settingsRes.rows) {
+        settingsMap[row.category] = row.settings;
+      }
+    }
+
+    // Also fetch branding and tax from their own tables
+    let brandingData = {};
+    try {
+      const brandingRes = await pool.query('SELECT * FROM branding_config WHERE organization_id = $1', [orgId || 1]);
+      if (brandingRes.rows.length > 0) brandingData = brandingRes.rows[0];
+    } catch {}
+
+    let taxData = {};
+    try {
+      const taxRes = await pool.query('SELECT * FROM tax_settings LIMIT 1');
+      if (taxRes.rows.length > 0) taxData = taxRes.rows[0];
+    } catch {}
+
+    let receiptData = {};
+    try {
+      const receiptRes = await pool.query("SELECT settings FROM settings WHERE category = 'receipt' AND organization_id = $1", [orgId || 1]);
+      if (receiptRes.rows.length > 0) receiptData = receiptRes.rows[0].settings;
+    } catch {}
+
+    const general = {
+      company_name: org.organization_name || '',
+      company_email: org.email || '',
+      company_phone: org.phone || '',
+      company_address: org.address || '',
+      ...(settingsMap.general || {})
+    };
+
+    res.json({
+      general,
+      branding: brandingData,
+      tax: taxData,
+      receipt: receiptData,
+      payment: settingsMap.payment || { cash_enabled: true, card_enabled: true, bank_transfer_enabled: true, mobile_money_enabled: false, default_payment_method: 'cash' },
+      notifications: settingsMap.notifications || { email_notifications: true, low_stock_alerts: true, low_stock_threshold: 10, daily_summary: false, order_notifications: true },
+      security: settingsMap.security || { session_timeout: 30, require_password_change: false, password_expiry_days: 90, two_factor_enabled: false },
+      display: settingsMap.display || { items_per_page: 20, default_view_mode: 'grid', show_product_images: true, compact_mode: false, theme: 'midnight' },
+    });
+  } catch (err) {
+    console.error('Error fetching company settings for store:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+module.exports = { getConfigBySlug, getConfigByDomain, getDefaultConfig, getAdminConfig, updateConfig, getCompanySettingsForStore };

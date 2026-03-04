@@ -2,23 +2,36 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
     Store, Palette, Home, Phone, Search, ShoppingCart, Settings,
     Plus, Trash2, Save, Upload, Image as ImageIcon, Loader2, Globe,
-    ToggleLeft, ToggleRight, CheckSquare, Square,
+    ToggleLeft, ToggleRight, CheckSquare, Square, 
+    Building2, Calculator, Receipt, CreditCard, Bell, Shield, Monitor,
+    Lock
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import PageHeader from '../components/common/PageHeader';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
-import { getStoreConfig, updateStoreConfig } from '../api/storeConfig';
+import { getStoreConfig, updateStoreConfig, getCompanySettingsForStore } from '../api/storeConfig';
 import api from '../api/axios';
 
-const TABS = [
-    { key: 'general', label: 'General', icon: Store },
+const COMPANY_TABS = [
+    { key: 'general', label: 'General', icon: Building2 },
     { key: 'branding', label: 'Branding', icon: Palette },
+    { key: 'tax', label: 'Tax', icon: Calculator },
+    { key: 'receipt', label: 'Receipt', icon: Receipt },
+    { key: 'payment', label: 'Payment', icon: CreditCard },
+    { key: 'notifications', label: 'Notifications', icon: Bell },
+    { key: 'security', label: 'Security', icon: Shield },
+    { key: 'display', label: 'Display', icon: Monitor },
+];
+
+const STORE_TABS = [
     { key: 'homepage', label: 'Homepage', icon: Home },
     { key: 'contact', label: 'Contact & Social', icon: Phone },
     { key: 'seo', label: 'SEO', icon: Search },
     { key: 'commerce', label: 'Commerce', icon: ShoppingCart },
     { key: 'advanced', label: 'Advanced', icon: Settings },
 ];
+
+const ALL_TABS = [...COMPANY_TABS, ...STORE_TABS];
 
 const FONT_FAMILIES = [
     'Inter', 'Roboto', 'Open Sans', 'Lato', 'Montserrat', 'Poppins',
@@ -27,12 +40,17 @@ const FONT_FAMILIES = [
 
 const CURRENCIES = ['NGN', 'USD', 'GBP', 'EUR', 'GHS', 'KES', 'ZAR', 'CAD', 'AUD'];
 
+const TIMEZONES = [
+    'UTC', 'Africa/Lagos', 'Africa/Accra', 'Africa/Nairobi', 'Africa/Johannesburg',
+    'Europe/London', 'America/New_York', 'America/Chicago', 'America/Los_Angeles'
+];
+
 const SectionLabel = ({ children }) => (
     <h3 className="text-sm font-semibold text-theme-primary mb-3 pb-2 border-b border-theme">{children}</h3>
 );
 
 const FormField = ({ label, hint, children }) => (
-    <div className="space-y-1.5">
+    <div className="space-y-1.5 w-full">
         <label className="block text-xs font-medium text-theme-muted">{label}</label>
         {children}
         {hint && <p className="text-[10px] text-theme-muted">{hint}</p>}
@@ -50,30 +68,32 @@ const TextInput = ({ value, onChange, placeholder, type = 'text', disabled }) =>
     />
 );
 
-const TextArea = ({ value, onChange, placeholder, rows = 3 }) => (
+const TextArea = ({ value, onChange, placeholder, rows = 3, disabled }) => (
     <textarea
         value={value ?? ''}
         onChange={onChange}
         placeholder={placeholder}
         rows={rows}
-        className="w-full px-3 py-2 text-sm bg-theme-primary border border-theme rounded-lg text-theme-primary placeholder-theme-muted focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none transition resize-none"
+        disabled={disabled}
+        className="w-full px-3 py-2 text-sm bg-theme-primary border border-theme rounded-lg text-theme-primary placeholder-theme-muted focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none transition resize-none disabled:opacity-60"
     />
 );
 
-const SelectInput = ({ value, onChange, children }) => (
+const SelectInput = ({ value, onChange, children, disabled }) => (
     <select
         value={value ?? ''}
         onChange={onChange}
-        className="w-full px-3 py-2 text-sm bg-theme-primary border border-theme rounded-lg text-theme-primary outline-none focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 transition cursor-pointer"
+        disabled={disabled}
+        className="w-full px-3 py-2 text-sm bg-theme-primary border border-theme rounded-lg text-theme-primary outline-none focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 transition cursor-pointer disabled:opacity-60"
     >
         {children}
     </select>
 );
 
-const Toggle = ({ checked, onChange, label }) => (
-    <label className="flex items-center gap-3 cursor-pointer group">
+const Toggle = ({ checked, onChange, label, disabled }) => (
+    <label className={`flex items-center gap-3 group ${disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'}`}>
         <div
-            onClick={() => onChange(!checked)}
+            onClick={() => !disabled && onChange(!checked)}
             className={`w-11 h-6 rounded-full transition-colors flex items-center px-0.5 flex-shrink-0 ${checked ? 'bg-accent-gold' : 'bg-theme-tertiary'}`}
         >
             <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
@@ -93,10 +113,11 @@ const SaveButton = ({ onClick, loading }) => (
     </button>
 );
 
-const LogoUploadField = ({ label, value, onChange, category = 'branding' }) => {
+const LogoUploadField = ({ label, value, onChange, category = 'branding', disabled }) => {
     const [uploading, setUploading] = useState(false);
 
     const handleFileChange = async (e) => {
+        if (disabled) return;
         const file = e.target.files?.[0];
         if (!file) return;
         setUploading(true);
@@ -116,7 +137,7 @@ const LogoUploadField = ({ label, value, onChange, category = 'branding' }) => {
     };
 
     return (
-        <div className="space-y-2">
+        <div className={`space-y-2 ${disabled ? 'opacity-60 pointer-events-none' : ''}`}>
             <label className="block text-xs font-medium text-theme-muted">{label}</label>
             <div className="flex items-center gap-3">
                 {value ? (
@@ -127,17 +148,18 @@ const LogoUploadField = ({ label, value, onChange, category = 'branding' }) => {
                     </div>
                 )}
                 <div className="flex-1">
-                    <label className="inline-flex items-center gap-2 cursor-pointer px-3 py-1.5 text-xs font-medium rounded-lg bg-theme-primary border border-theme text-theme-secondary hover:bg-theme-secondary transition">
+                    <label className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg bg-theme-primary border border-theme text-theme-secondary transition" style={{ cursor: disabled ? 'not-allowed' : 'pointer', hover: disabled ? 'none' : 'bg-theme-secondary' }}>
                         {uploading ? <Loader2 size={12} className="animate-spin" /> : <Upload size={12} />}
                         {uploading ? 'Uploading...' : 'Upload Image'}
-                        <input type="file" accept="image/*" className="hidden" onChange={handleFileChange} disabled={uploading} />
+                        <input type="file" accept="image/*" className="hidden" onChange={handleFileChange} disabled={uploading || disabled} />
                     </label>
                     {value && (
                         <div className="mt-1">
                             <input
                                 type="text"
                                 value={value}
-                                onChange={(e) => onChange(e.target.value)}
+                                onChange={(e) => !disabled && onChange(e.target.value)}
+                                disabled={disabled}
                                 className="w-full px-2 py-1 text-[10px] bg-theme-primary border border-theme rounded text-theme-muted outline-none"
                                 placeholder="Or paste URL..."
                             />
@@ -149,20 +171,23 @@ const LogoUploadField = ({ label, value, onChange, category = 'branding' }) => {
     );
 };
 
-const ColorField = ({ label, value, onChange }) => (
-    <div className="space-y-1.5">
+const ColorField = ({ label, value, onChange, disabled }) => (
+    <div className={`space-y-1.5 ${disabled ? 'opacity-60 pointer-events-none' : ''}`}>
         <label className="block text-xs font-medium text-theme-muted">{label}</label>
         <div className="flex items-center gap-2">
             <input
                 type="color"
                 value={value || '#000000'}
-                onChange={(e) => onChange(e.target.value)}
-                className="w-8 h-8 rounded border border-theme cursor-pointer bg-transparent p-0.5"
+                onChange={(e) => !disabled && onChange(e.target.value)}
+                disabled={disabled}
+                className="w-8 h-8 rounded border border-theme bg-transparent p-0.5"
+                style={{ cursor: disabled ? 'not-allowed' : 'pointer' }}
             />
             <input
                 type="text"
                 value={value || ''}
-                onChange={(e) => onChange(e.target.value)}
+                onChange={(e) => !disabled && onChange(e.target.value)}
+                disabled={disabled}
                 placeholder="#000000"
                 className="flex-1 px-3 py-1.5 text-xs bg-theme-primary border border-theme rounded-lg text-theme-primary outline-none focus:ring-2 focus:ring-accent-gold/20"
             />
@@ -170,22 +195,42 @@ const ColorField = ({ label, value, onChange }) => (
     </div>
 );
 
-const defaultConfig = {
+// Toggle Banner for Company Settings
+const CompanySettingsBanner = ({ isUsingCompanySettings, toggleSettings, sectionName }) => (
+    <div className={`flex items-center justify-between p-4 mb-6 rounded-xl border ${isUsingCompanySettings ? 'bg-accent-gold/10 border-accent-gold/30' : 'bg-theme-secondary border-theme'}`}>
+        <div>
+            <h3 className={`text-sm font-semibold flex items-center gap-2 ${isUsingCompanySettings ? 'text-accent-gold' : 'text-theme-primary'}`}>
+                {isUsingCompanySettings ? <Lock size={15} /> : <Store size={15} />}
+                Use Company Settings for {sectionName}
+            </h3>
+            <p className="text-xs text-theme-muted mt-1">
+                {isUsingCompanySettings 
+                    ? `Currently inheriting the company's ${sectionName.toLowerCase()} settings. Turn off to customize specifically for this store.` 
+                    : `Currently using store-specific ${sectionName.toLowerCase()} settings. Turn on to inherit from company settings.`}
+            </p>
+        </div>
+        <div
+            onClick={() => toggleSettings(!isUsingCompanySettings)}
+            className={`w-14 h-7 rounded-full transition-colors flex items-center px-1 flex-shrink-0 cursor-pointer ${isUsingCompanySettings ? 'bg-accent-gold' : 'bg-theme-tertiary border border-theme'}`}
+        >
+            <div className={`w-5 h-5 rounded-full bg-white shadow transition-transform ${isUsingCompanySettings ? 'translate-x-7' : 'translate-x-0'}`} />
+        </div>
+    </div>
+);
+
+const defaultStoreConfig = {
     store_name: '',
     tagline: '',
     description: '',
     currency: 'NGN',
     store_slug: '',
-    branding: {
-        logo_primary: '',
-        logo_icon: '',
-        logo_dark: '',
-        primary_color: '#d4a017',
-        secondary_color: '#1a1a2e',
-        accent_color: '#f0c040',
-        background_color: '#ffffff',
-        text_color: '#111827',
-        font_family: 'Inter',
+    use_company_settings: {
+        general: true, branding: true, tax: true, receipt: true, 
+        payment: true, notifications: true, security: true, display: true
+    },
+    store_settings: {
+        general: {}, branding: {}, tax: {}, receipt: {}, 
+        payment: {}, notifications: {}, security: {}, display: {}
     },
     homepage: {
         promo_bar_enabled: false,
@@ -195,38 +240,25 @@ const defaultConfig = {
         featured_products: [],
     },
     contact: {
-        email: '',
-        phone: '',
-        whatsapp: '',
-        address: '',
-        social: {
-            facebook: '',
-            instagram: '',
-            twitter: '',
-            youtube: '',
-        },
+        email: '', phone: '', whatsapp: '', address: '',
+        social: { facebook: '', instagram: '', twitter: '', youtube: '' },
     },
-    seo: {
-        meta_title: '',
-        meta_description: '',
-        og_image: '',
-    },
+    seo: { meta_title: '', meta_description: '', og_image: '' },
     commerce: {
         tax_rate: 0,
         shipping_methods: [],
         payment_methods: { paystack: true, bank_transfer: false },
     },
     advanced: {
-        maintenance_mode: false,
-        maintenance_message: '',
-        custom_domain: '',
-        store_active: true,
+        maintenance_mode: false, maintenance_message: '',
+        custom_domain: '', store_active: true,
     },
 };
 
 const StoreSettingsPage = () => {
     const [activeTab, setActiveTab] = useState('general');
-    const [config, setConfig] = useState(defaultConfig);
+    const [config, setConfig] = useState(defaultStoreConfig);
+    const [companySettings, setCompanySettings] = useState(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
@@ -234,30 +266,101 @@ const StoreSettingsPage = () => {
     const [categories, setCategories] = useState([]);
     const [products, setProducts] = useState([]);
 
-    const fetchConfig = async () => {
+    const loadData = async () => {
         setLoading(true);
         try {
-            const res = await getStoreConfig();
-            const data = res.data;
-            setConfig(prev => ({
-                ...defaultConfig,
-                ...data,
-                branding: { ...defaultConfig.branding, ...(data.branding || {}) },
-                homepage: { ...defaultConfig.homepage, ...(data.homepage || {}) },
+            const [configRes, companyRes, catRes, prodRes] = await Promise.all([
+                getStoreConfig(),
+                getCompanySettingsForStore(),
+                api.get('/products/categories').catch(() => ({ data: [] })),
+                api.get('/products?limit=200').catch(() => ({ data: [] }))
+            ]);
+
+            const d = configRes.data;
+
+            // Parse JSONB fields that might come as strings
+            const parseJson = (v, fallback = {}) => {
+                if (!v) return fallback;
+                if (typeof v === 'string') { try { return JSON.parse(v); } catch { return fallback; } }
+                return v;
+            };
+
+            // Map flat DB columns to the nested structure the frontend uses
+            const mappedConfig = {
+                ...defaultStoreConfig,
+                // Top-level fields
+                store_name: d.store_name || '',
+                store_slug: d.store_slug || '',
+                tagline: d.tagline || '',
+                description: d.description || '',
+                currency: d.currency || 'NGN',
+
+                // Company settings toggle fields
+                use_company_settings: {
+                    ...defaultStoreConfig.use_company_settings,
+                    ...parseJson(d.use_company_settings, {}),
+                },
+                store_settings: {
+                    ...defaultStoreConfig.store_settings,
+                    ...parseJson(d.store_settings, {}),
+                },
+
+                // Store branding (these are the online store branding, distinct from company branding)
+                logo_primary: d.logo_primary || '',
+                logo_icon: d.logo_icon || '',
+                logo_dark: d.logo_dark || '',
+                primary_color: d.primary_color || '#3B82F6',
+                secondary_color: d.secondary_color || '#1E40AF',
+                accent_color: d.accent_color || '#F59E0B',
+                background_color: d.background_color || '#FFFFFF',
+                text_color: d.text_color || '#111827',
+                font_family: d.font_family || 'Inter',
+
+                // Homepage (mapped from flat columns)
+                homepage: {
+                    promo_bar_enabled: d.show_promo_bar ?? false,
+                    promo_bar_text: d.promo_bar_text || '',
+                    hero_banners: parseJson(d.hero_banners, []),
+                    featured_categories: parseJson(d.featured_category_ids, []),
+                    featured_products: parseJson(d.featured_product_ids, []),
+                },
+
+                // Contact (mapped from flat columns)
                 contact: {
-                    ...defaultConfig.contact,
-                    ...(data.contact || {}),
-                    social: { ...defaultConfig.contact.social, ...(data.contact?.social || {}) },
+                    email: d.contact_email || '',
+                    phone: d.contact_phone || '',
+                    whatsapp: d.contact_whatsapp || '',
+                    address: d.contact_address || '',
+                    social: parseJson(d.social_links, { facebook: '', instagram: '', twitter: '', youtube: '' }),
                 },
-                seo: { ...defaultConfig.seo, ...(data.seo || {}) },
+
+                // SEO (mapped from flat columns)
+                seo: {
+                    meta_title: d.seo_meta_title || '',
+                    meta_description: d.seo_meta_description || '',
+                    og_image: d.seo_og_image || '',
+                },
+
+                // Commerce (mapped from flat columns)
                 commerce: {
-                    ...defaultConfig.commerce,
-                    ...(data.commerce || {}),
-                    shipping_methods: data.commerce?.shipping_methods || [],
-                    payment_methods: { ...defaultConfig.commerce.payment_methods, ...(data.commerce?.payment_methods || {}) },
+                    tax_rate: d.tax_rate || 0,
+                    shipping_methods: parseJson(d.shipping_methods, []),
+                    payment_methods: parseJson(d.payment_methods, { paystack: true, bank_transfer: false }),
                 },
-                advanced: { ...defaultConfig.advanced, ...(data.advanced || {}) },
-            }));
+
+                // Advanced (mapped from flat columns)
+                advanced: {
+                    store_active: d.is_active ?? true,
+                    maintenance_mode: d.maintenance_mode ?? false,
+                    maintenance_message: d.maintenance_message || '',
+                    custom_domain: d.custom_domain || '',
+                },
+            };
+
+            setConfig(mappedConfig);
+            setCompanySettings(companyRes.data);
+            setCategories(Array.isArray(catRes.data) ? catRes.data : catRes.data?.categories || []);
+            setProducts(Array.isArray(prodRes.data) ? prodRes.data : prodRes.data?.products || []);
         } catch (err) {
             console.error('Failed to load store config', err);
             toast.error('Failed to load store settings. Please refresh the page.');
@@ -266,21 +369,7 @@ const StoreSettingsPage = () => {
         }
     };
 
-    const fetchSupportingData = async () => {
-        try {
-            const [catRes, prodRes] = await Promise.all([
-                api.get('/products/categories').catch(() => ({ data: [] })),
-                api.get('/products?limit=200').catch(() => ({ data: [] })),
-            ]);
-            setCategories(Array.isArray(catRes.data) ? catRes.data : catRes.data?.categories || []);
-            setProducts(Array.isArray(prodRes.data) ? prodRes.data : prodRes.data?.products || []);
-        } catch {}
-    };
-
-    useEffect(() => {
-        fetchConfig();
-        fetchSupportingData();
-    }, []);
+    useEffect(() => { loadData(); }, []);
 
     const set = useCallback((path, value) => {
         setConfig(prev => {
@@ -296,25 +385,90 @@ const StoreSettingsPage = () => {
         });
     }, []);
 
-    const toSlug = (name) =>
-        name.toLowerCase().trim()
-            .replace(/[^a-z0-9\s-]/g, '')
-            .replace(/\s+/g, '-')
-            .replace(/-+/g, '-')
-            .replace(/^-|-$/g, '');
+    const handleToggleCompanySettings = (section, value) => {
+        set(`use_company_settings.${section}`, value);
+    };
 
-    const handleStoreNameChange = (value) => {
+    // Helper to get exactly what should be displayed (company fallback or store specific)
+    const getSectionData = (section) => {
+        const useCompany = config.use_company_settings[section];
+        if (useCompany && companySettings) {
+            return companySettings[section] || {};
+        }
+        return config.store_settings[section] || {};
+    };
+
+    const handleSectionChange = (section, field, value) => {
         setConfig(prev => ({
             ...prev,
-            store_name: value,
-            store_slug: toSlug(value),
+            store_settings: {
+                ...prev.store_settings,
+                [section]: {
+                    ...prev.store_settings[section],
+                    [field]: value
+                }
+            }
         }));
     };
 
     const handleSave = async () => {
         setSaving(true);
         try {
-            await updateStoreConfig(config);
+            // Flatten nested config back to flat DB columns for the backend
+            const payload = {
+                store_slug: config.store_slug,
+                store_name: config.store_name,
+                tagline: config.tagline,
+                description: config.description,
+                currency: config.currency,
+
+                // Branding (store-specific storefront branding)
+                logo_primary: config.logo_primary,
+                logo_icon: config.logo_icon,
+                logo_dark: config.logo_dark,
+                primary_color: config.primary_color,
+                secondary_color: config.secondary_color,
+                accent_color: config.accent_color,
+                background_color: config.background_color,
+                text_color: config.text_color,
+                font_family: config.font_family,
+
+                // Homepage
+                show_promo_bar: config.homepage.promo_bar_enabled,
+                promo_bar_text: config.homepage.promo_bar_text,
+                hero_banners: config.homepage.hero_banners,
+                featured_category_ids: config.homepage.featured_categories,
+                featured_product_ids: config.homepage.featured_products,
+
+                // Contact
+                contact_email: config.contact.email,
+                contact_phone: config.contact.phone,
+                contact_whatsapp: config.contact.whatsapp,
+                contact_address: config.contact.address,
+                social_links: config.contact.social,
+
+                // SEO
+                seo_meta_title: config.seo.meta_title,
+                seo_meta_description: config.seo.meta_description,
+                seo_og_image: config.seo.og_image,
+
+                // Commerce
+                tax_rate: config.commerce.tax_rate,
+                shipping_methods: config.commerce.shipping_methods,
+                payment_methods: config.commerce.payment_methods,
+
+                // Advanced
+                is_active: config.advanced.store_active,
+                maintenance_mode: config.advanced.maintenance_mode,
+                maintenance_message: config.advanced.maintenance_message,
+                custom_domain: config.advanced.custom_domain,
+
+                // Company settings integration
+                use_company_settings: config.use_company_settings,
+                store_settings: config.store_settings,
+            };
+
+            await updateStoreConfig(payload);
             toast.success('Store settings saved successfully!');
         } catch (err) {
             toast.error('Failed to save: ' + (err.response?.data?.message || err.message));
@@ -323,20 +477,7 @@ const StoreSettingsPage = () => {
         }
     };
 
-    // Hero banner helpers
-    const addHeroBanner = () => {
-        set('homepage.hero_banners', [...(config.homepage.hero_banners || []), { image_url: '', title: '', subtitle: '', cta_text: '', cta_link: '' }]);
-    };
-    const updateHeroBanner = (idx, field, value) => {
-        const banners = [...(config.homepage.hero_banners || [])];
-        banners[idx] = { ...banners[idx], [field]: value };
-        set('homepage.hero_banners', banners);
-    };
-    const removeHeroBanner = (idx) => {
-        set('homepage.hero_banners', config.homepage.hero_banners.filter((_, i) => i !== idx));
-    };
-
-    // Shipping method helpers
+    // Helper for shipping
     const addShippingMethod = () => {
         set('commerce.shipping_methods', [...(config.commerce.shipping_methods || []), { name: '', price: 0, description: '' }]);
     };
@@ -349,79 +490,83 @@ const StoreSettingsPage = () => {
         set('commerce.shipping_methods', config.commerce.shipping_methods.filter((_, i) => i !== idx));
     };
 
-    // Multi-select toggle helper
     const toggleArrayItem = (path, item) => {
         const arr = path.split('.').reduce((o, k) => o?.[k], config) || [];
         const next = arr.includes(item) ? arr.filter(i => i !== item) : [...arr, item];
         set(path, next);
     };
 
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-[60vh]">
-                <LoadingSpinner />
-            </div>
-        );
-    }
+    if (loading) return <div className="flex items-center justify-center min-h-[60vh]"><LoadingSpinner /></div>;
 
     const renderTab = () => {
+        const useCS = (section) => config.use_company_settings[section];
+        const data = (section) => getSectionData(section);
+        const setVal = (section, field, val) => handleSectionChange(section, field, val);
+
         switch (activeTab) {
+            // ─── MIRRORED SECTIONS ──────────────────────────────────────────
             case 'general':
+                const gen = data('general');
+                const disGen = useCS('general');
                 return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
-                        <FormField label="Store Name" hint="Your store's display name">
-                            <TextInput value={config.store_name} onChange={e => handleStoreNameChange(e.target.value)} placeholder="My Awesome Store" />
-                        </FormField>
-                        <FormField label="Store Slug" hint="Slug is auto-generated from the store name. You can still edit it manually.">
-                            <TextInput value={config.store_slug} onChange={e => set('store_slug', e.target.value)} placeholder="my-store" />
-                            {config.store_slug && (
-                                <p className="mt-1 text-[10px] text-theme-muted font-mono truncate">
-                                    URL: /store/<span className="text-accent-gold">{config.store_slug}</span>
-                                </p>
-                            )}
-                        </FormField>
-                        <FormField label="Tagline">
-                            <TextInput value={config.tagline} onChange={e => set('tagline', e.target.value)} placeholder="Quality products delivered fast" />
-                        </FormField>
-                        <FormField label="Currency">
-                            <SelectInput value={config.currency} onChange={e => set('currency', e.target.value)}>
-                                {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
-                            </SelectInput>
-                        </FormField>
-                        <div className="md:col-span-2">
-                            <FormField label="Store Description">
-                                <TextArea value={config.description} onChange={e => set('description', e.target.value)} placeholder="Tell customers about your store..." rows={4} />
+                    <div className="space-y-6">
+                        <CompanySettingsBanner isUsingCompanySettings={disGen} toggleSettings={(v) => handleToggleCompanySettings('general', v)} sectionName="General" />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+                            <FormField label="Company Name"><TextInput value={gen.company_name} onChange={e => setVal('general','company_name', e.target.value)} disabled={disGen} /></FormField>
+                            <FormField label="Company Email"><TextInput type="email" value={gen.company_email} onChange={e => setVal('general','company_email', e.target.value)} disabled={disGen} /></FormField>
+                            <FormField label="Company Phone"><TextInput value={gen.company_phone} onChange={e => setVal('general','company_phone', e.target.value)} disabled={disGen} /></FormField>
+                            <FormField label="Currency">
+                                <SelectInput value={gen.currency} onChange={e => setVal('general','currency', e.target.value)} disabled={disGen}>
+                                    {CURRENCIES.map(c => <option key={c} value={c}>{c}</option>)}
+                                </SelectInput>
+                            </FormField>
+                            <div className="md:col-span-2">
+                                <FormField label="Company Address"><TextArea value={gen.company_address} onChange={e => setVal('general','company_address', e.target.value)} disabled={disGen} /></FormField>
+                            </div>
+                            <FormField label="Timezone">
+                                <SelectInput value={gen.timezone} onChange={e => setVal('general','timezone', e.target.value)} disabled={disGen}>
+                                    {TIMEZONES.map(c => <option key={c} value={c}>{c}</option>)}
+                                </SelectInput>
+                            </FormField>
+                            <FormField label="Date Format">
+                                <SelectInput value={gen.date_format} onChange={e => setVal('general','date_format', e.target.value)} disabled={disGen}>
+                                    <option value="MM/DD/YYYY">MM/DD/YYYY</option>
+                                    <option value="DD/MM/YYYY">DD/MM/YYYY</option>
+                                    <option value="YYYY-MM-DD">YYYY-MM-DD</option>
+                                </SelectInput>
                             </FormField>
                         </div>
                     </div>
                 );
 
             case 'branding':
+                const br = data('branding');
+                const disBr = useCS('branding');
                 return (
                     <div className="space-y-6">
+                        <CompanySettingsBanner isUsingCompanySettings={disBr} toggleSettings={(v) => handleToggleCompanySettings('branding', v)} sectionName="Branding" />
                         <div>
                             <SectionLabel>Logos</SectionLabel>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <LogoUploadField label="Primary Logo" value={config.branding.logo_primary} onChange={v => set('branding.logo_primary', v)} category="branding" />
-                                <LogoUploadField label="Icon / Favicon" value={config.branding.logo_icon} onChange={v => set('branding.logo_icon', v)} category="branding" />
-                                <LogoUploadField label="Dark Mode Logo" value={config.branding.logo_dark} onChange={v => set('branding.logo_dark', v)} category="branding" />
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <LogoUploadField label="Primary Logo" value={br.logo_url} onChange={v => setVal('branding','logo_url', v)} disabled={disBr} />
                             </div>
                         </div>
                         <div>
                             <SectionLabel>Colors</SectionLabel>
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                                <ColorField label="Primary Color" value={config.branding.primary_color} onChange={v => set('branding.primary_color', v)} />
-                                <ColorField label="Secondary Color" value={config.branding.secondary_color} onChange={v => set('branding.secondary_color', v)} />
-                                <ColorField label="Accent Color" value={config.branding.accent_color} onChange={v => set('branding.accent_color', v)} />
-                                <ColorField label="Background Color" value={config.branding.background_color} onChange={v => set('branding.background_color', v)} />
-                                <ColorField label="Text Color" value={config.branding.text_color} onChange={v => set('branding.text_color', v)} />
+                                <ColorField label="Primary Color" value={br.primary_color} onChange={v => setVal('branding','primary_color', v)} disabled={disBr} />
+                                <ColorField label="Secondary Color" value={br.secondary_color} onChange={v => setVal('branding','secondary_color', v)} disabled={disBr} />
+                                <ColorField label="Accent Color" value={br.accent_color} onChange={v => setVal('branding','accent_color', v)} disabled={disBr} />
+                                <ColorField label="Hover Color" value={br.hover_color} onChange={v => setVal('branding','hover_color', v)} disabled={disBr} />
+                                <ColorField label="Active Text" value={br.active_text_color} onChange={v => setVal('branding','active_text_color', v)} disabled={disBr} />
+                                <ColorField label="Background Color" value={br.background_color} onChange={v => setVal('branding','background_color', v)} disabled={disBr} />
                             </div>
                         </div>
                         <div>
                             <SectionLabel>Typography</SectionLabel>
                             <div className="max-w-xs">
                                 <FormField label="Font Family">
-                                    <SelectInput value={config.branding.font_family} onChange={e => set('branding.font_family', e.target.value)}>
+                                    <SelectInput value={br.font_family} onChange={e => setVal('branding','font_family', e.target.value)} disabled={disBr}>
                                         {FONT_FAMILIES.map(f => <option key={f} value={f}>{f}</option>)}
                                     </SelectInput>
                                 </FormField>
@@ -430,17 +575,153 @@ const StoreSettingsPage = () => {
                     </div>
                 );
 
+            case 'tax':
+                const tx = data('tax');
+                const disTx = useCS('tax');
+                return (
+                    <div className="space-y-6">
+                        <CompanySettingsBanner isUsingCompanySettings={disTx} toggleSettings={(v) => handleToggleCompanySettings('tax', v)} sectionName="Tax" />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-5">
+                                <Toggle label="Enable Tax" checked={tx.tax_enabled} onChange={v => setVal('tax','tax_enabled',v)} disabled={disTx} />
+                                {tx.tax_enabled && (
+                                    <>
+                                        <FormField label="Standard Tax Rate (%)"><TextInput type="number" value={tx.standard_rate} onChange={e => setVal('tax','standard_rate',e.target.value)} disabled={disTx}/></FormField>
+                                        <FormField label="Reduced Tax Rate (%)"><TextInput type="number" value={tx.reduced_rate} onChange={e => setVal('tax','reduced_rate',e.target.value)} disabled={disTx}/></FormField>
+                                    </>
+                                )}
+                            </div>
+                            <div className="space-y-5">
+                                <FormField label="Tax Identification Number (TIN)"><TextInput value={tx.tax_number} onChange={e => setVal('tax','tax_number',e.target.value)} disabled={disTx} /></FormField>
+                                <FormField label="Effective Date"><TextInput type="date" value={tx.effective_date?.split('T')[0] || ''} onChange={e => setVal('tax','effective_date',e.target.value)} disabled={disTx} /></FormField>
+                            </div>
+                        </div>
+                    </div>
+                );
+
+            case 'receipt':
+                const rc = data('receipt');
+                const disRc = useCS('receipt');
+                return (
+                    <div className="space-y-6">
+                        <CompanySettingsBanner isUsingCompanySettings={disRc} toggleSettings={(v) => handleToggleCompanySettings('receipt', v)} sectionName="Receipt" />
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-4">
+                                <SectionLabel>Company on Receipt</SectionLabel>
+                                <FormField label="Name"><TextInput value={rc.company_name} onChange={e => setVal('receipt','company_name',e.target.value)} disabled={disRc} /></FormField>
+                                <FormField label="Address"><TextArea value={rc.company_address} onChange={e => setVal('receipt','company_address',e.target.value)} disabled={disRc} /></FormField>
+                                <FormField label="Phone"><TextInput value={rc.company_phone} onChange={e => setVal('receipt','company_phone',e.target.value)} disabled={disRc} /></FormField>
+                                <FormField label="Email"><TextInput type="email" value={rc.company_email} onChange={e => setVal('receipt','company_email',e.target.value)} disabled={disRc} /></FormField>
+                                <LogoUploadField label="Receipt Logo" value={rc.company_logo_url} onChange={v => setVal('receipt','company_logo_url',v)} disabled={disRc} category="receipts" />
+                            </div>
+                            <div className="space-y-4">
+                                <SectionLabel>Content & Options</SectionLabel>
+                                <FormField label="Footer Text"><TextArea value={rc.footer_text} onChange={e => setVal('receipt','footer_text',e.target.value)} disabled={disRc} /></FormField>
+                                <FormField label="Terms & Conditions"><TextArea value={rc.terms_and_conditions} onChange={e => setVal('receipt','terms_and_conditions',e.target.value)} disabled={disRc} /></FormField>
+                                <Toggle label="Show Logo" checked={rc.show_logo} onChange={v => setVal('receipt','show_logo',v)} disabled={disRc} />
+                                <Toggle label="Show Tax Number" checked={rc.show_tax_number} onChange={v => setVal('receipt','show_tax_number',v)} disabled={disRc} />
+                                <Toggle label="Show Barcode" checked={rc.show_barcode} onChange={v => setVal('receipt','show_barcode',v)} disabled={disRc} />
+                                <Toggle label="Show QR Code" checked={rc.show_qr_code} onChange={v => setVal('receipt','show_qr_code',v)} disabled={disRc} />
+                            </div>
+                        </div>
+                    </div>
+                );
+
+            case 'payment':
+                const pay = data('payment');
+                const disPay = useCS('payment');
+                return (
+                    <div className="space-y-6">
+                        <CompanySettingsBanner isUsingCompanySettings={disPay} toggleSettings={(v) => handleToggleCompanySettings('payment', v)} sectionName="Payment" />
+                        <div className="space-y-4 max-w-lg">
+                            <Toggle label="Cash Payments" checked={pay.cash_enabled} onChange={v => setVal('payment','cash_enabled',v)} disabled={disPay} />
+                            <Toggle label="Card Payments" checked={pay.card_enabled} onChange={v => setVal('payment','card_enabled',v)} disabled={disPay} />
+                            <Toggle label="Bank Transfer" checked={pay.bank_transfer_enabled} onChange={v => setVal('payment','bank_transfer_enabled',v)} disabled={disPay} />
+                            <Toggle label="Mobile Money" checked={pay.mobile_money_enabled} onChange={v => setVal('payment','mobile_money_enabled',v)} disabled={disPay} />
+                            <FormField label="Default Payment Method">
+                                <SelectInput value={pay.default_payment_method} onChange={e => setVal('payment','default_payment_method', e.target.value)} disabled={disPay}>
+                                    <option value="cash">Cash</option>
+                                    <option value="card">Card</option>
+                                    <option value="bank_transfer">Bank Transfer</option>
+                                    <option value="mobile_money">Mobile Money</option>
+                                </SelectInput>
+                            </FormField>
+                        </div>
+                    </div>
+                );
+
+            case 'notifications':
+                const not = data('notifications');
+                const disNot = useCS('notifications');
+                return (
+                    <div className="space-y-6">
+                        <CompanySettingsBanner isUsingCompanySettings={disNot} toggleSettings={(v) => handleToggleCompanySettings('notifications', v)} sectionName="Notifications" />
+                        <div className="space-y-4 max-w-lg">
+                            <Toggle label="Email Notifications" checked={not.email_notifications} onChange={v => setVal('notifications','email_notifications',v)} disabled={disNot} />
+                            <Toggle label="Low Stock Alerts" checked={not.low_stock_alerts} onChange={v => setVal('notifications','low_stock_alerts',v)} disabled={disNot} />
+                            {not.low_stock_alerts && (
+                                <FormField label="Low Stock Threshold">
+                                    <TextInput type="number" value={not.low_stock_threshold} onChange={e => setVal('notifications','low_stock_threshold', e.target.value)} disabled={disNot} />
+                                </FormField>
+                            )}
+                            <Toggle label="Daily Summary" checked={not.daily_summary} onChange={v => setVal('notifications','daily_summary',v)} disabled={disNot} />
+                            <Toggle label="Order Notifications" checked={not.order_notifications} onChange={v => setVal('notifications','order_notifications',v)} disabled={disNot} />
+                        </div>
+                    </div>
+                );
+
+            case 'security':
+                const sec = data('security');
+                const disSec = useCS('security');
+                return (
+                    <div className="space-y-6">
+                        <CompanySettingsBanner isUsingCompanySettings={disSec} toggleSettings={(v) => handleToggleCompanySettings('security', v)} sectionName="Security" />
+                        <div className="space-y-4 max-w-lg">
+                            <FormField label="Session Timeout (minutes)">
+                                <TextInput type="number" value={sec.session_timeout} onChange={e => setVal('security','session_timeout', e.target.value)} disabled={disSec} />
+                            </FormField>
+                            <Toggle label="Require Password Change" checked={sec.require_password_change} onChange={v => setVal('security','require_password_change',v)} disabled={disSec} />
+                            {sec.require_password_change && (
+                                <FormField label="Password Expiry (days)">
+                                    <TextInput type="number" value={sec.password_expiry_days} onChange={e => setVal('security','password_expiry_days', e.target.value)} disabled={disSec} />
+                                </FormField>
+                            )}
+                            <Toggle label="Two-Factor Authentication" checked={sec.two_factor_enabled} onChange={v => setVal('security','two_factor_enabled',v)} disabled={disSec} />
+                        </div>
+                    </div>
+                );
+
+            case 'display':
+                const disp = data('display');
+                const disDisp = useCS('display');
+                return (
+                    <div className="space-y-6">
+                        <CompanySettingsBanner isUsingCompanySettings={disDisp} toggleSettings={(v) => handleToggleCompanySettings('display', v)} sectionName="Display" />
+                        <div className="space-y-4 max-w-lg">
+                            <FormField label="Items Per Page">
+                                <SelectInput value={disp.items_per_page} onChange={e => setVal('display','items_per_page', e.target.value)} disabled={disDisp}>
+                                    <option value="10">10</option><option value="20">20</option><option value="50">50</option><option value="100">100</option>
+                                </SelectInput>
+                            </FormField>
+                            <FormField label="Default View Mode">
+                                <SelectInput value={disp.default_view_mode} onChange={e => setVal('display','default_view_mode', e.target.value)} disabled={disDisp}>
+                                    <option value="grid">Grid</option><option value="list">List</option>
+                                </SelectInput>
+                            </FormField>
+                            <Toggle label="Show Product Images" checked={disp.show_product_images} onChange={v => setVal('display','show_product_images',v)} disabled={disDisp} />
+                            <Toggle label="Compact Mode" checked={disp.compact_mode} onChange={v => setVal('display','compact_mode',v)} disabled={disDisp} />
+                        </div>
+                    </div>
+                );
+
+            // ─── STORE ONLY SECTIONS ─────────────────────────────────────────
             case 'homepage':
                 return (
                     <div className="space-y-6">
                         <div>
                             <SectionLabel>Promotional Bar</SectionLabel>
                             <div className="space-y-3">
-                                <Toggle
-                                    checked={config.homepage.promo_bar_enabled}
-                                    onChange={v => set('homepage.promo_bar_enabled', v)}
-                                    label="Enable promotional bar at top of store"
-                                />
+                                <Toggle checked={config.homepage.promo_bar_enabled} onChange={v => set('homepage.promo_bar_enabled', v)} label="Enable promotional bar at top of store" />
                                 {config.homepage.promo_bar_enabled && (
                                     <FormField label="Promo Bar Text">
                                         <TextInput value={config.homepage.promo_bar_text} onChange={e => set('homepage.promo_bar_text', e.target.value)} placeholder="Free shipping on orders over $50!" />
@@ -448,70 +729,29 @@ const StoreSettingsPage = () => {
                                 )}
                             </div>
                         </div>
-
                         <div>
                             <SectionLabel>Hero Section</SectionLabel>
                             <div className="flex items-start gap-3 p-4 rounded-xl border border-accent-gold/30 bg-accent-gold/5">
                                 <ImageIcon className="w-5 h-5 text-accent-gold flex-shrink-0 mt-0.5" />
                                 <div>
                                     <p className="text-sm font-semibold text-theme-primary mb-1">Hero section has moved to App Builder</p>
-                                    <p className="text-xs text-theme-muted leading-relaxed mb-3">
-                                        Choose from 5 desktop templates (Split, Full-Width, Fashion, Spotlight, Deals Grid) and 3 mobile templates, then set your heading, image, CTA and colours — all from the App Builder.
-                                    </p>
-                                    <a
-                                        href="/app-builder"
-                                        className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold bg-accent-gold text-white rounded-lg hover:bg-accent-gold-dark transition"
-                                    >
-                                        Open App Builder →
-                                    </a>
+                                    <a href="/app-builder" className="inline-flex items-center gap-2 px-4 py-2 text-xs font-semibold bg-accent-gold text-white rounded-lg hover:bg-accent-gold-dark transition">Open App Builder →</a>
                                 </div>
                             </div>
                         </div>
-
                         <div>
                             <SectionLabel>Featured Categories</SectionLabel>
-                            {categories.length === 0 ? (
-                                <p className="text-sm text-theme-muted">No categories found.</p>
-                            ) : (
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-                                    {categories.map(cat => {
-                                        const selected = (config.homepage.featured_categories || []).includes(cat.id);
-                                        return (
-                                            <button
-                                                key={cat.id}
-                                                onClick={() => toggleArrayItem('homepage.featured_categories', cat.id)}
-                                                className={`flex items-center gap-2 px-3 py-2 text-xs rounded-lg border transition text-left ${selected ? 'border-accent-gold bg-accent-gold/10 text-accent-gold' : 'border-theme bg-theme-primary text-theme-secondary hover:border-accent-gold/50'}`}
-                                            >
-                                                {selected ? <CheckSquare size={12} /> : <Square size={12} />}
-                                                {cat.name || cat.category_name}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            )}
-                        </div>
-
-                        <div>
-                            <SectionLabel>Featured Products</SectionLabel>
-                            {products.length === 0 ? (
-                                <p className="text-sm text-theme-muted">No products found.</p>
-                            ) : (
-                                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-60 overflow-y-auto">
-                                    {products.map(prod => {
-                                        const selected = (config.homepage.featured_products || []).includes(prod.id);
-                                        return (
-                                            <button
-                                                key={prod.id}
-                                                onClick={() => toggleArrayItem('homepage.featured_products', prod.id)}
-                                                className={`flex items-center gap-2 px-3 py-2 text-xs rounded-lg border transition text-left ${selected ? 'border-accent-gold bg-accent-gold/10 text-accent-gold' : 'border-theme bg-theme-primary text-theme-secondary hover:border-accent-gold/50'}`}
-                                            >
-                                                {selected ? <CheckSquare size={12} /> : <Square size={12} />}
-                                                <span className="truncate">{prod.product_name || prod.name}</span>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            )}
+                            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                                {categories.map(cat => {
+                                    const selected = (config.homepage.featured_categories || []).includes(cat.id);
+                                    return (
+                                        <button key={cat.id} onClick={() => toggleArrayItem('homepage.featured_categories', cat.id)} className={`flex items-center gap-2 px-3 py-2 text-xs rounded-lg border transition text-left ${selected ? 'border-accent-gold bg-accent-gold/10 text-accent-gold' : 'border-theme bg-theme-primary text-theme-secondary'}`}>
+                                            {selected ? <CheckSquare size={12} /> : <Square size={12} />}
+                                            {cat.name || cat.category_name}
+                                        </button>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
                 );
@@ -522,19 +762,11 @@ const StoreSettingsPage = () => {
                         <div>
                             <SectionLabel>Contact Information</SectionLabel>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <FormField label="Contact Email">
-                                    <TextInput type="email" value={config.contact.email} onChange={e => set('contact.email', e.target.value)} placeholder="hello@store.com" />
-                                </FormField>
-                                <FormField label="Phone Number">
-                                    <TextInput value={config.contact.phone} onChange={e => set('contact.phone', e.target.value)} placeholder="+234 800 000 0000" />
-                                </FormField>
-                                <FormField label="WhatsApp Number" hint="Include country code">
-                                    <TextInput value={config.contact.whatsapp} onChange={e => set('contact.whatsapp', e.target.value)} placeholder="+2348000000000" />
-                                </FormField>
+                                <FormField label="Contact Email"><TextInput type="email" value={config.contact.email} onChange={e => set('contact.email', e.target.value)} /></FormField>
+                                <FormField label="Phone Number"><TextInput value={config.contact.phone} onChange={e => set('contact.phone', e.target.value)} /></FormField>
+                                <FormField label="WhatsApp Number"><TextInput value={config.contact.whatsapp} onChange={e => set('contact.whatsapp', e.target.value)} /></FormField>
                                 <div className="md:col-span-2">
-                                    <FormField label="Business Address">
-                                        <TextArea value={config.contact.address} onChange={e => set('contact.address', e.target.value)} placeholder="123 Main St, Lagos, Nigeria" rows={2} />
-                                    </FormField>
+                                    <FormField label="Business Address"><TextArea value={config.contact.address} onChange={e => set('contact.address', e.target.value)} rows={2} /></FormField>
                                 </div>
                             </div>
                         </div>
@@ -543,11 +775,7 @@ const StoreSettingsPage = () => {
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {['facebook', 'instagram', 'twitter', 'youtube'].map(platform => (
                                     <FormField key={platform} label={platform.charAt(0).toUpperCase() + platform.slice(1)}>
-                                        <TextInput
-                                            value={config.contact.social?.[platform] || ''}
-                                            onChange={e => set(`contact.social.${platform}`, e.target.value)}
-                                            placeholder={`https://${platform}.com/yourpage`}
-                                        />
+                                        <TextInput value={config.contact.social?.[platform] || ''} onChange={e => set(`contact.social.${platform}`, e.target.value)} />
                                     </FormField>
                                 ))}
                             </div>
@@ -558,21 +786,9 @@ const StoreSettingsPage = () => {
             case 'seo':
                 return (
                     <div className="space-y-4">
-                        <FormField label="Meta Title" hint="Recommended: 50–60 characters">
-                            <TextInput value={config.seo.meta_title} onChange={e => set('seo.meta_title', e.target.value)} placeholder="My Store — Quality Products" />
-                        </FormField>
-                        <FormField label="Meta Description" hint="Recommended: 150–160 characters">
-                            <TextArea value={config.seo.meta_description} onChange={e => set('seo.meta_description', e.target.value)} placeholder="Discover quality products at great prices..." rows={3} />
-                        </FormField>
-                        <FormField label="OG Image URL" hint="Image shown when sharing on social media (1200x630px recommended)">
-                            <TextInput value={config.seo.og_image} onChange={e => set('seo.og_image', e.target.value)} placeholder="https://..." />
-                        </FormField>
-                        {config.seo.og_image && (
-                            <div>
-                                <p className="text-xs text-theme-muted mb-2">Preview:</p>
-                                <img src={config.seo.og_image} alt="OG preview" className="h-24 w-auto rounded border border-theme object-cover" />
-                            </div>
-                        )}
+                        <FormField label="Meta Title"><TextInput value={config.seo.meta_title} onChange={e => set('seo.meta_title', e.target.value)} /></FormField>
+                        <FormField label="Meta Description"><TextArea value={config.seo.meta_description} onChange={e => set('seo.meta_description', e.target.value)} /></FormField>
+                        <FormField label="OG Image URL"><TextInput value={config.seo.og_image} onChange={e => set('seo.og_image', e.target.value)} /></FormField>
                     </div>
                 );
 
@@ -582,56 +798,35 @@ const StoreSettingsPage = () => {
                         <div>
                             <SectionLabel>Tax</SectionLabel>
                             <div className="max-w-xs">
-                                <FormField label="Tax Rate (%)" hint="Applied to all products unless overridden">
-                                    <TextInput type="number" value={config.commerce.tax_rate} onChange={e => set('commerce.tax_rate', parseFloat(e.target.value) || 0)} placeholder="7.5" />
+                                <FormField label="Tax Rate (%) (Storefront Override)">
+                                    <TextInput type="number" value={config.commerce.tax_rate} onChange={e => set('commerce.tax_rate', parseFloat(e.target.value) || 0)} />
                                 </FormField>
                             </div>
                         </div>
-
                         <div>
                             <SectionLabel>Payment Methods</SectionLabel>
                             <div className="space-y-3">
-                                <Toggle
-                                    checked={!!config.commerce.payment_methods?.paystack}
-                                    onChange={v => set('commerce.payment_methods.paystack', v)}
-                                    label="Paystack (card payments)"
-                                />
-                                <Toggle
-                                    checked={!!config.commerce.payment_methods?.bank_transfer}
-                                    onChange={v => set('commerce.payment_methods.bank_transfer', v)}
-                                    label="Bank Transfer (manual verification)"
-                                />
+                                <Toggle checked={!!config.commerce.payment_methods?.paystack} onChange={v => set('commerce.payment_methods.paystack', v)} label="Paystack (card payments)" />
+                                <Toggle checked={!!config.commerce.payment_methods?.bank_transfer} onChange={v => set('commerce.payment_methods.bank_transfer', v)} label="Bank Transfer" />
                             </div>
                         </div>
-
                         <div>
                             <SectionLabel>Shipping Methods</SectionLabel>
                             <div className="space-y-3">
-                                {(config.commerce.shipping_methods || []).map((method, idx) => (
+                                {(config.commerce.shipping_methods || []).map((m, idx) => (
                                     <div key={idx} className="bg-theme-primary rounded-lg border border-theme p-4">
                                         <div className="flex items-center justify-between mb-3">
                                             <span className="text-xs font-semibold text-theme-muted">Shipping Method {idx + 1}</span>
-                                            <button onClick={() => removeShippingMethod(idx)} className="p-1 text-theme-muted hover:text-red-500 transition">
-                                                <Trash2 size={14} />
-                                            </button>
+                                            <button onClick={() => removeShippingMethod(idx)} className="p-1 text-theme-muted hover:text-red-500 transition"><Trash2 size={14} /></button>
                                         </div>
                                         <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                                            <FormField label="Name">
-                                                <TextInput value={method.name} onChange={e => updateShippingMethod(idx, 'name', e.target.value)} placeholder="Standard Delivery" />
-                                            </FormField>
-                                            <FormField label="Price">
-                                                <TextInput type="number" value={method.price} onChange={e => updateShippingMethod(idx, 'price', parseFloat(e.target.value) || 0)} placeholder="0" />
-                                            </FormField>
-                                            <FormField label="Description">
-                                                <TextInput value={method.description} onChange={e => updateShippingMethod(idx, 'description', e.target.value)} placeholder="3–5 business days" />
-                                            </FormField>
+                                            <FormField label="Name"><TextInput value={m.name} onChange={e => updateShippingMethod(idx, 'name', e.target.value)} /></FormField>
+                                            <FormField label="Price"><TextInput type="number" value={m.price} onChange={e => updateShippingMethod(idx, 'price', parseFloat(e.target.value) || 0)} /></FormField>
+                                            <FormField label="Description"><TextInput value={m.description} onChange={e => updateShippingMethod(idx, 'description', e.target.value)} /></FormField>
                                         </div>
                                     </div>
                                 ))}
-                                <button
-                                    onClick={addShippingMethod}
-                                    className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg border border-dashed border-theme text-theme-muted hover:border-accent-gold hover:text-accent-gold transition"
-                                >
+                                <button onClick={addShippingMethod} className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg border border-dashed border-theme text-theme-muted hover:border-accent-gold hover:text-accent-gold transition">
                                     <Plus size={14} /> Add Shipping Method
                                 </button>
                             </div>
@@ -645,26 +840,13 @@ const StoreSettingsPage = () => {
                         <div>
                             <SectionLabel>Store Status</SectionLabel>
                             <div className="space-y-4">
-                                <Toggle
-                                    checked={!!config.advanced.store_active}
-                                    onChange={v => set('advanced.store_active', v)}
-                                    label="Store is active and accepting orders"
-                                />
+                                <Toggle checked={!!config.advanced.store_active} onChange={v => set('advanced.store_active', v)} label="Store is active and accepting orders" />
                                 <div className="pt-2 border-t border-theme">
-                                    <Toggle
-                                        checked={!!config.advanced.maintenance_mode}
-                                        onChange={v => set('advanced.maintenance_mode', v)}
-                                        label="Enable maintenance mode"
-                                    />
+                                    <Toggle checked={!!config.advanced.maintenance_mode} onChange={v => set('advanced.maintenance_mode', v)} label="Enable maintenance mode" />
                                     {config.advanced.maintenance_mode && (
                                         <div className="mt-3">
                                             <FormField label="Maintenance Message">
-                                                <TextArea
-                                                    value={config.advanced.maintenance_message}
-                                                    onChange={e => set('advanced.maintenance_message', e.target.value)}
-                                                    placeholder="We're currently undergoing maintenance. We'll be back shortly!"
-                                                    rows={2}
-                                                />
+                                                <TextArea value={config.advanced.maintenance_message} onChange={e => set('advanced.maintenance_message', e.target.value)} rows={2} />
                                             </FormField>
                                         </div>
                                     )}
@@ -674,9 +856,10 @@ const StoreSettingsPage = () => {
                         <div>
                             <SectionLabel>Domain</SectionLabel>
                             <div className="max-w-md">
-                                <FormField label="Custom Domain" hint="Point your domain's DNS to this store (e.g. shop.yourbrand.com)">
-                                    <TextInput value={config.advanced.custom_domain} onChange={e => set('advanced.custom_domain', e.target.value)} placeholder="shop.yourbrand.com" />
-                                </FormField>
+                                <FormField label="Custom Domain"><TextInput value={config.advanced.custom_domain} onChange={e => set('advanced.custom_domain', e.target.value)} /></FormField>
+                            </div>
+                            <div className="max-w-md mt-4">
+                                <FormField label="Store Slug"><TextInput value={config.store_slug} onChange={e => set('store_slug', e.target.value)} /></FormField>
                             </div>
                         </div>
                     </div>
@@ -689,27 +872,36 @@ const StoreSettingsPage = () => {
 
     return (
         <div className="space-y-4 sm:space-y-6 max-w-[1400px] mx-auto pb-6 sm:pb-10">
-            <PageHeader
-                title="Store Settings"
-                subtitle="Configure your online storefront"
-                icon={Store}
-            />
+            <PageHeader title="Store Settings" subtitle="Configure your online storefront and integrations" icon={Store} />
 
             <div className="flex flex-col lg:flex-row gap-4 sm:gap-6">
                 {/* Sidebar Tabs */}
-                <div className="lg:w-48 xl:w-56 flex-shrink-0">
+                <div className="lg:w-48 xl:w-56 flex-shrink-0 space-y-4">
                     <nav className="bg-theme-secondary rounded-lg border border-theme shadow-theme-sm overflow-hidden">
-                        {TABS.map(tab => {
+                        <div className="px-4 py-2 text-xs font-semibold text-theme-muted uppercase tracking-wide bg-theme-tertiary/30 border-b border-theme">
+                            Company Settings
+                        </div>
+                        {COMPANY_TABS.map(tab => {
                             const Icon = tab.icon;
                             const isActive = activeTab === tab.key;
                             return (
-                                <button
-                                    key={tab.key}
-                                    onClick={() => setActiveTab(tab.key)}
-                                    className={`w-full flex items-center gap-2.5 px-4 py-3 text-sm font-medium transition text-left border-b border-theme last:border-0 ${isActive ? 'bg-accent-gold/10 text-accent-gold' : 'text-theme-secondary hover:bg-theme-primary hover:text-theme-primary'}`}
-                                >
-                                    <Icon size={15} className={isActive ? 'text-accent-gold' : 'text-theme-muted'} />
-                                    {tab.label}
+                                <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={`w-full flex items-center gap-2.5 px-4 py-3 text-sm font-medium transition text-left border-b border-theme last:border-0 ${isActive ? 'bg-accent-gold/10 text-accent-gold' : 'text-theme-secondary hover:bg-theme-primary'}`}>
+                                    <Icon size={15} className={isActive ? 'text-accent-gold' : 'text-theme-muted'} />{tab.label}
+                                </button>
+                            );
+                        })}
+                    </nav>
+
+                    <nav className="bg-theme-secondary rounded-lg border border-theme shadow-theme-sm overflow-hidden">
+                        <div className="px-4 py-2 text-xs font-semibold text-theme-muted uppercase tracking-wide bg-theme-tertiary/30 border-b border-theme">
+                            Store Settings
+                        </div>
+                        {STORE_TABS.map(tab => {
+                            const Icon = tab.icon;
+                            const isActive = activeTab === tab.key;
+                            return (
+                                <button key={tab.key} onClick={() => setActiveTab(tab.key)} className={`w-full flex items-center gap-2.5 px-4 py-3 text-sm font-medium transition text-left border-b border-theme last:border-0 ${isActive ? 'bg-accent-gold/10 text-accent-gold' : 'text-theme-secondary hover:bg-theme-primary'}`}>
+                                    <Icon size={15} className={isActive ? 'text-accent-gold' : 'text-theme-muted'} />{tab.label}
                                 </button>
                             );
                         })}
@@ -719,9 +911,9 @@ const StoreSettingsPage = () => {
                 {/* Content Panel */}
                 <div className="flex-1 min-w-0">
                     <div className="bg-theme-secondary rounded-lg border border-theme shadow-theme-sm p-4 sm:p-6">
-                        <div className="flex items-center justify-between mb-5 sm:mb-6">
+                        <div className="flex items-center justify-between mb-5 sm:mb-6 pb-4 border-b border-theme">
                             <h2 className="text-base sm:text-lg font-semibold text-theme-primary">
-                                {TABS.find(t => t.key === activeTab)?.label}
+                                {ALL_TABS.find(t => t.key === activeTab)?.label}
                             </h2>
                             <SaveButton onClick={handleSave} loading={saving} />
                         </div>
