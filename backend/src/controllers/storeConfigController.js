@@ -29,7 +29,8 @@ const getConfigBySlug = async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ code: 'TENANT_NOT_FOUND', message: 'Store not found' });
     }
-    res.json(formatConfig(result.rows[0]));
+    const formatted = await resolveCompanyOverrides(formatConfig(result.rows[0]), result.rows[0]);
+    res.json(formatted);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -45,7 +46,8 @@ const getDefaultConfig = async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ code: 'TENANT_NOT_FOUND', message: 'No active store found' });
     }
-    res.json(formatConfig(result.rows[0]));
+    const formatted = await resolveCompanyOverrides(formatConfig(result.rows[0]), result.rows[0]);
+    res.json(formatted);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -63,7 +65,8 @@ const getConfigByDomain = async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ code: 'TENANT_NOT_FOUND', message: 'Store not found' });
     }
-    res.json(formatConfig(result.rows[0]));
+    const formatted = await resolveCompanyOverrides(formatConfig(result.rows[0]), result.rows[0]);
+    res.json(formatted);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -302,6 +305,106 @@ function formatConfig(row) {
     footerConfig: row.footer_config || {},
     deliveryConfig: row.delivery_config || {},
   };
+}
+
+// ─── Company Settings Resolution ─────────────────────────────────────────────
+// For each section where use_company_settings[section] === true, fetch company
+// values and merge them into the formatted config before sending to the store.
+async function resolveCompanyOverrides(formatted, row) {
+  let ucs = row.use_company_settings;
+  if (!ucs) return formatted; // nothing to resolve
+  if (typeof ucs === 'string') {
+    try { ucs = JSON.parse(ucs); } catch { return formatted; }
+  }
+
+  // If every section is false, skip the DB calls entirely
+  const anyOn = Object.values(ucs).some(Boolean);
+  if (!anyOn) return formatted;
+
+  const result = { ...formatted };
+
+  try {
+    // Fetch org info (used by general + branding)
+    const orgRes = await pool.query('SELECT * FROM organizations LIMIT 1');
+    const org = orgRes.rows[0] || {};
+    const orgId = org.id || 1;
+
+    // ── General ────────────────────────────────────────────────────────────
+    if (ucs.general) {
+      // Fetch general settings from settings table if available
+      let genSettings = {};
+      try {
+        const gr = await pool.query(
+          "SELECT settings FROM settings WHERE category = 'general' AND organization_id = $1",
+          [orgId]
+        );
+        if (gr.rows.length > 0) genSettings = gr.rows[0].settings || {};
+      } catch {}
+
+      if (org.organization_name) result.storeName = org.organization_name;
+      if (genSettings.currency) result.currency = genSettings.currency;
+    }
+
+    // ── Branding ─────────────────────────────────────────────────────────
+    if (ucs.branding) {
+      try {
+        const br = await pool.query(
+          'SELECT * FROM branding_config WHERE organization_id = $1',
+          [orgId]
+        );
+        if (br.rows.length > 0) {
+          const b = br.rows[0];
+          result.theme = {
+            ...result.theme,
+            primaryColor:   b.primary_color   || result.theme?.primaryColor,
+            secondaryColor: b.secondary_color || result.theme?.secondaryColor,
+            accentColor:    b.accent_color    || result.theme?.accentColor,
+            backgroundColor:b.background_color|| result.theme?.backgroundColor,
+            fontFamily:     b.font_family     || result.theme?.fontFamily,
+          };
+          // Use company logo if set
+          if (b.logo_url) {
+            result.logo = { ...result.logo, primary: b.logo_url };
+          }
+        }
+      } catch {}
+    }
+
+    // ── Tax ──────────────────────────────────────────────────────────────
+    if (ucs.tax) {
+      try {
+        const tx = await pool.query('SELECT * FROM tax_settings LIMIT 1');
+        if (tx.rows.length > 0 && tx.rows[0].standard_rate != null) {
+          result.taxRate = tx.rows[0].standard_rate;
+        }
+      } catch {}
+    }
+
+    // ── Payment ──────────────────────────────────────────────────────────
+    if (ucs.payment) {
+      try {
+        const py = await pool.query(
+          "SELECT settings FROM settings WHERE category = 'payment' AND organization_id = $1",
+          [orgId]
+        );
+        if (py.rows.length > 0) {
+          const ps = py.rows[0].settings || {};
+          // Map company payment toggles to the store paymentMethods array format
+          const methods = [];
+          if (ps.cash_enabled)           methods.push('cash');
+          if (ps.card_enabled)           methods.push('card');
+          if (ps.bank_transfer_enabled)  methods.push('bank_transfer');
+          if (ps.mobile_money_enabled)   methods.push('mobile_money');
+          if (methods.length > 0) result.paymentMethods = methods;
+        }
+      } catch {}
+    }
+  } catch (err) {
+    // Non-fatal — return whatever we've resolved so far
+    console.error('resolveCompanyOverrides error:', err.message);
+  }
+
+  return result;
 }
 
 // GET /api/store-config/company-settings — returns company settings for store fallback
