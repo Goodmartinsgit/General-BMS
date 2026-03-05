@@ -265,6 +265,25 @@ async function applyMigrations() {
     await client.query(`ALTER TABLE sales ADD COLUMN IF NOT EXISTS unreverse_reason TEXT`);
     console.log('Added unreverse_reason to sales');
 
+    // ── Store Config extensions (migrations 030, 031, 032) ──────────────────
+    await client.query(`ALTER TABLE store_config ADD COLUMN IF NOT EXISTS delivery_config JSONB DEFAULT '{}'`);
+    console.log('Added delivery_config to store_config');
+
+    await client.query(`ALTER TABLE store_config
+      ADD COLUMN IF NOT EXISTS use_company_settings JSONB NOT NULL DEFAULT '{"general":true,"branding":true,"tax":true,"receipt":true,"payment":true,"notifications":true,"security":true,"display":true}',
+      ADD COLUMN IF NOT EXISTS store_settings JSONB NOT NULL DEFAULT '{}'`);
+    console.log('Added use_company_settings and store_settings to store_config');
+
+    await client.query(`ALTER TABLE store_config
+      ADD COLUMN IF NOT EXISTS hover_color       VARCHAR(20),
+      ADD COLUMN IF NOT EXISTS active_text_color VARCHAR(20),
+      ADD COLUMN IF NOT EXISTS sidebar_bg_color  VARCHAR(20),
+      ADD COLUMN IF NOT EXISTS navbar_bg_color   VARCHAR(20),
+      ADD COLUMN IF NOT EXISTS button_color      VARCHAR(20),
+      ADD COLUMN IF NOT EXISTS logo_type         VARCHAR(50) DEFAULT 'image',
+      ADD COLUMN IF NOT EXISTS sidebar_name_size VARCHAR(20) DEFAULT 'text-lg'`);
+    console.log('Added branding columns to store_config');
+
     console.log('\n=== All migrations applied successfully! ===');
 
   } catch (err) {
