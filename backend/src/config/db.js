@@ -1,11 +1,15 @@
 const { Pool } = require('pg');
 require('dotenv').config();
 
+const isRemoteDB = process.env.DATABASE_URL && 
+  !process.env.DATABASE_URL.includes('localhost') && 
+  !process.env.DATABASE_URL.includes('127.0.0.1');
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production'
-    ? { rejectUnauthorized: true }
-    : { rejectUnauthorized: false }
+  ssl: isRemoteDB
+    ? { rejectUnauthorized: process.env.NODE_ENV === 'production' }
+    : false
 });
 
 pool.on('connect', () => {
