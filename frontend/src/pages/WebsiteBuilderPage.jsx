@@ -1303,6 +1303,18 @@ function SettingsTab({ hc, setHc, fc, setFc, onSave, saving, saved }) {
         </div>
       </div>
 
+      {/* Footer Colors */}
+      <div className="border border-theme rounded-xl overflow-hidden">
+        <div className="px-4 py-3 bg-theme-secondary">
+          <h3 className="text-sm font-semibold text-theme-primary">Footer Colors</h3>
+          <p className="text-xs text-theme-muted">Customize the footer background and text colors</p>
+        </div>
+        <div className="p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <ColorField label="Background Color" value={fc.bg_color || '#ffffff'} onChange={v => updFc('bg_color', v)} />
+          <ColorField label="Text Color" value={fc.text_color || '#6b7280'} onChange={v => updFc('text_color', v)} />
+        </div>
+      </div>
+
       {/* Footer newsletter */}
       <div className="border border-theme rounded-xl overflow-hidden">
         <div className="px-4 py-3 bg-theme-secondary">
