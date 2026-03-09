@@ -71,6 +71,10 @@ const onlineOrderRoutes = require('./routes/onlineOrderRoutes');
 
 const app = express();
 
+// Trust first proxy (Render, Railway, etc.) so express-rate-limit
+// and req.ip work correctly behind a reverse proxy.
+app.set('trust proxy', 1);
+
 // Middleware
 const corsOptions = {
   origin: process.env.ALLOWED_ORIGINS
