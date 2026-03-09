@@ -76,7 +76,7 @@ const getConfigByDomain = async (req, res) => {
 // GET /api/store-config (admin)
 const getAdminConfig = async (req, res) => {
   try {
-    let result = await query(`SELECT * FROM store_config LIMIT 1`);
+    let result = await query(`SELECT * FROM store_config ORDER BY id LIMIT 1`);
 
     // Auto-seed a default config row so the storefront app can load on first run
     if (result.rows.length === 0) {
@@ -85,7 +85,7 @@ const getAdminConfig = async (req, res) => {
          VALUES ('demo', 'My Store', true)
          ON CONFLICT DO NOTHING`
       );
-      result = await query(`SELECT * FROM store_config LIMIT 1`);
+      result = await query(`SELECT * FROM store_config ORDER BY id LIMIT 1`);
     }
 
     if (result.rows.length === 0) {
@@ -125,7 +125,7 @@ const updateConfig = async (req, res) => {
     } = req.body;
 
     // Check if config exists
-    const existing = await query(`SELECT id FROM store_config LIMIT 1`);
+    const existing = await query(`SELECT id FROM store_config ORDER BY id LIMIT 1`);
 
     if (existing.rows.length === 0) {
       // Create new config
