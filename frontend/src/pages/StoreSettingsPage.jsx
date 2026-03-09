@@ -3,15 +3,60 @@ import {
     Store, Palette, Home, Phone, Search, ShoppingCart, Settings,
     Plus, Trash2, Save, Upload, Image as ImageIcon, Loader2,
     CheckSquare, Square, Building2, Calculator, Receipt, CreditCard,
-    Bell, Shield, Monitor, Lock
+    Bell, Shield, Monitor, Lock, QrCode, Barcode
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import PageHeader from '../components/common/PageHeader';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import SearchableSelect from '../components/ui/SearchableSelect';
 import { CURRENCIES, getCurrencySymbol } from '../utils/currency';
+import { useTheme, themes as themeList } from '../context/ThemeContext';
 import { getStoreConfig, updateStoreConfig, getCompanySettingsForStore } from '../api/storeConfig';
 import api from '../api/axios';
+
+// ── African timezone data ────────────────────────────────────────────────
+const AFRICA_TIMEZONES = [
+    { label: 'UTC+0 · GMT — West / Atlantic Africa', zones: [
+        { value: 'Africa/Abidjan', label: "Abidjan — Côte d'Ivoire" }, { value: 'Africa/Accra', label: 'Accra — Ghana' },
+    ]},
+    { label: 'UTC+1 · WAT — West Africa Time', zones: [
+        { value: 'Africa/Lagos', label: 'Lagos — Nigeria' }, { value: 'Africa/Luanda', label: 'Luanda — Angola' },
+        { value: 'Africa/Douala', label: 'Douala — Cameroon' }, { value: 'Africa/Kinshasa', label: 'Kinshasa — DR Congo (West)' },
+    ]},
+    { label: 'UTC+1 · CET / WET — North Africa', zones: [
+        { value: 'Africa/Algiers', label: 'Algiers — Algeria' }, { value: 'Africa/Casablanca', label: 'Casablanca — Morocco' },
+    ]},
+    { label: 'UTC+2 · CAT — Central Africa Time', zones: [
+        { value: 'Africa/Johannesburg', label: 'Johannesburg — South Africa' }, { value: 'Africa/Harare', label: 'Harare — Zimbabwe' },
+        { value: 'Africa/Lusaka', label: 'Lusaka — Zambia' }, { value: 'Africa/Kigali', label: 'Kigali — Rwanda' },
+    ]},
+    { label: 'UTC+2 · EET — North-East Africa', zones: [
+        { value: 'Africa/Cairo', label: 'Cairo — Egypt' }, { value: 'Africa/Tripoli', label: 'Tripoli — Libya' },
+    ]},
+    { label: 'UTC+3 · EAT — East Africa Time', zones: [
+        { value: 'Africa/Nairobi', label: 'Nairobi — Kenya' }, { value: 'Africa/Dar_es_Salaam', label: 'Dar es Salaam — Tanzania' },
+        { value: 'Africa/Kampala', label: 'Kampala — Uganda' }, { value: 'Africa/Addis_Ababa', label: 'Addis Ababa — Ethiopia' },
+    ]},
+    { label: 'UTC+4 · Indian Ocean Islands', zones: [
+        { value: 'Indian/Mauritius', label: 'Port Louis — Mauritius' },
+    ]},
+];
+
+const TIMEZONE_OPTIONS = [
+    ...AFRICA_TIMEZONES.map(g => ({ group: g.label, items: g.zones.map(z => ({ value: z.value, label: z.label })) })),
+    { group: 'Other Timezones', items: [
+        { value: 'UTC', label: 'UTC — Coordinated Universal Time' },
+        { value: 'Europe/London', label: 'London — UK (GMT/BST)' },
+        { value: 'America/New_York', label: 'New York — Eastern Time (ET)' },
+    ]},
+];
+
+const RECEIPT_TEMPLATES = [
+    { id: 'modern', name: 'Modern', description: 'Clean and bold' },
+    { id: 'classic', name: 'Classic', description: 'Traditional layout' },
+    { id: 'minimal', name: 'Minimal', description: 'Essential info only' },
+    { id: 'detailed', name: 'Detailed', description: 'All details included' },
+];
 
 const COMPANY_TABS = [
     { key: 'general', label: 'General', icon: Building2 },
@@ -255,6 +300,7 @@ const defaultStoreConfig = {
 };
 
 const StoreSettingsPage = () => {
+    const { persistTheme } = useTheme();
     const [activeTab, setActiveTab] = useState('general');
     const [config, setConfig] = useState(defaultStoreConfig);
     const [companySettings, setCompanySettings] = useState(null);
@@ -549,6 +595,17 @@ const StoreSettingsPage = () => {
                             <div className="md:col-span-2">
                                 <FormField label="Company Address"><TextArea value={gen.company_address} onChange={e => setVal('general','company_address', e.target.value)} disabled={disGen} /></FormField>
                             </div>
+                            <FormField label="Timezone">
+                                <div className={disGen ? 'opacity-60 pointer-events-none' : ''}>
+                                    <SearchableSelect
+                                        value={gen.timezone}
+                                        onChange={val => setVal('general','timezone', val)}
+                                        options={TIMEZONE_OPTIONS}
+                                        placeholder="Select timezone"
+                                        searchPlaceholder="Search timezones…"
+                                    />
+                                </div>
+                            </FormField>
                             <FormField label="Date Format">
                                 <SelectInput value={gen.date_format} onChange={e => setVal('general','date_format', e.target.value)} disabled={disGen}>
                                     <option value="MM/DD/YYYY">MM/DD/YYYY</option>
@@ -698,14 +755,51 @@ const StoreSettingsPage = () => {
                                 <Toggle label="Enable Tax" checked={tx.tax_enabled} onChange={v => setVal('tax','tax_enabled',v)} disabled={disTx} />
                                 {tx.tax_enabled && (
                                     <>
-                                        <FormField label="Standard Tax Rate (%)"><TextInput type="number" value={tx.standard_rate} onChange={e => setVal('tax','standard_rate',e.target.value)} disabled={disTx}/></FormField>
-                                        <FormField label="Reduced Tax Rate (%)"><TextInput type="number" value={tx.reduced_rate} onChange={e => setVal('tax','reduced_rate',e.target.value)} disabled={disTx}/></FormField>
+                                        <FormField label="Standard Tax Rate (%)" hint="Applied to most goods and services"><TextInput type="number" value={tx.standard_rate} onChange={e => setVal('tax','standard_rate',e.target.value)} disabled={disTx}/></FormField>
+                                        <FormField label="Reduced Tax Rate (%)" hint="For eligible items with lower tax rates"><TextInput type="number" value={tx.reduced_rate} onChange={e => setVal('tax','reduced_rate',e.target.value)} disabled={disTx}/></FormField>
+                                        <FormField label="Zero-Rated (%)" hint="Always 0% — exempt items"><TextInput type="number" value={0} disabled onChange={() => {}} /></FormField>
+                                        <div>
+                                            <label className="block text-xs font-medium text-theme-muted mb-1.5">Tax Application Mode</label>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                {[
+                                                    { value: 'exclusive', label: 'Tax Exclusive', desc: 'Tax added on top of prices' },
+                                                    { value: 'inclusive', label: 'Tax Inclusive', desc: 'Prices already include tax' }
+                                                ].map(o => (
+                                                    <button key={o.value} type="button"
+                                                        onClick={() => !disTx && setVal('tax', 'tax_application_mode', o.value)}
+                                                        disabled={disTx}
+                                                        className={`p-3 rounded-lg border text-left transition-all disabled:opacity-60 ${(tx.tax_application_mode || 'exclusive') === o.value ? 'border-accent-gold bg-accent-gold/10 ring-2 ring-accent-gold/20' : 'border-theme bg-theme-primary hover:border-accent-gold/30'}`}>
+                                                        <p className={`text-sm font-semibold ${(tx.tax_application_mode || 'exclusive') === o.value ? 'text-accent-gold' : 'text-theme-primary'}`}>{o.label}</p>
+                                                        <p className="text-xs text-theme-muted mt-0.5">{o.desc}</p>
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        </div>
                                     </>
                                 )}
                             </div>
                             <div className="space-y-5">
+                                <SectionLabel>Tax Registration</SectionLabel>
                                 <FormField label="Tax Identification Number (TIN)"><TextInput value={tx.tax_number} onChange={e => setVal('tax','tax_number',e.target.value)} disabled={disTx} /></FormField>
-                                <FormField label="Effective Date"><TextInput type="date" value={tx.effective_date?.split('T')[0] || ''} onChange={e => setVal('tax','effective_date',e.target.value)} disabled={disTx} /></FormField>
+                                <FormField label="Effective Date" hint="Date these tax rates take effect"><TextInput type="date" value={tx.effective_date?.split('T')[0] || ''} onChange={e => setVal('tax','effective_date',e.target.value)} disabled={disTx} /></FormField>
+                                {tx.tax_enabled && (
+                                    <div className="p-4 bg-theme-primary rounded-lg border border-theme">
+                                        <h4 className="text-sm font-semibold text-theme-primary mb-3">Current Tax Summary</h4>
+                                        <div className="space-y-2 text-sm">
+                                            {[
+                                                ['Standard Rate', `${tx.standard_rate || 0}%`],
+                                                ['Reduced Rate', `${tx.reduced_rate || 0}%`],
+                                                ['Mode', tx.tax_application_mode || 'exclusive'],
+                                                ['TIN', tx.tax_number || 'Not set']
+                                            ].map(([k, v]) => (
+                                                <div key={k} className="flex justify-between">
+                                                    <span className="text-theme-muted">{k}</span>
+                                                    <span className="text-theme-primary font-medium capitalize">{v}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -717,23 +811,77 @@ const StoreSettingsPage = () => {
                 return (
                     <div className="space-y-6">
                         <CompanySettingsBanner isUsingCompanySettings={disRc} toggleSettings={(v) => handleToggleCompanySettings('receipt', v)} sectionName="Receipt" />
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {/* Company on Receipt */}
                             <div className="space-y-4">
                                 <SectionLabel>Company on Receipt</SectionLabel>
-                                <FormField label="Name"><TextInput value={rc.company_name} onChange={e => setVal('receipt','company_name',e.target.value)} disabled={disRc} /></FormField>
+                                <FormField label="Company Name"><TextInput value={rc.company_name} onChange={e => setVal('receipt','company_name',e.target.value)} disabled={disRc} /></FormField>
                                 <FormField label="Address"><TextArea value={rc.company_address} onChange={e => setVal('receipt','company_address',e.target.value)} disabled={disRc} /></FormField>
                                 <FormField label="Phone"><TextInput value={rc.company_phone} onChange={e => setVal('receipt','company_phone',e.target.value)} disabled={disRc} /></FormField>
                                 <FormField label="Email"><TextInput type="email" value={rc.company_email} onChange={e => setVal('receipt','company_email',e.target.value)} disabled={disRc} /></FormField>
+                                <FormField label="Tax / TIN Number"><TextInput value={rc.tax_number} onChange={e => setVal('receipt','tax_number',e.target.value)} disabled={disRc} placeholder="Tax identification number" /></FormField>
                                 <LogoUploadField label="Receipt Logo" value={rc.company_logo_url} onChange={v => setVal('receipt','company_logo_url',v)} disabled={disRc} category="receipts" />
                             </div>
+                            {/* Content & Display Options */}
                             <div className="space-y-4">
-                                <SectionLabel>Content & Options</SectionLabel>
+                                <SectionLabel>Content & Display</SectionLabel>
                                 <FormField label="Footer Text"><TextArea value={rc.footer_text} onChange={e => setVal('receipt','footer_text',e.target.value)} disabled={disRc} /></FormField>
                                 <FormField label="Terms & Conditions"><TextArea value={rc.terms_and_conditions} onChange={e => setVal('receipt','terms_and_conditions',e.target.value)} disabled={disRc} /></FormField>
                                 <Toggle label="Show Logo" checked={rc.show_logo} onChange={v => setVal('receipt','show_logo',v)} disabled={disRc} />
                                 <Toggle label="Show Tax Number" checked={rc.show_tax_number} onChange={v => setVal('receipt','show_tax_number',v)} disabled={disRc} />
                                 <Toggle label="Show Barcode" checked={rc.show_barcode} onChange={v => setVal('receipt','show_barcode',v)} disabled={disRc} />
                                 <Toggle label="Show QR Code" checked={rc.show_qr_code} onChange={v => setVal('receipt','show_qr_code',v)} disabled={disRc} />
+                            </div>
+                            {/* Template Style & Preview */}
+                            <div className="space-y-6">
+                                <div className="space-y-3">
+                                    <SectionLabel>Template Style</SectionLabel>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {RECEIPT_TEMPLATES.map(t => (
+                                            <button key={t.id} type="button"
+                                                onClick={() => !disRc && setVal('receipt','template_style', t.id)}
+                                                disabled={disRc}
+                                                className={`p-3 rounded-lg border text-left transition-all disabled:opacity-60 ${(rc.template_style || 'modern') === t.id ? 'border-accent-gold bg-accent-gold/10 ring-2 ring-accent-gold/20' : 'border-theme bg-theme-primary hover:border-accent-gold/30'}`}>
+                                                <p className={`text-sm font-semibold ${(rc.template_style || 'modern') === t.id ? 'text-accent-gold' : 'text-theme-primary'}`}>{t.name}</p>
+                                                <p className="text-xs text-theme-muted mt-0.5">{t.description}</p>
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
+                                {/* Preview */}
+                                <div>
+                                    <SectionLabel>Preview</SectionLabel>
+                                    <div className="bg-white rounded-lg border border-gray-200 p-4 text-gray-900 text-center max-w-[200px] mx-auto">
+                                        {rc.show_logo && rc.company_logo_url && (
+                                            <img src={rc.company_logo_url} alt="Logo" className="w-12 h-12 mx-auto mb-2 object-contain" />
+                                        )}
+                                        <p className="font-bold text-sm">{rc.company_name || 'Your Business'}</p>
+                                        {rc.company_address && <p className="text-[10px] text-gray-500 mt-0.5">{rc.company_address}</p>}
+                                        {rc.company_phone && <p className="text-[10px] text-gray-500">{rc.company_phone}</p>}
+                                        {rc.show_tax_number && rc.tax_number && <p className="text-[10px] text-gray-500">TIN: {rc.tax_number}</p>}
+                                        <div className="border-t border-dashed border-gray-300 my-2" />
+                                        <div className="text-left text-[10px] space-y-1">
+                                            <div className="flex justify-between"><span className="text-gray-500">Item x2</span><span>5,000</span></div>
+                                            <div className="flex justify-between font-bold text-xs mt-1"><span>Total</span><span>5,000</span></div>
+                                        </div>
+                                        <div className="border-t border-dashed border-gray-300 my-2" />
+                                        {rc.footer_text && <p className="text-[10px] text-gray-500 italic">{rc.footer_text}</p>}
+                                        {rc.show_barcode && (
+                                            <div className="mt-2 flex justify-center gap-px">
+                                                {Array(20).fill(0).map((_, i) => (
+                                                    <div key={i} className="bg-gray-900" style={{ width: i % 3 === 0 ? 2 : 1, height: 20 }} />
+                                                ))}
+                                            </div>
+                                        )}
+                                        {rc.show_qr_code && (
+                                            <div className="mt-2 flex justify-center">
+                                                <div className="w-12 h-12 bg-gray-200 rounded flex items-center justify-center">
+                                                    <QrCode size={24} className="text-gray-400" />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -822,6 +970,20 @@ const StoreSettingsPage = () => {
                             </FormField>
                             <Toggle label="Show Product Images" checked={disp.show_product_images} onChange={v => setVal('display','show_product_images',v)} disabled={disDisp} />
                             <Toggle label="Compact Mode" checked={disp.compact_mode} onChange={v => setVal('display','compact_mode',v)} disabled={disDisp} />
+                            <FormField label="Theme">
+                                <SelectInput
+                                    value={disp.theme || 'midnight'}
+                                    onChange={e => {
+                                        if (!disDisp) {
+                                            setVal('display','theme', e.target.value);
+                                            persistTheme(e.target.value);
+                                        }
+                                    }}
+                                    disabled={disDisp}
+                                >
+                                    {themeList.map(t => <option key={t.id} value={t.id}>{t.icon} {t.name}</option>)}
+                                </SelectInput>
+                            </FormField>
                         </div>
                     </div>
                 );
