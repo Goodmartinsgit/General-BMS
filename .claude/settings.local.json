@@ -59,7 +59,14 @@
       "Read(//c/Users/DELL/ XPS/Desktop/BMS/General-BMS/frontend/src/components/stock/**)",
       "Read(//c/Users/DELL XPS/Desktop/BMS/Eldaved-BMS/**)",
       "Bash(cat \"/c/Users/DELL XPS/Desktop/BMS/General-BMS/backend/database/migrations\"/*.sql)",
-      "Read(//c/Users/DELL XPS/Desktop/One Manager/**)"
+      "Read(//c/Users/DELL XPS/Desktop/One Manager/**)",
+      "Bash(vercel --version)",
+      "Bash(vercel --prod --yes)",
+      "Bash(PGPASSWORD=npg_YZA3cqtGof4e psql \"postgresql://neondb_owner:npg_YZA3cqtGof4e@ep-long-field-ah819j3l-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require\" -c \"SELECT column_name FROM information_schema.columns WHERE table_name = ''store_config'' ORDER BY ordinal_position;\")",
+      "Bash(PGPASSWORD=npg_YZA3cqtGof4e psql \"postgresql://neondb_owner:npg_YZA3cqtGof4e@ep-long-field-ah819j3l-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require\" -c \"SELECT id, store_slug, store_name FROM store_config ORDER BY id;\")",
+      "Bash(PGPASSWORD=npg_YZA3cqtGof4e psql \"postgresql://neondb_owner:npg_YZA3cqtGof4e@ep-long-field-ah819j3l-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require\" -c \"DELETE FROM store_config WHERE id = 2;\")",
+      "Bash(npx vite build)",
+      "Read(//c/Users/DELL/ XPS/Desktop/BMS/General-BMS/backend/**)"
     ],
     "additionalDirectories": [
       "C:\\Users\\DELL XPS\\Desktop\\One Manager\\platform\\apps\\store",

@@ -536,34 +536,71 @@ function HeroSlideEditor({ slide, onChange, onRemove, index, total, onMoveUp, on
 
       {open && (
         <div className="px-4 py-4 bg-theme-primary space-y-4">
-          {/* Content */}
-          <div className="space-y-3">
-            <FormField label="Badge / Eyebrow text" hint="Small label shown above the main heading">
-              <TInput value={slide.badge_text} onChange={e => upd('badge_text', e.target.value)} placeholder="New Collection · Free Shipping · 50% Off" />
-            </FormField>
-            <FormField label="Main Heading">
-              <TTextarea value={slide.heading} onChange={e => upd('heading', e.target.value)} placeholder="Transform Your Space with Sustainable Furniture" rows={2} />
-            </FormField>
-            <FormField label="Subheading / Description">
-              <TTextarea value={slide.subheading} onChange={e => upd('subheading', e.target.value)} placeholder="Discover timeless pieces crafted for modern living." rows={2} />
-            </FormField>
-            <div className="grid grid-cols-2 gap-3">
-              <FormField label="Primary CTA Text">
-                <TInput value={slide.cta_text} onChange={e => upd('cta_text', e.target.value)} placeholder="Shop Now" />
-              </FormField>
-              <FormField label="Primary CTA URL">
-                <TInput value={slide.cta_url} onChange={e => upd('cta_url', e.target.value)} placeholder="/products" />
-              </FormField>
-              <FormField label="Secondary CTA Text" hint="Optional second button">
-                <TInput value={slide.secondary_cta_text} onChange={e => upd('secondary_cta_text', e.target.value)} placeholder="Learn More" />
-              </FormField>
-              <FormField label="Secondary CTA URL">
-                <TInput value={slide.secondary_cta_url} onChange={e => upd('secondary_cta_url', e.target.value)} placeholder="/about" />
-              </FormField>
+          {/* Text visibility toggles */}
+          <div>
+            <SectionLabel>Text Visibility</SectionLabel>
+            <p className="text-[10px] text-theme-muted mb-3">Toggle which text elements appear on this slide.</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-y-2 gap-x-4">
+              <Toggle checked={slide.show_badge !== false} onChange={v => upd('show_badge', v)} label="Badge text" />
+              <Toggle checked={slide.show_heading !== false} onChange={v => upd('show_heading', v)} label="Heading" />
+              <Toggle checked={slide.show_subheading !== false} onChange={v => upd('show_subheading', v)} label="Subheading" />
+              <Toggle checked={slide.show_cta !== false} onChange={v => upd('show_cta', v)} label="CTA button" />
             </div>
           </div>
 
-          {/* Image */}
+          {/* Content */}
+          <div className="space-y-3">
+            {slide.show_badge !== false && (
+              <FormField label="Badge / Eyebrow text" hint="Small label shown above the main heading">
+                <TInput value={slide.badge_text} onChange={e => upd('badge_text', e.target.value)} placeholder="New Collection · Free Shipping · 50% Off" />
+              </FormField>
+            )}
+            {slide.show_heading !== false && (
+              <FormField label="Main Heading">
+                <TTextarea value={slide.heading} onChange={e => upd('heading', e.target.value)} placeholder="Transform Your Space with Sustainable Furniture" rows={2} />
+              </FormField>
+            )}
+            {slide.show_subheading !== false && (
+              <FormField label="Subheading / Description">
+                <TTextarea value={slide.subheading} onChange={e => upd('subheading', e.target.value)} placeholder="Discover timeless pieces crafted for modern living." rows={2} />
+              </FormField>
+            )}
+            {slide.show_cta !== false && (
+              <div className="grid grid-cols-2 gap-3">
+                <FormField label="Primary CTA Text">
+                  <TInput value={slide.cta_text} onChange={e => upd('cta_text', e.target.value)} placeholder="Shop Now" />
+                </FormField>
+                <FormField label="Primary CTA URL">
+                  <TInput value={slide.cta_url} onChange={e => upd('cta_url', e.target.value)} placeholder="/products" />
+                </FormField>
+                <FormField label="Secondary CTA Text" hint="Optional second button">
+                  <TInput value={slide.secondary_cta_text} onChange={e => upd('secondary_cta_text', e.target.value)} placeholder="Learn More" />
+                </FormField>
+                <FormField label="Secondary CTA URL">
+                  <TInput value={slide.secondary_cta_url} onChange={e => upd('secondary_cta_url', e.target.value)} placeholder="/about" />
+                </FormField>
+              </div>
+            )}
+          </div>
+
+          {/* Linked Product */}
+          <div>
+            <SectionLabel>Linked Product</SectionLabel>
+            <p className="text-[10px] text-theme-muted mb-3">Link a product to this slide. The product image appears on the right and clicking leads to the product page.</p>
+            <div className="grid grid-cols-2 gap-3">
+              <FormField label="Product Slug" hint="e.g. blue-sneakers">
+                <TInput value={slide.product_slug} onChange={e => upd('product_slug', e.target.value)} placeholder="product-slug" />
+              </FormField>
+              <FormField label="Product Image URL" hint="Overrides hero image on mobile">
+                <TInput value={slide.product_image_url} onChange={e => upd('product_image_url', e.target.value)} placeholder="https://..." />
+              </FormField>
+            </div>
+            <div className="mt-2">
+              <ImageUploadField label="Or upload product image" value={slide.product_image_url} onChange={v => upd('product_image_url', v)} category="products" />
+            </div>
+          </div>
+
+          {/* Hero / background image */}
           <div>
             <ImageUploadField label="Hero / background image" value={slide.image_url} onChange={v => upd('image_url', v)} category="branding" />
           </div>
@@ -607,14 +644,29 @@ function HeroSlideEditor({ slide, onChange, onRemove, index, total, onMoveUp, on
             </div>
           )}
 
-          {/* Mobile-specific fields */}
+          {/* Mobile-specific fields with toggles */}
           {mobileTpl === 'dark_promo' && (
             <div>
               <SectionLabel>Mobile Dark Promo — Details</SectionLabel>
-              <div className="grid grid-cols-2 gap-3">
-                <FormField label="Discount Label"><TInput value={slide.discount_label} onChange={e => upd('discount_label', e.target.value)} placeholder="Discount" /></FormField>
-                <FormField label="Discount Value"><TInput value={slide.discount_value} onChange={e => upd('discount_value', e.target.value)} placeholder="50%" /></FormField>
-                <FormField label="Button Text"><TInput value={slide.mobile_cta_text} onChange={e => upd('mobile_cta_text', e.target.value)} placeholder="Shop Now" /></FormField>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-2.5 border border-theme rounded-lg bg-theme-secondary/30">
+                  <div className="flex-1 mr-3">
+                    <FormField label="Discount Label"><TInput value={slide.discount_label} onChange={e => upd('discount_label', e.target.value)} placeholder="Discount" disabled={slide.show_discount_label === false} /></FormField>
+                  </div>
+                  <Toggle checked={slide.show_discount_label !== false} onChange={v => upd('show_discount_label', v)} />
+                </div>
+                <div className="flex items-center justify-between p-2.5 border border-theme rounded-lg bg-theme-secondary/30">
+                  <div className="flex-1 mr-3">
+                    <FormField label="Discount Value"><TInput value={slide.discount_value} onChange={e => upd('discount_value', e.target.value)} placeholder="50%" disabled={slide.show_discount_value === false} /></FormField>
+                  </div>
+                  <Toggle checked={slide.show_discount_value !== false} onChange={v => upd('show_discount_value', v)} />
+                </div>
+                <div className="flex items-center justify-between p-2.5 border border-theme rounded-lg bg-theme-secondary/30">
+                  <div className="flex-1 mr-3">
+                    <FormField label="Button Text"><TInput value={slide.mobile_cta_text} onChange={e => upd('mobile_cta_text', e.target.value)} placeholder="Shop Now" disabled={slide.show_mobile_cta === false} /></FormField>
+                  </div>
+                  <Toggle checked={slide.show_mobile_cta !== false} onChange={v => upd('show_mobile_cta', v)} />
+                </div>
               </div>
             </div>
           )}
@@ -631,6 +683,9 @@ const DEFAULT_SLIDE = {
   secondary_cta_text: '', secondary_cta_url: '', image_url: '', bg_color: '#1C1C1E',
   text_color: 'light', overlay_opacity: 0.5, feature_cards: [], discount_label: 'Discount',
   discount_value: '50%', mobile_cta_text: 'Shop Now', is_visible: true,
+  show_badge: true, show_heading: true, show_subheading: true, show_cta: true,
+  show_discount_label: true, show_discount_value: true, show_mobile_cta: true,
+  product_slug: '', product_image_url: '',
 };
 
 function makeSlideId() {
@@ -696,11 +751,22 @@ function HeroEditor({ hs, upd, onSave, saving, saved }) {
   return (
     <div className="space-y-6">
 
-      {/* ── Desktop template ── */}
-      <div>
-        <SectionLabel>Desktop Template</SectionLabel>
-        <TemplatePicker value={desktopTpl} onChange={v => upd('hero_template_desktop', v)} options={DESKTOP_TEMPLATES} />
+      {/* ── Use mobile layout on desktop toggle ── */}
+      <div className="flex items-center justify-between p-3 border border-theme rounded-lg bg-theme-secondary/30">
+        <div>
+          <p className="text-sm font-medium text-theme-primary">Use mobile hero on desktop</p>
+          <p className="text-[10px] text-theme-muted">Display the mobile hero carousel full-width on desktop instead of desktop templates.</p>
+        </div>
+        <Toggle checked={!!hs.hero_use_mobile_on_desktop} onChange={v => upd('hero_use_mobile_on_desktop', v)} />
       </div>
+
+      {/* ── Desktop template ── */}
+      {!hs.hero_use_mobile_on_desktop && (
+        <div>
+          <SectionLabel>Desktop Template</SectionLabel>
+          <TemplatePicker value={desktopTpl} onChange={v => upd('hero_template_desktop', v)} options={DESKTOP_TEMPLATES} />
+        </div>
+      )}
 
       {/* ── Mobile template ── */}
       <div>
