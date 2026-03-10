@@ -514,6 +514,8 @@ function HeroSlideEditor({ slide, onChange, onRemove, index, total, onMoveUp, on
             Slide {index + 1}{slide.heading ? ` — ${slide.heading.slice(0, 30)}` : ''}
           </span>
           {!slide.is_visible && <span className="text-[10px] bg-theme-tertiary text-theme-muted px-2 py-0.5 rounded-full">Hidden</span>}
+          {slide.is_visible !== false && slide.show_on_desktop === false && <span className="text-[10px] bg-blue-100 text-blue-600 px-2 py-0.5 rounded-full">Mobile only</span>}
+          {slide.is_visible !== false && slide.show_on_mobile === false && <span className="text-[10px] bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full">Desktop only</span>}
         </div>
         <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
           <button onClick={() => onMoveUp()} disabled={index === 0} className="p-1 text-theme-muted hover:text-theme-primary disabled:opacity-30 transition" title="Move up">
@@ -536,6 +538,16 @@ function HeroSlideEditor({ slide, onChange, onRemove, index, total, onMoveUp, on
 
       {open && (
         <div className="px-4 py-4 bg-theme-primary space-y-4">
+          {/* Platform visibility */}
+          <div>
+            <SectionLabel>Show On</SectionLabel>
+            <p className="text-[10px] text-theme-muted mb-3">Choose which platforms display this slide.</p>
+            <div className="flex gap-6">
+              <Toggle checked={slide.show_on_desktop !== false} onChange={v => upd('show_on_desktop', v)} label="Desktop" />
+              <Toggle checked={slide.show_on_mobile !== false} onChange={v => upd('show_on_mobile', v)} label="Mobile" />
+            </div>
+          </div>
+
           {/* Text visibility toggles */}
           <div>
             <SectionLabel>Text Visibility</SectionLabel>
@@ -686,6 +698,7 @@ const DEFAULT_SLIDE = {
   show_badge: true, show_heading: true, show_subheading: true, show_cta: true,
   show_discount_label: true, show_discount_value: true, show_mobile_cta: true,
   product_slug: '', product_image_url: '',
+  show_on_desktop: true, show_on_mobile: true,
 };
 
 function makeSlideId() {
