@@ -488,19 +488,210 @@ const MOBILE_TEMPLATES = [
   { id: 'centered',   label: 'Centered',    desc: 'Gradient banner · Centered text + CTA',     aspect: '9/14', Preview: MobilePreviews.centered },
 ];
 
-// ── Hero Section Full Editor ──────────────────────────────────────────────────
+// ── Hero Slide Editor (single slide) ─────────────────────────────────────────
 
-function HeroEditor({ hs, upd, onSave, saving, saved }) {
-  const desktopTpl  = hs.hero_template_desktop || 'split';
-  const mobileTpl   = hs.hero_template_mobile  || 'dark_promo';
+function HeroSlideEditor({ slide, onChange, onRemove, index, total, onMoveUp, onMoveDown, desktopTpl, mobileTpl }) {
+  const [open, setOpen] = useState(index === 0);
+  const upd = (key, val) => onChange({ ...slide, [key]: val });
 
   const updFeatureCard = (i, field, val) => {
-    const cards = [...(hs.hero_feature_cards || [])];
+    const cards = [...(slide.feature_cards || [])];
     cards[i] = { ...cards[i], [field]: val };
-    upd('hero_feature_cards', cards);
+    upd('feature_cards', cards);
   };
-  const addFeatureCard    = () => upd('hero_feature_cards', [...(hs.hero_feature_cards || []), { label: '', sub: '' }]);
-  const removeFeatureCard = (i) => upd('hero_feature_cards', (hs.hero_feature_cards || []).filter((_, idx) => idx !== i));
+  const addFeatureCard = () => upd('feature_cards', [...(slide.feature_cards || []), { label: '', sub: '' }]);
+  const removeFeatureCard = (i) => upd('feature_cards', (slide.feature_cards || []).filter((_, idx) => idx !== i));
+
+  return (
+    <div className="border border-theme rounded-xl overflow-hidden">
+      <div
+        className="flex items-center justify-between px-4 py-3 bg-theme-secondary cursor-pointer hover:bg-theme-tertiary/30 transition"
+        onClick={() => setOpen(v => !v)}
+      >
+        <div className="flex items-center gap-3 min-w-0">
+          <GripVertical className="w-4 h-4 text-theme-muted flex-shrink-0" />
+          <span className="text-sm font-semibold text-theme-primary truncate">
+            Slide {index + 1}{slide.heading ? ` — ${slide.heading.slice(0, 30)}` : ''}
+          </span>
+          {!slide.is_visible && <span className="text-[10px] bg-theme-tertiary text-theme-muted px-2 py-0.5 rounded-full">Hidden</span>}
+        </div>
+        <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+          <button onClick={() => onMoveUp()} disabled={index === 0} className="p-1 text-theme-muted hover:text-theme-primary disabled:opacity-30 transition" title="Move up">
+            <ArrowUp className="w-3.5 h-3.5" />
+          </button>
+          <button onClick={() => onMoveDown()} disabled={index === total - 1} className="p-1 text-theme-muted hover:text-theme-primary disabled:opacity-30 transition" title="Move down">
+            <ArrowDown className="w-3.5 h-3.5" />
+          </button>
+          <Toggle checked={slide.is_visible !== false} onChange={v => upd('is_visible', v)} />
+          {total > 1 && (
+            <button onClick={onRemove} className="p-1 text-red-400 hover:text-red-600 transition" title="Delete slide">
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+          <div onClick={() => setOpen(v => !v)} className="cursor-pointer">
+            {open ? <ChevronUp className="w-4 h-4 text-theme-muted" /> : <ChevronDown className="w-4 h-4 text-theme-muted" />}
+          </div>
+        </div>
+      </div>
+
+      {open && (
+        <div className="px-4 py-4 bg-theme-primary space-y-4">
+          {/* Content */}
+          <div className="space-y-3">
+            <FormField label="Badge / Eyebrow text" hint="Small label shown above the main heading">
+              <TInput value={slide.badge_text} onChange={e => upd('badge_text', e.target.value)} placeholder="New Collection · Free Shipping · 50% Off" />
+            </FormField>
+            <FormField label="Main Heading">
+              <TTextarea value={slide.heading} onChange={e => upd('heading', e.target.value)} placeholder="Transform Your Space with Sustainable Furniture" rows={2} />
+            </FormField>
+            <FormField label="Subheading / Description">
+              <TTextarea value={slide.subheading} onChange={e => upd('subheading', e.target.value)} placeholder="Discover timeless pieces crafted for modern living." rows={2} />
+            </FormField>
+            <div className="grid grid-cols-2 gap-3">
+              <FormField label="Primary CTA Text">
+                <TInput value={slide.cta_text} onChange={e => upd('cta_text', e.target.value)} placeholder="Shop Now" />
+              </FormField>
+              <FormField label="Primary CTA URL">
+                <TInput value={slide.cta_url} onChange={e => upd('cta_url', e.target.value)} placeholder="/products" />
+              </FormField>
+              <FormField label="Secondary CTA Text" hint="Optional second button">
+                <TInput value={slide.secondary_cta_text} onChange={e => upd('secondary_cta_text', e.target.value)} placeholder="Learn More" />
+              </FormField>
+              <FormField label="Secondary CTA URL">
+                <TInput value={slide.secondary_cta_url} onChange={e => upd('secondary_cta_url', e.target.value)} placeholder="/about" />
+              </FormField>
+            </div>
+          </div>
+
+          {/* Image */}
+          <div>
+            <ImageUploadField label="Hero / background image" value={slide.image_url} onChange={v => upd('image_url', v)} category="branding" />
+          </div>
+
+          {/* Appearance */}
+          <div className="grid grid-cols-2 gap-3">
+            <ColorField label="Background Color" value={slide.bg_color || '#F8F5F0'} onChange={v => upd('bg_color', v)} />
+            <FormField label="Text Color Scheme">
+              <TSelect value={slide.text_color || 'dark'} onChange={e => upd('text_color', e.target.value)}>
+                <option value="dark">Dark text (on light bg)</option>
+                <option value="light">Light text (on dark/image bg)</option>
+              </TSelect>
+            </FormField>
+          </div>
+          {desktopTpl === 'fullwidth' && (
+            <FormField label={`Image Overlay Opacity — ${Math.round((slide.overlay_opacity ?? 0.5) * 100)}%`} hint="Darkens the background image so text stays readable">
+              <input type="range" min={0} max={1} step={0.05} value={slide.overlay_opacity ?? 0.5}
+                onChange={e => upd('overlay_opacity', parseFloat(e.target.value))} className="w-full accent-yellow-500" />
+            </FormField>
+          )}
+
+          {/* Floating feature cards (split template) */}
+          {desktopTpl === 'split' && (
+            <div>
+              <SectionLabel>Floating Product Cards</SectionLabel>
+              <p className="text-[10px] text-theme-muted mb-3">Mini-cards that float over the hero image. Add up to 3.</p>
+              <div className="space-y-2">
+                {(slide.feature_cards || []).map((card, i) => (
+                  <div key={i} className="flex gap-2 items-start p-2.5 border border-theme rounded-lg bg-theme-secondary/30">
+                    <div className="flex-1 grid grid-cols-2 gap-2">
+                      <FormField label="Label"><TInput value={card.label} onChange={e => updFeatureCard(i, 'label', e.target.value)} placeholder="Product name" /></FormField>
+                      <FormField label="Sub-label"><TInput value={card.sub} onChange={e => updFeatureCard(i, 'sub', e.target.value)} placeholder="$49.00" /></FormField>
+                    </div>
+                    <button onClick={() => removeFeatureCard(i)} className="mt-5 p-1 text-red-400 hover:text-red-600 transition"><Trash2 className="w-3.5 h-3.5" /></button>
+                  </div>
+                ))}
+                {(slide.feature_cards || []).length < 3 && (
+                  <button onClick={addFeatureCard} className="flex items-center gap-1.5 text-xs text-accent-gold hover:underline"><Plus className="w-3.5 h-3.5" /> Add Feature Card</button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Mobile-specific fields */}
+          {mobileTpl === 'dark_promo' && (
+            <div>
+              <SectionLabel>Mobile Dark Promo — Details</SectionLabel>
+              <div className="grid grid-cols-2 gap-3">
+                <FormField label="Discount Label"><TInput value={slide.discount_label} onChange={e => upd('discount_label', e.target.value)} placeholder="Discount" /></FormField>
+                <FormField label="Discount Value"><TInput value={slide.discount_value} onChange={e => upd('discount_value', e.target.value)} placeholder="50%" /></FormField>
+                <FormField label="Button Text"><TInput value={slide.mobile_cta_text} onChange={e => upd('mobile_cta_text', e.target.value)} placeholder="Shop Now" /></FormField>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Hero Section Full Editor ──────────────────────────────────────────────────
+
+const DEFAULT_SLIDE = {
+  id: '', heading: '', subheading: '', badge_text: '', cta_text: 'Shop Now', cta_url: '/products',
+  secondary_cta_text: '', secondary_cta_url: '', image_url: '', bg_color: '#1C1C1E',
+  text_color: 'light', overlay_opacity: 0.5, feature_cards: [], discount_label: 'Discount',
+  discount_value: '50%', mobile_cta_text: 'Shop Now', is_visible: true,
+};
+
+function makeSlideId() {
+  return 'slide_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 6);
+}
+
+/** Migrate legacy single-hero fields into hero_slides array */
+function migrateToSlides(hs) {
+  if (hs.hero_slides?.length) return hs.hero_slides;
+  // Build one slide from the flat fields
+  return [{
+    id: makeSlideId(),
+    heading: hs.hero_heading || '',
+    subheading: hs.hero_subheading || '',
+    badge_text: hs.hero_badge_text || '',
+    cta_text: hs.hero_cta_text || 'Shop Now',
+    cta_url: hs.hero_cta_url || '/products',
+    secondary_cta_text: hs.hero_secondary_cta_text || '',
+    secondary_cta_url: hs.hero_secondary_cta_url || '',
+    image_url: hs.hero_image_url || '',
+    bg_color: hs.hero_bg_color || '#1C1C1E',
+    text_color: hs.hero_text_color || 'dark',
+    overlay_opacity: hs.hero_overlay_opacity ?? 0.5,
+    feature_cards: hs.hero_feature_cards || [],
+    discount_label: hs.mobile_discount_label || 'Discount',
+    discount_value: hs.mobile_discount_value || '50%',
+    mobile_cta_text: hs.mobile_cta_text || 'Shop Now',
+    is_visible: true,
+  }];
+}
+
+function HeroEditor({ hs, upd, onSave, saving, saved }) {
+  const desktopTpl = hs.hero_template_desktop || 'split';
+  const mobileTpl  = hs.hero_template_mobile  || 'dark_promo';
+
+  // Ensure slides array exists
+  const slides = migrateToSlides(hs);
+  const setSlides = (newSlides) => upd('hero_slides', newSlides);
+
+  const addSlide = () => {
+    setSlides([...slides, { ...DEFAULT_SLIDE, id: makeSlideId() }]);
+  };
+
+  const updateSlide = (i, updated) => {
+    const next = [...slides];
+    next[i] = updated;
+    setSlides(next);
+  };
+
+  const removeSlide = (i) => {
+    if (slides.length <= 1) return;
+    setSlides(slides.filter((_, idx) => idx !== i));
+  };
+
+  const moveSlide = (from, to) => {
+    if (to < 0 || to >= slides.length) return;
+    const next = [...slides];
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setSlides(next);
+  };
 
   return (
     <div className="space-y-6">
@@ -508,174 +699,65 @@ function HeroEditor({ hs, upd, onSave, saving, saved }) {
       {/* ── Desktop template ── */}
       <div>
         <SectionLabel>Desktop Template</SectionLabel>
-        <TemplatePicker
-          value={desktopTpl}
-          onChange={v => upd('hero_template_desktop', v)}
-          options={DESKTOP_TEMPLATES}
-        />
+        <TemplatePicker value={desktopTpl} onChange={v => upd('hero_template_desktop', v)} options={DESKTOP_TEMPLATES} />
       </div>
 
       {/* ── Mobile template ── */}
       <div>
         <SectionLabel>Mobile Template</SectionLabel>
-        <TemplatePicker
-          value={mobileTpl}
-          onChange={v => upd('hero_template_mobile', v)}
-          options={MOBILE_TEMPLATES}
-        />
+        <TemplatePicker value={mobileTpl} onChange={v => upd('hero_template_mobile', v)} options={MOBILE_TEMPLATES} />
       </div>
 
-      {/* ── Shared content ── */}
+      {/* ── Carousel Settings ── */}
       <div>
-        <SectionLabel>Content</SectionLabel>
-        <div className="space-y-3">
-          <FormField label="Badge / Eyebrow text" hint="Small label shown above the main heading">
-            <TInput value={hs.hero_badge_text} onChange={e => upd('hero_badge_text', e.target.value)} placeholder="New Collection · Free Shipping · 50% Off" />
-          </FormField>
-          <FormField label="Main Heading">
-            <TTextarea value={hs.hero_heading} onChange={e => upd('hero_heading', e.target.value)} placeholder="Transform Your Space with Sustainable Furniture" rows={2} />
-          </FormField>
-          <FormField label="Subheading / Description">
-            <TTextarea value={hs.hero_subheading} onChange={e => upd('hero_subheading', e.target.value)} placeholder="Discover timeless pieces crafted for modern living." rows={2} />
-          </FormField>
-          <div className="grid grid-cols-2 gap-3">
-            <FormField label="Primary CTA Text">
-              <TInput value={hs.hero_cta_text} onChange={e => upd('hero_cta_text', e.target.value)} placeholder="Shop Now" />
-            </FormField>
-            <FormField label="Primary CTA URL">
-              <TInput value={hs.hero_cta_url} onChange={e => upd('hero_cta_url', e.target.value)} placeholder="/products" />
-            </FormField>
-            <FormField label="Secondary CTA Text" hint="Optional second button">
-              <TInput value={hs.hero_secondary_cta_text} onChange={e => upd('hero_secondary_cta_text', e.target.value)} placeholder="Learn More" />
-            </FormField>
-            <FormField label="Secondary CTA URL">
-              <TInput value={hs.hero_secondary_cta_url} onChange={e => upd('hero_secondary_cta_url', e.target.value)} placeholder="/about" />
-            </FormField>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Image ── */}
-      <div>
-        <SectionLabel>Hero Image</SectionLabel>
-        <ImageUploadField
-          label="Hero / background image"
-          value={hs.hero_image_url}
-          onChange={v => upd('hero_image_url', v)}
-          category="branding"
-        />
-        <p className="text-[10px] text-theme-muted mt-1">
-          For <em>Full-Width Banner</em>: used as the page background. For <em>Split</em> / <em>Fashion</em>: placed on the right / left panel. For <em>Spotlight</em>: the floating product image.
-        </p>
-      </div>
-
-      {/* ── Appearance ── */}
-      <div>
-        <SectionLabel>Appearance</SectionLabel>
-        <div className="grid grid-cols-2 gap-3">
-          <ColorField label="Background Color" value={hs.hero_bg_color || '#F8F5F0'} onChange={v => upd('hero_bg_color', v)} />
-          <FormField label="Text Color Scheme">
-            <TSelect value={hs.hero_text_color || 'dark'} onChange={e => upd('hero_text_color', e.target.value)}>
-              <option value="dark">Dark text (on light bg)</option>
-              <option value="light">Light text (on dark/image bg)</option>
+        <SectionLabel>Carousel Settings</SectionLabel>
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+          <FormField label="Swipe Direction">
+            <TSelect value={hs.hero_swipe_direction || 'horizontal'} onChange={e => upd('hero_swipe_direction', e.target.value)}>
+              <option value="horizontal">Horizontal</option>
+              <option value="vertical">Vertical</option>
             </TSelect>
           </FormField>
+          <FormField label="Autoplay">
+            <TSelect value={hs.hero_autoplay ? 'on' : 'off'} onChange={e => upd('hero_autoplay', e.target.value === 'on')}>
+              <option value="on">On</option>
+              <option value="off">Off</option>
+            </TSelect>
+          </FormField>
+          <FormField label="Interval (seconds)">
+            <TInput type="number" value={hs.hero_autoplay_interval || 5} onChange={e => upd('hero_autoplay_interval', parseInt(e.target.value) || 5)} placeholder="5" />
+          </FormField>
         </div>
-        {/* Overlay opacity — only relevant for fullwidth */}
-        {desktopTpl === 'fullwidth' && (
-          <div className="mt-3">
-            <FormField label={`Image Overlay Opacity — ${Math.round((hs.hero_overlay_opacity ?? 0.5) * 100)}%`} hint="Darkens the background image so text stays readable">
-              <input
-                type="range" min={0} max={1} step={0.05}
-                value={hs.hero_overlay_opacity ?? 0.5}
-                onChange={e => upd('hero_overlay_opacity', parseFloat(e.target.value))}
-                className="w-full accent-yellow-500"
-              />
-            </FormField>
-          </div>
-        )}
       </div>
 
-      {/* ── Floating feature cards (split template) ── */}
-      {desktopTpl === 'split' && (
-        <div>
-          <SectionLabel>Floating Product Cards (Split Template)</SectionLabel>
-          <p className="text-[10px] text-theme-muted mb-3">These mini-cards float over the hero image. Add up to 3. Leave empty to show featured products automatically.</p>
-          <div className="space-y-2">
-            {(hs.hero_feature_cards || []).map((card, i) => (
-              <div key={i} className="flex gap-2 items-start p-2.5 border border-theme rounded-lg bg-theme-secondary/30">
-                <div className="flex-1 grid grid-cols-2 gap-2">
-                  <FormField label="Label">
-                    <TInput value={card.label} onChange={e => updFeatureCard(i, 'label', e.target.value)} placeholder="Product name" />
-                  </FormField>
-                  <FormField label="Sub-label">
-                    <TInput value={card.sub} onChange={e => updFeatureCard(i, 'sub', e.target.value)} placeholder="$49.00" />
-                  </FormField>
-                </div>
-                <button onClick={() => removeFeatureCard(i)} className="mt-5 p-1 text-red-400 hover:text-red-600 transition">
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
-            {(hs.hero_feature_cards || []).length < 3 && (
-              <button onClick={addFeatureCard} className="flex items-center gap-1.5 text-xs text-accent-gold hover:underline">
-                <Plus className="w-3.5 h-3.5" /> Add Feature Card
-              </button>
-            )}
-          </div>
-        </div>
-      )}
+      {/* ── Mobile section heading ── */}
+      <FormField label="Section Heading (below hero on mobile)">
+        <TInput value={hs.mobile_section_heading} onChange={e => upd('mobile_section_heading', e.target.value)} placeholder="Special For You" />
+      </FormField>
 
-      {/* ── Mobile-specific fields ── */}
-      {mobileTpl === 'dark_promo' && (
-        <div>
-          <SectionLabel>Mobile Dark Promo — Details</SectionLabel>
-          <p className="text-[10px] text-theme-muted mb-3">These fields only appear on the mobile dark promo banner.</p>
-          <div className="grid grid-cols-2 gap-3">
-            <FormField label="Discount Label">
-              <TInput value={hs.mobile_discount_label} onChange={e => upd('mobile_discount_label', e.target.value)} placeholder="Discount" />
-            </FormField>
-            <FormField label="Discount Value">
-              <TInput value={hs.mobile_discount_value} onChange={e => upd('mobile_discount_value', e.target.value)} placeholder="50%" />
-            </FormField>
-            <FormField label="Button Text">
-              <TInput value={hs.mobile_cta_text} onChange={e => upd('mobile_cta_text', e.target.value)} placeholder="Shop Now" />
-            </FormField>
-            <FormField label="Section Heading (below banner)">
-              <TInput value={hs.mobile_section_heading} onChange={e => upd('mobile_section_heading', e.target.value)} placeholder="Special For You" />
-            </FormField>
-          </div>
+      {/* ── Hero Slides ── */}
+      <div>
+        <SectionLabel>Hero Slides ({slides.length})</SectionLabel>
+        <div className="space-y-3">
+          {slides.map((slide, i) => (
+            <HeroSlideEditor
+              key={slide.id || i}
+              slide={slide}
+              index={i}
+              total={slides.length}
+              onChange={updated => updateSlide(i, updated)}
+              onRemove={() => removeSlide(i)}
+              onMoveUp={() => moveSlide(i, i - 1)}
+              onMoveDown={() => moveSlide(i, i + 1)}
+              desktopTpl={desktopTpl}
+              mobileTpl={mobileTpl}
+            />
+          ))}
         </div>
-      )}
-
-      {mobileTpl === 'minimal' && (
-        <div>
-          <SectionLabel>Mobile Minimal — Section Heading</SectionLabel>
-          <FormField label="Products Section Heading">
-            <TInput value={hs.mobile_section_heading} onChange={e => upd('mobile_section_heading', e.target.value)} placeholder="Special For You" />
-          </FormField>
-        </div>
-      )}
-
-      {mobileTpl === 'centered' && (
-        <div>
-          <SectionLabel>Mobile Centered Banner — Content</SectionLabel>
-          <div className="grid grid-cols-2 gap-3">
-            <FormField label="Gradient Start Color">
-              <ColorField value={hs.hero_bg_color || '#667eea'} onChange={v => upd('hero_bg_color', v)} />
-            </FormField>
-            <FormField label="Text Color">
-              <TSelect value={hs.hero_text_color || 'light'} onChange={e => upd('hero_text_color', e.target.value)}>
-                <option value="light">Light</option>
-                <option value="dark">Dark</option>
-              </TSelect>
-            </FormField>
-          </div>
-          <FormField label="Section Heading (below banner)">
-            <TInput value={hs.mobile_section_heading} onChange={e => upd('mobile_section_heading', e.target.value)} placeholder="Special For You" />
-          </FormField>
-        </div>
-      )}
+        <button onClick={addSlide} className="mt-3 flex items-center gap-1.5 text-xs text-accent-gold hover:underline">
+          <Plus className="w-3.5 h-3.5" /> Add Slide
+        </button>
+      </div>
 
       <SaveBar onSave={onSave} saving={saving} saved={saved} />
     </div>
