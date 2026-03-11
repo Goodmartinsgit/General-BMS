@@ -9,7 +9,7 @@ const ProductColorManager = ({ productId, colors, onColorsChange, disabled = fal
     if (!newColor.color_name.trim()) return;
     
     const colorToAdd = {
-      id: Date.now(), // Temporary ID for new colors
+      id: 'temp_' + Date.now(), // Temporary ID for new colors (string to prevent DB overflow)
       color_name: newColor.color_name.trim(),
       color_code: newColor.color_code,
       display_order: colors.length,

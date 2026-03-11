@@ -612,27 +612,61 @@ function HeroSlideEditor({ slide, onChange, onRemove, index, total, onMoveUp, on
             </div>
           </div>
 
-          {/* Hero / background image */}
+          {/* ── Per-Platform Background ── */}
           <div>
-            <ImageUploadField label="Hero / background image" value={slide.image_url} onChange={v => upd('image_url', v)} category="branding" />
+            <SectionLabel>Background Settings</SectionLabel>
+            <p className="text-[10px] text-theme-muted mb-3">Configure background separately for desktop and mobile, or set the same for both.</p>
+            {['desktop', 'mobile'].map(plat => {
+              const typeKey  = `${plat}_bg_type`;
+              const colorKey = `${plat}_bg_color`;
+              const imageKey = `${plat}_bg_image`;
+              const bgType   = slide[typeKey] || 'color';
+              const bgColor  = slide[colorKey] || (plat === 'desktop' ? '#F8F5F0' : '#1C1C1E');
+              const bgImage  = slide[imageKey] || '';
+              return (
+                <div key={plat} className="mb-4 p-3 border border-theme rounded-lg bg-theme-secondary/20">
+                  <p className="text-xs font-semibold text-theme-primary mb-2 capitalize">{plat} Background</p>
+                  {/* Type toggle */}
+                  <div className="flex gap-2 mb-3">
+                    {['color', 'image'].map(t => (
+                      <button
+                        key={t}
+                        onClick={() => upd(typeKey, t)}
+                        className={`flex-1 py-1.5 text-xs font-medium rounded-lg border transition ${
+                          bgType === t
+                            ? 'border-accent-gold bg-accent-gold/10 text-accent-gold'
+                            : 'border-theme text-theme-muted hover:border-accent-gold/50'
+                        }`}
+                      >
+                        {t === 'color' ? '🎨 Color' : '🖼️ Image'}
+                      </button>
+                    ))}
+                  </div>
+                  {bgType === 'color' ? (
+                    <ColorField label={`${plat.charAt(0).toUpperCase() + plat.slice(1)} Background Color`} value={bgColor} onChange={v => upd(colorKey, v)} />
+                  ) : (
+                    <div className="space-y-2">
+                      <ImageUploadField label={`${plat.charAt(0).toUpperCase() + plat.slice(1)} Background Image`} value={bgImage} onChange={v => upd(imageKey, v)} category="branding" />
+                      {(plat === 'desktop' && desktopTpl === 'fullwidth') && (
+                        <FormField label={`Overlay Opacity — ${Math.round((slide.overlay_opacity ?? 0.5) * 100)}%`} hint="Darkens the background image so text stays readable">
+                          <input type="range" min={0} max={1} step={0.05} value={slide.overlay_opacity ?? 0.5}
+                            onChange={e => upd('overlay_opacity', parseFloat(e.target.value))} className="w-full accent-yellow-500" />
+                        </FormField>
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
 
-          {/* Appearance */}
-          <div className="grid grid-cols-2 gap-3">
-            <ColorField label="Background Color" value={slide.bg_color || '#F8F5F0'} onChange={v => upd('bg_color', v)} />
-            <FormField label="Text Color Scheme">
-              <TSelect value={slide.text_color || 'dark'} onChange={e => upd('text_color', e.target.value)}>
-                <option value="dark">Dark text (on light bg)</option>
-                <option value="light">Light text (on dark/image bg)</option>
-              </TSelect>
-            </FormField>
-          </div>
-          {desktopTpl === 'fullwidth' && (
-            <FormField label={`Image Overlay Opacity — ${Math.round((slide.overlay_opacity ?? 0.5) * 100)}%`} hint="Darkens the background image so text stays readable">
-              <input type="range" min={0} max={1} step={0.05} value={slide.overlay_opacity ?? 0.5}
-                onChange={e => upd('overlay_opacity', parseFloat(e.target.value))} className="w-full accent-yellow-500" />
-            </FormField>
-          )}
+          {/* Text Color Scheme */}
+          <FormField label="Text Color Scheme">
+            <TSelect value={slide.text_color || 'dark'} onChange={e => upd('text_color', e.target.value)}>
+              <option value="dark">Dark text (on light bg)</option>
+              <option value="light">Light text (on dark/image bg)</option>
+            </TSelect>
+          </FormField>
 
           {/* Floating feature cards (split template) */}
           {desktopTpl === 'split' && (
@@ -699,6 +733,8 @@ const DEFAULT_SLIDE = {
   show_discount_label: true, show_discount_value: true, show_mobile_cta: true,
   product_slug: '', product_image_url: '',
   show_on_desktop: true, show_on_mobile: true,
+  desktop_bg_type: 'color', desktop_bg_color: '#F8F5F0', desktop_bg_image: '',
+  mobile_bg_type: 'color', mobile_bg_color: '#1C1C1E', mobile_bg_image: '',
 };
 
 function makeSlideId() {
@@ -709,6 +745,7 @@ function makeSlideId() {
 function migrateToSlides(hs) {
   if (hs.hero_slides?.length) return hs.hero_slides;
   // Build one slide from the flat fields
+  const hasImage = !!hs.hero_image_url;
   return [{
     id: makeSlideId(),
     heading: hs.hero_heading || '',
@@ -727,6 +764,12 @@ function migrateToSlides(hs) {
     discount_value: hs.mobile_discount_value || '50%',
     mobile_cta_text: hs.mobile_cta_text || 'Shop Now',
     is_visible: true,
+    desktop_bg_type: hasImage ? 'image' : 'color',
+    desktop_bg_color: hs.hero_bg_color || '#F8F5F0',
+    desktop_bg_image: hasImage ? hs.hero_image_url : '',
+    mobile_bg_type: hasImage ? 'image' : 'color',
+    mobile_bg_color: hs.hero_bg_color || '#1C1C1E',
+    mobile_bg_image: hasImage ? hs.hero_image_url : '',
   }];
 }
 

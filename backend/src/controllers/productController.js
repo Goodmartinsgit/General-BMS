@@ -979,6 +979,17 @@ const addProductImage = async (req, res) => {
       return res.status(400).json({ message: 'Image URL is required' });
     }
 
+    // Validate color_id is a safe integer for PostgreSQL (max 2147483647)
+    let safeColorId = color_id || null;
+    if (safeColorId !== null) {
+      const num = parseInt(safeColorId, 10);
+      if (isNaN(num) || num < 1 || num > 2147483647) {
+        safeColorId = null; // Discard invalid/temp IDs
+      } else {
+        safeColorId = num;
+      }
+    }
+
     await query('BEGIN');
 
     // If setting as primary, unset other primary images
@@ -992,7 +1003,7 @@ const addProductImage = async (req, res) => {
     const result = await query(
       `INSERT INTO product_images_v2 (product_id, image_url, color_id, is_primary, display_order, alt_text)
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
-      [id, image_url, color_id || null, is_primary || false, display_order || 0, alt_text || null]
+      [id, image_url, safeColorId, is_primary || false, display_order || 0, alt_text || null]
     );
 
     await query('COMMIT');

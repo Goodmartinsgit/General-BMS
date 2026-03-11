@@ -202,6 +202,18 @@ export const batchSaveColors = async (productId, colors) => {
 };
 
 /**
+ * Sanitize a color_id before sending to the backend.
+ * Detects temp IDs (string-prefixed or oversized integers) and returns null.
+ */
+const sanitizeColorId = (colorId) => {
+  if (!colorId) return null;
+  if (typeof colorId === 'string' && colorId.startsWith('temp_')) return null;
+  const num = Number(colorId);
+  if (isNaN(num) || num > 2147483647 || num < 1) return null;
+  return num;
+};
+
+/**
  * Batch save images for a product
  * @param {number} productId - Product ID
  * @param {Array} images - Array of image objects
@@ -216,7 +228,7 @@ export const batchSaveImages = async (productId, images) => {
         // Add new image
         const saved = await addProductImage(productId, {
           image_url: image.image_url,
-          color_id: image.color_id || null,
+          color_id: sanitizeColorId(image.color_id),
           is_primary: image.is_primary || false,
           display_order: image.display_order || 0,
           alt_text: image.alt_text || '',
@@ -225,7 +237,7 @@ export const batchSaveImages = async (productId, images) => {
       } else if (image.isModified) {
         // Update existing image
         const saved = await updateProductImage(productId, image.id, {
-          color_id: image.color_id,
+          color_id: sanitizeColorId(image.color_id),
           is_primary: image.is_primary,
           display_order: image.display_order,
           alt_text: image.alt_text,

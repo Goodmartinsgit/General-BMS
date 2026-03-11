@@ -10,7 +10,7 @@ const ProductImageManager = ({ productId, images, colors, onImagesChange, disabl
     if (!newImage.image_url) return;
 
     const imageToAdd = {
-      id: Date.now(),
+      id: 'temp_' + Date.now(), // String prefix prevents DB integer overflow
       image_url: newImage.image_url,
       color_id: newImage.color_id || null,
       is_primary: images.length === 0,

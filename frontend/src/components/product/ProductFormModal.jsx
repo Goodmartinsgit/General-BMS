@@ -163,10 +163,18 @@ const ProductFormModal = ({
         // Save images if any
         if (formData.images && formData.images.length > 0) {
           try {
-            const imagesToSave = formData.images.map(img => ({
-              ...img,
-              color_id: img.color_id && updatedColorsMap[img.color_id] ? updatedColorsMap[img.color_id] : img.color_id
-            }));
+            const imagesToSave = formData.images.map(img => {
+              let resolvedColorId = img.color_id;
+              // Map temp color ID to real DB ID
+              if (resolvedColorId && updatedColorsMap[resolvedColorId]) {
+                resolvedColorId = updatedColorsMap[resolvedColorId];
+              }
+              // If color_id is still a temp string, clear it so the image still saves (without color)
+              if (typeof resolvedColorId === 'string' && resolvedColorId.startsWith('temp_')) {
+                resolvedColorId = null;
+              }
+              return { ...img, color_id: resolvedColorId };
+            });
             await batchSaveImages(productId, imagesToSave);
           } catch (error) {
             console.error('Error saving images:', error);
