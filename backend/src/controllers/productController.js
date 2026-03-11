@@ -848,6 +848,311 @@ const deleteCategory = async (req, res) => {
   }
 };
 
+// ============================================================================
+// PRODUCT COLORS MANAGEMENT
+// ============================================================================
+
+const getProductColors = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await query(
+      `SELECT * FROM product_colors WHERE product_id = $1 ORDER BY display_order, color_name`,
+      [id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching product colors:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const addProductColor = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { color_name, color_code, display_order } = req.body;
+
+    if (!color_name) {
+      return res.status(400).json({ message: 'Color name is required' });
+    }
+
+    const result = await query(
+      `INSERT INTO product_colors (product_id, color_name, color_code, display_order)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [id, color_name, color_code, display_order || 0]
+    );
+
+    await query('UPDATE products SET has_colors = true WHERE id = $1', [id]);
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(400).json({ message: 'Color already exists for this product' });
+    }
+    console.error('Error adding product color:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const updateProductColor = async (req, res) => {
+  try {
+    const { colorId } = req.params;
+    const { color_name, color_code, display_order, is_active } = req.body;
+
+    const result = await query(
+      `UPDATE product_colors SET
+         color_name = COALESCE($1, color_name),
+         color_code = COALESCE($2, color_code),
+         display_order = COALESCE($3, display_order),
+         is_active = COALESCE($4, is_active)
+       WHERE id = $5 RETURNING *`,
+      [color_name, color_code, display_order, is_active, colorId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Color not found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error('Error updating product color:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const deleteProductColor = async (req, res) => {
+  try {
+    const { colorId } = req.params;
+
+    await query('BEGIN');
+
+    // Check if color has inventory
+    const inventoryCheck = await query(
+      'SELECT COUNT(*) FROM inventory_colors WHERE color_id = $1',
+      [colorId]
+    );
+
+    if (parseInt(inventoryCheck.rows[0].count) > 0) {
+      await query('ROLLBACK');
+      return res.status(400).json({ message: 'Cannot delete color with existing inventory' });
+    }
+
+    // Delete color (images will be set to NULL due to ON DELETE SET NULL)
+    await query('DELETE FROM product_colors WHERE id = $1', [colorId]);
+
+    await query('COMMIT');
+    res.json({ message: 'Color deleted successfully' });
+  } catch (err) {
+    await query('ROLLBACK');
+    console.error('Error deleting product color:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ============================================================================
+// PRODUCT IMAGES MANAGEMENT
+// ============================================================================
+
+const getProductImages = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await query(
+      `SELECT pi.*, pc.color_name, pc.color_code
+       FROM product_images_v2 pi
+       LEFT JOIN product_colors pc ON pi.color_id = pc.id
+       WHERE pi.product_id = $1
+       ORDER BY pi.is_primary DESC, pi.display_order, pi.id`,
+      [id]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching product images:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const addProductImage = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { image_url, color_id, is_primary, display_order, alt_text } = req.body;
+
+    if (!image_url) {
+      return res.status(400).json({ message: 'Image URL is required' });
+    }
+
+    await query('BEGIN');
+
+    // If setting as primary, unset other primary images
+    if (is_primary) {
+      await query(
+        'UPDATE product_images_v2 SET is_primary = false WHERE product_id = $1',
+        [id]
+      );
+    }
+
+    const result = await query(
+      `INSERT INTO product_images_v2 (product_id, image_url, color_id, is_primary, display_order, alt_text)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [id, image_url, color_id || null, is_primary || false, display_order || 0, alt_text || null]
+    );
+
+    await query('COMMIT');
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    await query('ROLLBACK');
+    console.error('Error adding product image:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const updateProductImage = async (req, res) => {
+  try {
+    const { imageId } = req.params;
+    const { color_id, is_primary, display_order, alt_text } = req.body;
+
+    await query('BEGIN');
+
+    // If setting as primary, get product_id and unset others
+    if (is_primary) {
+      const imgResult = await query('SELECT product_id FROM product_images_v2 WHERE id = $1', [imageId]);
+      if (imgResult.rows.length > 0) {
+        await query(
+          'UPDATE product_images_v2 SET is_primary = false WHERE product_id = $1 AND id != $2',
+          [imgResult.rows[0].product_id, imageId]
+        );
+      }
+    }
+
+    const result = await query(
+      `UPDATE product_images_v2 SET
+         color_id = COALESCE($1, color_id),
+         is_primary = COALESCE($2, is_primary),
+         display_order = COALESCE($3, display_order),
+         alt_text = COALESCE($4, alt_text)
+       WHERE id = $5 RETURNING *`,
+      [color_id, is_primary, display_order, alt_text, imageId]
+    );
+
+    await query('COMMIT');
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Image not found' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    await query('ROLLBACK');
+    console.error('Error updating product image:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const deleteProductImage = async (req, res) => {
+  try {
+    const { imageId } = req.params;
+    await query('DELETE FROM product_images_v2 WHERE id = $1', [imageId]);
+    res.json({ message: 'Image deleted successfully' });
+  } catch (err) {
+    console.error('Error deleting product image:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ============================================================================
+// COLOR-BASED INVENTORY
+// ============================================================================
+
+const getProductColorInventory = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { branch_id } = req.query;
+
+    let queryStr = `
+      SELECT
+        i.id as inventory_id,
+        i.branch_id,
+        b.branch_name,
+        i.quantity_on_hand as total_quantity,
+        pc.id as color_id,
+        pc.color_name,
+        pc.color_code,
+        COALESCE(ic.quantity_on_hand, 0) as color_quantity,
+        COALESCE(ic.quantity_reserved, 0) as color_reserved,
+        COALESCE(ic.quantity_available, 0) as color_available
+      FROM inventory i
+      JOIN branches b ON i.branch_id = b.id
+      LEFT JOIN product_colors pc ON pc.product_id = i.product_id AND pc.is_active = true
+      LEFT JOIN inventory_colors ic ON ic.inventory_id = i.id AND ic.color_id = pc.id
+      WHERE i.product_id = $1
+    `;
+
+    const params = [id];
+    if (branch_id) {
+      queryStr += ' AND i.branch_id = $2';
+      params.push(branch_id);
+    }
+
+    queryStr += ' ORDER BY b.branch_name, pc.display_order, pc.color_name';
+
+    const result = await query(queryStr, params);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching color inventory:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+const updateColorInventory = async (req, res) => {
+  try {
+    const { product_id, branch_id, color_id, quantity } = req.body;
+
+    if (!product_id || !branch_id || !color_id || quantity === undefined) {
+      return res.status(400).json({ message: 'Missing required fields' });
+    }
+
+    await query('BEGIN');
+
+    // Get inventory_id
+    const invResult = await query(
+      'SELECT id FROM inventory WHERE product_id = $1 AND branch_id = $2',
+      [product_id, branch_id]
+    );
+
+    if (invResult.rows.length === 0) {
+      await query('ROLLBACK');
+      return res.status(404).json({ message: 'Inventory record not found' });
+    }
+
+    const inventory_id = invResult.rows[0].id;
+
+    // Upsert color inventory
+    await query(
+      `INSERT INTO inventory_colors (inventory_id, color_id, quantity_on_hand)
+       VALUES ($1, $2, $3)
+       ON CONFLICT (inventory_id, color_id)
+       DO UPDATE SET quantity_on_hand = $3, updated_at = CURRENT_TIMESTAMP`,
+      [inventory_id, color_id, quantity]
+    );
+
+    // Update total inventory
+    const totalResult = await query(
+      'SELECT COALESCE(SUM(quantity_on_hand), 0) as total FROM inventory_colors WHERE inventory_id = $1',
+      [inventory_id]
+    );
+
+    await query(
+      'UPDATE inventory SET quantity_on_hand = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2',
+      [totalResult.rows[0].total, inventory_id]
+    );
+
+    await query('COMMIT');
+    res.json({ message: 'Color inventory updated successfully' });
+  } catch (err) {
+    await query('ROLLBACK');
+    console.error('Error updating color inventory:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
   getAllProducts,
   getProductById,
@@ -868,4 +1173,17 @@ module.exports = {
   createCategory,
   updateCategory,
   deleteCategory,
+  // Color management
+  getProductColors,
+  addProductColor,
+  updateProductColor,
+  deleteProductColor,
+  // Image management
+  getProductImages,
+  addProductImage,
+  updateProductImage,
+  deleteProductImage,
+  // Color inventory
+  getProductColorInventory,
+  updateColorInventory,
 };

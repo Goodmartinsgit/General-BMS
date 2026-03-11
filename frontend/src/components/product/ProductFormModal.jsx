@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { X, Package, Tag, DollarSign, Database, Plus, Check, RefreshCw, Globe } from 'lucide-react';
 import Modal from '../ui/Modal';
 import CloudinaryUpload from '../common/CloudinaryUpload';
+import ProductColorManager from './ProductColorManager';
+import ProductImageManager from './ProductImageManager';
+import { batchSaveColors, batchSaveImages } from '../../api/productColors';
+import { toast } from 'react-toastify';
 
 const inputClass =
   'w-full px-3 py-2.5 bg-theme-primary border border-theme rounded-lg text-sm text-theme-primary placeholder-theme-muted focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none transition-all';
@@ -19,6 +23,7 @@ const ProductFormModal = ({
   loading = false,
 }) => {
   const isEditMode = !!product;
+  const [editLoading, setEditLoading] = useState(false);
 
   const [formData, setFormData] = useState({
     product_name: '',
@@ -42,6 +47,10 @@ const ProductFormModal = ({
     is_online_available: false,
     slug: '',
     short_description: '',
+    // Color and image management
+    has_colors: false,
+    colors: [],
+    images: [],
   });
 
   const [errors, setErrors] = useState({});
@@ -70,6 +79,9 @@ const ProductFormModal = ({
         is_online_available: product.is_online_available || false,
         slug: product.slug || '',
         short_description: product.short_description || '',
+        has_colors: product.has_colors || false,
+        colors: product.colors || [],
+        images: product.images || [],
       });
     } else {
       setFormData({
@@ -93,6 +105,9 @@ const ProductFormModal = ({
         is_online_available: false,
         slug: '',
         short_description: '',
+        has_colors: false,
+        colors: [],
+        images: [],
       });
     }
     setErrors({});
@@ -119,8 +134,41 @@ const ProductFormModal = ({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = () => {
-    if (validate()) onSubmit(formData);
+  const handleSubmit = async () => {
+    if (!validate()) return;
+    
+    setEditLoading(true);
+    try {
+      // First, submit the main product data
+      await onSubmit(formData);
+      
+      // If in edit mode and product has colors/images, save them
+      if (isEditMode && product?.id) {
+        // Save colors if any
+        if (formData.colors && formData.colors.length > 0) {
+          try {
+            await batchSaveColors(product.id, formData.colors);
+          } catch (error) {
+            console.error('Error saving colors:', error);
+            toast.error('Product saved but some colors failed to save');
+          }
+        }
+        
+        // Save images if any
+        if (formData.images && formData.images.length > 0) {
+          try {
+            await batchSaveImages(product.id, formData.images);
+          } catch (error) {
+            console.error('Error saving images:', error);
+            toast.error('Product saved but some images failed to save');
+          }
+        }
+      }
+    } catch (error) {
+      // Error already handled by onSubmit
+    } finally {
+      setEditLoading(false);
+    }
   };
 
   const generateSlug = () => {
@@ -153,7 +201,7 @@ const ProductFormModal = ({
           <button
             type="button"
             onClick={onClose}
-            disabled={loading}
+            disabled={loading || editLoading}
             className="px-4 py-2 text-sm font-medium text-theme-secondary bg-theme-primary hover:bg-theme-tertiary border border-theme rounded-lg transition-colors"
           >
             Cancel
@@ -161,10 +209,10 @@ const ProductFormModal = ({
           <button
             type="button"
             onClick={handleSubmit}
-            disabled={loading}
+            disabled={loading || editLoading}
             className="flex items-center gap-2 px-6 py-2 text-sm font-semibold bg-accent-gold text-white rounded-lg hover:bg-yellow-600 transition-colors shadow-sm disabled:opacity-60"
           >
-            {loading && <RefreshCw size={14} className="animate-spin" />}
+            {(loading || editLoading) && <RefreshCw size={14} className="animate-spin" />}
             {isEditMode ? 'Save Changes' : 'Add Product'}
           </button>
         </div>
@@ -438,12 +486,32 @@ const ProductFormModal = ({
         <div className="space-y-4">
           <h3 className={sectionHeadClass}>Media & Tags</h3>
 
-          <CloudinaryUpload
-            category="products"
-            label="Product Image"
-            value={formData.image_url}
-            onChange={(url) => handleChange('image_url', url)}
+          {/* Color Management */}
+          <ProductColorManager
+            productId={product?.id}
+            colors={formData.colors}
+            onColorsChange={(colors) => handleChange('colors', colors)}
+            disabled={loading || editLoading}
           />
+
+          {/* Image Management */}
+          <ProductImageManager
+            productId={product?.id}
+            images={formData.images}
+            colors={formData.colors}
+            onImagesChange={(images) => handleChange('images', images)}
+            disabled={loading || editLoading}
+          />
+
+          {/* Legacy single image upload (kept for backward compatibility) */}
+          {formData.images.length === 0 && (
+            <CloudinaryUpload
+              category="products"
+              label="Product Image (Legacy)"
+              value={formData.image_url}
+              onChange={(url) => handleChange('image_url', url)}
+            />
+          )}
 
           <div>
             <label className={labelClass}>Tags</label>

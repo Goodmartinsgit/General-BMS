@@ -5,6 +5,9 @@ const {
   getProductStatistics, getFeaturedProducts, getLowStockProducts,
   getBrands, createBrand, updateBrand, deleteBrand,
   getCategories, createCategory, updateCategory, deleteCategory,
+  getProductColors, addProductColor, updateProductColor, deleteProductColor,
+  getProductImages, addProductImage, updateProductImage, deleteProductImage,
+  getProductColorInventory, updateColorInventory,
 } = require('../controllers/productController');
 const authenticateToken = require('../middleware/authMiddleware');
 const authorize = require('../middleware/permissionMiddleware');
@@ -32,5 +35,21 @@ router.get('/:id', authenticateToken, authorize('view_products'), getProductById
 router.post('/', authenticateToken, authorize('manage_products'), createProduct);
 router.put('/:id', authenticateToken, authorize('manage_products'), updateProduct);
 router.delete('/:id', authenticateToken, authorize('manage_products'), deleteProduct);
+
+// Product Colors
+router.get('/:id/colors', authenticateToken, authorize('view_products'), getProductColors);
+router.post('/:id/colors', authenticateToken, authorize('manage_products'), addProductColor);
+router.put('/:id/colors/:colorId', authenticateToken, authorize('manage_products'), updateProductColor);
+router.delete('/:id/colors/:colorId', authenticateToken, authorize('manage_products'), deleteProductColor);
+
+// Product Images
+router.get('/:id/images', authenticateToken, authorize('view_products'), getProductImages);
+router.post('/:id/images', authenticateToken, authorize('manage_products'), addProductImage);
+router.put('/:id/images/:imageId', authenticateToken, authorize('manage_products'), updateProductImage);
+router.delete('/:id/images/:imageId', authenticateToken, authorize('manage_products'), deleteProductImage);
+
+// Color Inventory
+router.get('/:id/color-inventory', authenticateToken, authorize('view_products'), getProductColorInventory);
+router.post('/color-inventory', authenticateToken, authorize('manage_inventory'), updateColorInventory);
 
 module.exports = router;

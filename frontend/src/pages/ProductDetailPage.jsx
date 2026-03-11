@@ -12,6 +12,7 @@ import { useCurrency } from '../context/CurrencyContext';
 import { useAuth } from '../context/AuthContext';
 import { useBranch } from '../context/BranchContext';
 import Modal from '../components/ui/Modal';
+import ColorStockManager from '../components/product/ColorStockManager';
 
 // ── Date range helper ─────────────────────────────────────────────────────────
 const getDateRange = (filter) => {
@@ -695,6 +696,18 @@ const ProductDetailPage = () => {
                         </div>
                       ))}
                     </div>
+                  </div>
+                )}
+
+                {/* Color-based stock breakdown */}
+                {product.has_colors && (
+                  <div className="mt-4">
+                    <h3 className="text-sm font-semibold text-theme-secondary mb-2">Stock by Color</h3>
+                    <ColorStockManager
+                      productId={product.id}
+                      branchId={null}
+                      onStockUpdate={() => { fetchProduct(); setRefreshKey(k => k + 1); }}
+                    />
                   </div>
                 )}
               </div>

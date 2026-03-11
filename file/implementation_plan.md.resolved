@@ -1,0 +1,66 @@
+# Store ↔ General-BMS Integration
+
+## Background
+
+The store frontend is **already built** to consume the BMS backend. API routes, CORS, and Vite proxy all match. The only missing piece is a **company-settings resolution layer** inside [formatConfig()](file:///c:/Users/DELL%20XPS/Desktop/BMS/General-BMS/backend/src/controllers/storeConfigController.js#236-293) so that when "Use Company Settings" is toggled ON for a section, the store receives the company's values instead of the store's own.
+
+## How Each `/store-settings` Section Maps to the Store
+
+| Store-Settings Section | What the Store Frontend Displays | Config Fields Affected |
+|---|---|---|
+| **General** | Store name, currency for pricing | `storeName`, `currency` |
+| **Branding** | Logo, theme colors, fonts (Header, Footer, ThemeContext CSS vars) | `logo.*`, `theme.*` |
+| **Tax** | Tax calculations at checkout | `taxRate` |
+| **Receipt** | _Not used by store_ (receipts are BMS-only) | — |
+| **Payment** | Payment methods at checkout | `paymentMethods` |
+| **Notifications** | _Not used by store_ (admin-only) | — |
+| **Security** | _Not used by store_ (admin-only) | — |
+| **Display** | _Not used by store_ (admin-only UI pref) | — |
+
+Store-only sections (Homepage, Contact, SEO, Commerce, Advanced) always come from `store_config` directly — no company fallback needed.
+
+## Proposed Changes
+
+### [MODIFY] [storeConfigController.js](file:///c:/Users/DELL%20XPS/Desktop/BMS/General-BMS/backend/src/controllers/storeConfigController.js)
+
+Add a `resolveCompanyOverrides(row, formatted)` function that:
+
+1. Reads `row.use_company_settings` (JSONB) 
+2. For each section where the toggle is `true`, fetches company values and overwrites the corresponding fields in the formatted config
+3. Call this function from [getConfigBySlug()](file:///c:/Users/DELL%20XPS/Desktop/BMS/General-BMS/backend/src/controllers/storeConfigController.js#3-38), [getDefaultConfig()](file:///c:/Users/DELL%20XPS/Desktop/BMS/General-BMS/backend/src/controllers/storeConfigController.js#39-54), and [getConfigByDomain()](file:///c:/Users/DELL%20XPS/Desktop/BMS/General-BMS/backend/src/controllers/storeConfigController.js#55-72) before sending the response
+
+**Section-by-section resolution logic:**
+
+```
+if use_company_settings.general === true:
+  → storeName = org.organization_name
+  → currency = company general settings currency
+
+if use_company_settings.branding === true:
+  → theme.primaryColor = branding_config.primary_color
+  → theme.secondaryColor = branding_config.secondary_color
+  → theme.accentColor = branding_config.accent_color
+  → theme.backgroundColor = branding_config.background_color
+  → theme.textColor = (derived or default)
+  → theme.fontFamily = branding_config.font_family
+  → logo.primary = branding_config.logo_url
+
+if use_company_settings.tax === true:
+  → taxRate = tax_settings.standard_rate
+
+if use_company_settings.payment === true:
+  → paymentMethods = company payment settings
+```
+
+> [!IMPORTANT]
+> Receipt, Notifications, Security, and Display sections are admin-only — they don't affect the storefront output. No resolution needed for those sections.
+
+## Verification Plan
+
+1. Start BMS backend (`npm run dev`)
+2. Start store frontend (`npm run dev` in store directory)
+3. Open `http://localhost:3006` — verify store loads with BMS data
+4. Toggle "Use Company Settings" ON for **Branding** → verify store uses company colors
+5. Toggle OFF → verify store uses its own custom colors
+6. Toggle ON for **General** → verify store name/currency matches company
+7. Check Footer shows correct contact/social from store config
