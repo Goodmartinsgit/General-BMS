@@ -4,11 +4,13 @@ const {
   getAllProducts, getProductById, createProduct, updateProduct, deleteProduct,
   getProductStatistics, getFeaturedProducts, getLowStockProducts,
   getBrands, createBrand, updateBrand, deleteBrand,
-  getCategories, createCategory, updateCategory, deleteCategory,
   getProductColors, addProductColor, updateProductColor, deleteProductColor,
   getProductImages, addProductImage, updateProductImage, deleteProductImage,
   getProductColorInventory, updateColorInventory,
 } = require('../controllers/productController');
+const {
+  getCategories, createCategory, updateCategory, deleteCategory,
+} = require('../controllers/categoryController');
 const authenticateToken = require('../middleware/authMiddleware');
 const authorize = require('../middleware/permissionMiddleware');
 
