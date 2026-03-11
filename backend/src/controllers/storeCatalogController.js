@@ -118,6 +118,7 @@ const getProductBySlug = async (req, res) => {
     const { productSlug } = req.params;
     const result = await query(
       `SELECT p.*, c.category_name as category_name, c.slug as category_slug,
+              c.level as category_level, c.parent_category_id,
               COALESCE(inv.total_qty, 0) as stock_quantity,
               COALESCE(inv.total_qty, 0) > 0 as in_stock
        FROM products p
@@ -143,10 +144,33 @@ const getProductBySlug = async (req, res) => {
       variants = varResult.rows;
     }
 
+    // Get category assignments (selection-level attributes with stock/price)
+    let categoryAssignments = [];
+    const assignResult = await query(
+      `SELECT pca.category_id, pca.price_override, pca.stock_allocated, pca.is_leaf,
+              c.category_name, c.level, c.parent_category_id, c.unit_of_measure, c.slug as category_slug
+       FROM product_category_assignments pca
+       JOIN categories c ON c.id = pca.category_id
+       WHERE pca.product_id = $1
+       ORDER BY c.level, c.display_order, c.category_name`,
+      [product.id]
+    );
+    categoryAssignments = assignResult.rows.map(a => ({
+      categoryId: a.category_id,
+      categoryName: a.category_name,
+      categorySlug: a.category_slug,
+      level: a.level,
+      parentCategoryId: a.parent_category_id,
+      unitOfMeasure: a.unit_of_measure,
+      priceOverride: a.price_override ? parseFloat(a.price_override) : null,
+      stockAllocated: parseInt(a.stock_allocated) || 0,
+      isLeaf: a.is_leaf,
+    }));
+
     // Increment view count
     query(`UPDATE products SET view_count = view_count + 1 WHERE id = $1`, [product.id]).catch(() => {});
 
-    res.json({ ...formatProductDetail(product), variants });
+    res.json({ ...formatProductDetail(product), variants, categoryAssignments });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -156,22 +180,57 @@ const getProductBySlug = async (req, res) => {
 // GET /api/store/:slug/categories
 const getCategories = async (req, res) => {
   try {
+    const { format } = req.query; // ?format=tree for nested
     const result = await query(
       `SELECT c.id, c.category_name as name, c.slug, c.description, c.image_url,
-              COUNT(p.id) FILTER (WHERE p.is_online_available = true AND p.deleted_at IS NULL) as product_count
+              c.parent_category_id, c.level, c.unit_of_measure,
+              c.is_selection_attribute, c.display_order,
+              COUNT(p.id) FILTER (WHERE p.is_online_available = true AND p.deleted_at IS NULL)::int as product_count
        FROM categories c
        LEFT JOIN products p ON p.category_id = c.id
        WHERE c.is_active = true
        GROUP BY c.id
-       HAVING COUNT(p.id) FILTER (WHERE p.is_online_available = true AND p.deleted_at IS NULL) > 0
-       ORDER BY c.category_name ASC`
+       ORDER BY c.level, c.display_order, c.category_name ASC`
     );
-    res.json(result.rows);
+
+    // Map to camelCase for store frontend
+    const mapped = result.rows.map(r => ({
+      id: String(r.id),
+      name: r.name,
+      slug: r.slug,
+      description: r.description,
+      image: r.image_url,
+      parentId: r.parent_category_id ? String(r.parent_category_id) : null,
+      level: r.level || 1,
+      unitOfMeasure: r.unit_of_measure,
+      isSelectionAttribute: r.is_selection_attribute,
+      productCount: parseInt(r.product_count) || 0,
+    }));
+
+    if (format === 'tree') {
+      return res.json(buildStoreCategoryTree(mapped));
+    }
+
+    // Default: return nested tree for browsing-level categories
+    res.json(buildStoreCategoryTree(mapped));
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+/**
+ * Build a nested tree from flat mapped categories for the store.
+ */
+function buildStoreCategoryTree(cats, parentId = null) {
+  return cats
+    .filter(c => c.parentId === parentId)
+    .map(c => ({
+      ...c,
+      children: buildStoreCategoryTree(cats, c.id),
+    }))
+    .filter(c => c.productCount > 0 || (c.children && c.children.length > 0));
+}
 
 // GET /api/store/:slug/categories/:categorySlug — products in a category
 const getProductsByCategory = async (req, res) => {
