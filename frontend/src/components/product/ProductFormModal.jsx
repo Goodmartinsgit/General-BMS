@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { X, Package, Tag, DollarSign, Database, Plus, Check, RefreshCw, Globe } from 'lucide-react';
+import { X, Package, Tag, DollarSign, Database, Plus, Check, RefreshCw, Globe, Layers } from 'lucide-react';
 import Modal from '../ui/Modal';
 import CloudinaryUpload from '../common/CloudinaryUpload';
 import ProductColorManager from './ProductColorManager';
 import ProductImageManager from './ProductImageManager';
+import CategoryStockAssigner from './CategoryStockAssigner';
 import { batchSaveColors, batchSaveImages } from '../../api/productColors';
+import api from '../../api/axios';
 import { toast } from 'react-toastify';
 
 const inputClass =
@@ -55,6 +57,33 @@ const ProductFormModal = ({
 
   const [errors, setErrors] = useState({});
   const [newTag, setNewTag] = useState('');
+
+  // Hierarchical category assignments
+  const [listingCategories, setListingCategories] = useState([]);
+  const [categoryAssignments, setCategoryAssignments] = useState([]);
+  const [assignmentErrors, setAssignmentErrors] = useState({});
+  const [listingLevel, setListingLevel] = useState(1);
+
+  // Fetch listing-level categories
+  useEffect(() => {
+    const fetchListingData = async () => {
+      try {
+        const [levelRes, catsRes] = await Promise.all([
+          api.get('/categories/listing-level'),
+          api.get('/categories'),
+        ]);
+        const lvl = levelRes.data?.product_listing_level || 1;
+        setListingLevel(lvl);
+        // Filter categories at listing level for the dropdown
+        const allCats = Array.isArray(catsRes.data) ? catsRes.data : [];
+        setListingCategories(allCats.filter(c => c.level === lvl && c.is_active));
+      } catch {
+        // Fallback: use passed categories
+        setListingCategories(categories);
+      }
+    };
+    fetchListingData();
+  }, []);
 
   useEffect(() => {
     if (product) {
@@ -136,6 +165,12 @@ const ProductFormModal = ({
 
   const handleSubmit = async () => {
     if (!validate()) return;
+
+    // Block save if stock assignments are imbalanced
+    if (Object.keys(assignmentErrors).length > 0) {
+      toast.error('Stock allocation is imbalanced. Fix all levels before saving.');
+      return;
+    }
     
     setEditLoading(true);
     try {
@@ -165,11 +200,9 @@ const ProductFormModal = ({
           try {
             const imagesToSave = formData.images.map(img => {
               let resolvedColorId = img.color_id;
-              // Map temp color ID to real DB ID
               if (resolvedColorId && updatedColorsMap[resolvedColorId]) {
                 resolvedColorId = updatedColorsMap[resolvedColorId];
               }
-              // If color_id is still a temp string, clear it so the image still saves (without color)
               if (typeof resolvedColorId === 'string' && resolvedColorId.startsWith('temp_')) {
                 resolvedColorId = null;
               }
@@ -179,6 +212,19 @@ const ProductFormModal = ({
           } catch (error) {
             console.error('Error saving images:', error);
             toast.error('Product saved but some images failed to save');
+          }
+        }
+
+        // Save category assignments (hierarchical stock/price)
+        if (categoryAssignments && categoryAssignments.length > 0) {
+          try {
+            await api.post(`/categories/assignments/${productId}`, {
+              assignments: categoryAssignments,
+            });
+          } catch (error) {
+            console.error('Error saving category assignments:', error);
+            const msg = error.response?.data?.message || 'Failed to save category stock allocation';
+            toast.error(msg);
           }
         }
       }
@@ -311,21 +357,40 @@ const ProductFormModal = ({
               </select>
             </div>
             <div>
-              <label className={labelClass}>Category</label>
+              <label className={labelClass}>
+                <span className="flex items-center gap-1">
+                  <Layers size={12} />
+                  Category (Level {listingLevel})
+                </span>
+              </label>
               <select
                 value={formData.category_id}
                 onChange={(e) => handleChange('category_id', e.target.value)}
                 className={inputClass}
               >
                 <option value="">Select Category</option>
-                {categories.map((c) => (
+                {(listingCategories.length > 0 ? listingCategories : categories).map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.category_name}
+                    {c.parent_category_id ? '↳ ' : ''}{c.category_name}
                   </option>
                 ))}
               </select>
             </div>
           </div>
+
+          {/* Hierarchical Stock & Price Allocation */}
+          {formData.category_id && (
+            <CategoryStockAssigner
+              categoryId={parseInt(formData.category_id)}
+              productId={product?.id}
+              totalStock={parseInt(formData.reorder_level) || 0}
+              basePrice={parseFloat(formData.retail_price) || 0}
+              onChange={(assignments, errors) => {
+                setCategoryAssignments(assignments);
+                setAssignmentErrors(errors);
+              }}
+            />
+          )}
         </div>
 
         {/* Pricing Section */}

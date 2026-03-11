@@ -10,6 +10,10 @@ const {
   deleteCategory,
   getListingLevel,
   setListingLevel,
+  getProductAssignments,
+  saveProductAssignments,
+  getSubcategoryTree,
+  getCategoriesByLevel,
 } = require('../controllers/categoryController');
 const authenticateToken = require('../middleware/authMiddleware');
 const authorize = require('../middleware/permissionMiddleware');
@@ -21,8 +25,16 @@ router.get('/levels', authenticateToken, authorize('view_products'), getCategory
 router.get('/listing-level', authenticateToken, authorize('view_products'), getListingLevel);
 router.put('/listing-level', authenticateToken, authorize('manage_products'), setListingLevel);
 
-// Parameterized routes
+// Category assignments (product stock/price per node)
+router.get('/assignments/:productId', authenticateToken, authorize('view_products'), getProductAssignments);
+router.post('/assignments/:productId', authenticateToken, authorize('manage_products'), saveProductAssignments);
+
+// By-level lookup
+router.get('/by-level/:level', authenticateToken, authorize('view_products'), getCategoriesByLevel);
+
+// Parameterized routes (must be last)
 router.get('/:id', authenticateToken, authorize('view_products'), getCategoryById);
+router.get('/:id/subtree', authenticateToken, authorize('view_products'), getSubcategoryTree);
 router.post('/', authenticateToken, authorize('manage_products'), createCategory);
 router.put('/:id', authenticateToken, authorize('manage_products'), updateCategory);
 router.delete('/:id', authenticateToken, authorize('manage_products'), deleteCategory);

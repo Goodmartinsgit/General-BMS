@@ -435,6 +435,213 @@ const setListingLevel = async (req, res) => {
   }
 };
 
+// ============================================================================
+// PRODUCT CATEGORY ASSIGNMENTS (Stock & Price per selection-level node)
+// ============================================================================
+
+/**
+ * GET /api/categories/assignments/:productId
+ * Get all category assignments for a product.
+ */
+const getProductAssignments = async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const result = await query(
+      `SELECT pca.*, c.category_name, c.level, c.parent_category_id,
+              c.unit_of_measure, c.path
+       FROM product_category_assignments pca
+       JOIN categories c ON c.id = pca.category_id
+       WHERE pca.product_id = $1
+       ORDER BY c.level, c.display_order, c.category_name`,
+      [productId]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching product assignments:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+/**
+ * POST /api/categories/assignments/:productId
+ * Batch save category assignments for a product.
+ * Enforces hard stock balancing: parent.stock == SUM(children.stock) at every non-leaf level.
+ *
+ * Body: { assignments: [{ category_id, price_override, stock_allocated, is_leaf }] }
+ */
+const saveProductAssignments = async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const { assignments = [] } = req.body;
+
+    if (!Array.isArray(assignments)) {
+      return res.status(400).json({ message: 'assignments must be an array' });
+    }
+
+    // ── Stock balancing validation ──────────────────────────────────
+    // Build a map of category_id -> assignment for quick lookup
+    const assignMap = {};
+    for (const a of assignments) {
+      assignMap[a.category_id] = a;
+    }
+
+    // Load category tree info for these categories
+    const catIds = assignments.map(a => a.category_id);
+    if (catIds.length > 0) {
+      const catsResult = await query(
+        `SELECT id, parent_category_id, level FROM categories WHERE id = ANY($1)`,
+        [catIds]
+      );
+      const catsMap = {};
+      for (const c of catsResult.rows) {
+        catsMap[c.id] = c;
+      }
+
+      // For every non-leaf assignment, check that SUM(children) == parent stock
+      for (const a of assignments) {
+        if (a.is_leaf) continue;
+        const cat = catsMap[a.category_id];
+        if (!cat) continue;
+
+        // Find children in the assignment list that have this category as parent
+        const childAssignments = assignments.filter(ch => {
+          const childCat = catsMap[ch.category_id];
+          return childCat && childCat.parent_category_id === cat.id;
+        });
+
+        if (childAssignments.length === 0) continue; // No children submitted, skip
+
+        const childTotal = childAssignments.reduce(
+          (sum, ch) => sum + (parseInt(ch.stock_allocated) || 0),
+          0
+        );
+        const parentStock = parseInt(a.stock_allocated) || 0;
+
+        if (childTotal !== parentStock) {
+          const catInfo = catsMap[a.category_id];
+          return res.status(400).json({
+            message: `Stock imbalance: Category ID ${a.category_id} has ${parentStock} units allocated, but its children total ${childTotal} units. Stock must balance exactly.`,
+            error_type: 'STOCK_IMBALANCE',
+            category_id: a.category_id,
+            parent_stock: parentStock,
+            children_total: childTotal,
+          });
+        }
+      }
+    }
+
+    // ── Save assignments in a transaction ───────────────────────────
+    await query('BEGIN');
+
+    try {
+      // Delete existing assignments for this product
+      await query(
+        'DELETE FROM product_category_assignments WHERE product_id = $1',
+        [productId]
+      );
+
+      // Insert new assignments
+      for (const a of assignments) {
+        // Get the category level
+        const catResult = await query('SELECT level FROM categories WHERE id = $1', [a.category_id]);
+        const catLevel = catResult.rows.length ? catResult.rows[0].level : 1;
+
+        await query(
+          `INSERT INTO product_category_assignments
+            (product_id, category_id, category_level, price_override, stock_allocated, is_leaf, display_order)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+          [
+            productId,
+            a.category_id,
+            catLevel,
+            a.price_override || null,
+            parseInt(a.stock_allocated) || 0,
+            a.is_leaf || false,
+            a.display_order || 0,
+          ]
+        );
+      }
+
+      await query('COMMIT');
+
+      // Return the saved assignments
+      const saved = await query(
+        `SELECT pca.*, c.category_name, c.level, c.parent_category_id, c.unit_of_measure
+         FROM product_category_assignments pca
+         JOIN categories c ON c.id = pca.category_id
+         WHERE pca.product_id = $1
+         ORDER BY c.level, c.display_order`,
+        [productId]
+      );
+
+      res.json(saved.rows);
+    } catch (err) {
+      await query('ROLLBACK');
+      throw err;
+    }
+  } catch (err) {
+    console.error('Error saving product assignments:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+/**
+ * GET /api/categories/:id/subtree
+ * Get the full subtree under a category (selection-level children for product assignment UI).
+ */
+const getSubcategoryTree = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // Get the category and all descendants using the path column
+    const parent = await query('SELECT path FROM categories WHERE id = $1', [id]);
+    if (parent.rows.length === 0) {
+      return res.status(404).json({ message: 'Category not found' });
+    }
+    const parentPath = parent.rows[0].path;
+
+    const result = await query(
+      `SELECT id, category_name, description, parent_category_id,
+              level, path, unit_of_measure, is_selection_attribute,
+              is_active, display_order
+       FROM categories
+       WHERE path LIKE $1 || '/%'
+       ORDER BY level, display_order, category_name`,
+      [parentPath]
+    );
+
+    // Build tree from these descendants
+    const tree = buildTree(result.rows, parseInt(id));
+    res.json(tree);
+  } catch (err) {
+    console.error('Error fetching subtree:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+/**
+ * GET /api/categories/by-level/:level
+ * Get all categories at a specific level.
+ */
+const getCategoriesByLevel = async (req, res) => {
+  try {
+    const { level } = req.params;
+    const result = await query(
+      `SELECT c.*, COUNT(DISTINCT p.id)::int AS product_count
+       FROM categories c
+       LEFT JOIN products p ON p.category_id = c.id AND p.deleted_at IS NULL
+       WHERE c.level = $1 AND c.is_active = true
+       GROUP BY c.id
+       ORDER BY c.display_order, c.category_name`,
+      [parseInt(level)]
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching categories by level:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
   getCategories,
   getCategoryTree,
@@ -445,4 +652,8 @@ module.exports = {
   deleteCategory,
   getListingLevel,
   setListingLevel,
+  getProductAssignments,
+  saveProductAssignments,
+  getSubcategoryTree,
+  getCategoriesByLevel,
 };
