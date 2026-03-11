@@ -187,13 +187,15 @@ const ProductsPage = () => {
   const handleEditSubmit = async (formData) => {
     setEditLoading(true);
     try {
-      await api.put(`/products/${editProduct.id}`, formData);
+      const res = await api.put(`/products/${editProduct.id}`, formData);
       toast.success('Product updated successfully');
       handleEditClose();
       fetchProducts();
       fetchStatistics();
+      return res.data;
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to update product');
+      throw error;
     } finally {
       setEditLoading(false);
     }

@@ -179,7 +179,7 @@ export const batchSaveColors = async (productId, colors) => {
           color_code: color.color_code,
           display_order: color.display_order || 0,
         });
-        savedColors.push(saved);
+        savedColors.push({ ...saved, _tempId: color.id });
       } else if (color.isModified) {
         // Update existing color
         const saved = await updateProductColor(productId, color.id, {
@@ -188,9 +188,9 @@ export const batchSaveColors = async (productId, colors) => {
           display_order: color.display_order,
           is_active: color.is_active,
         });
-        savedColors.push(saved);
+        savedColors.push({ ...saved, _tempId: color.id });
       } else {
-        savedColors.push(color);
+        savedColors.push({ ...color, _tempId: color.id });
       }
     } catch (error) {
       console.error(`Error saving color ${color.color_name}:`, error);

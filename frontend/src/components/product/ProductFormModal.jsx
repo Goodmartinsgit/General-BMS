@@ -140,14 +140,20 @@ const ProductFormModal = ({
     setEditLoading(true);
     try {
       // First, submit the main product data
-      await onSubmit(formData);
+      const response = await onSubmit(formData);
       
-      // If in edit mode and product has colors/images, save them
-      if (isEditMode && product?.id) {
+      const productId = product?.id || response?.id;
+      
+      if (productId) {
+        let updatedColorsMap = {};
+        
         // Save colors if any
         if (formData.colors && formData.colors.length > 0) {
           try {
-            await batchSaveColors(product.id, formData.colors);
+            const savedColors = await batchSaveColors(productId, formData.colors);
+            savedColors.forEach(sc => {
+              if (sc._tempId) updatedColorsMap[sc._tempId] = sc.id;
+            });
           } catch (error) {
             console.error('Error saving colors:', error);
             toast.error('Product saved but some colors failed to save');
@@ -157,7 +163,11 @@ const ProductFormModal = ({
         // Save images if any
         if (formData.images && formData.images.length > 0) {
           try {
-            await batchSaveImages(product.id, formData.images);
+            const imagesToSave = formData.images.map(img => ({
+              ...img,
+              color_id: img.color_id && updatedColorsMap[img.color_id] ? updatedColorsMap[img.color_id] : img.color_id
+            }));
+            await batchSaveImages(productId, imagesToSave);
           } catch (error) {
             console.error('Error saving images:', error);
             toast.error('Product saved but some images failed to save');

@@ -94,23 +94,27 @@ const ProductCatalog = () => {
 
   const handleCreate = async (productData) => {
     try {
-      await api.post('/products', productData);
+      const res = await api.post('/products', productData);
       toast.success('Product created');
       setShowForm(false); setSelectedProduct(null);
       fetchProducts(); fetchStats();
+      return res.data;
     } catch (e) {
       toast.error(e.response?.data?.message || 'Failed to create product');
+      throw e;
     }
   };
 
   const handleUpdate = async (productData) => {
     try {
-      await api.put(`/products/${selectedProduct.id}`, productData);
+      const res = await api.put(`/products/${selectedProduct.id}`, productData);
       toast.success('Product updated');
       setShowForm(false); setSelectedProduct(null);
       fetchProducts(); fetchStats();
+      return res.data;
     } catch (e) {
       toast.error(e.response?.data?.message || 'Failed to update product');
+      throw e;
     }
   };
 
