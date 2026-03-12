@@ -173,7 +173,7 @@ const getAllProducts = async (req, res) => {
     if (view_mode === 'compact') {
       selectFields = 'p.id, p.product_code, p.product_name, p.retail_price, p.product_images, p.is_active';
     } else if (view_mode === 'list') {
-      selectFields = 'p.id, p.product_code, p.product_name, p.product_type, p.retail_price, p.cost_price, p.reorder_level, p.is_active, p.is_featured';
+      selectFields = 'p.id, p.product_code, p.product_name, p.product_type, p.retail_price, p.cost_price, p.reorder_level, p.is_active, p.is_featured, p.product_images';
     }
 
     // Add related data for detailed view
@@ -323,6 +323,7 @@ const createProduct = async (req, res) => {
       is_online_available = false,
       short_description,
       slug: rawSlug,
+      has_colors = false,
       branch_stock_allocation = [] // Array of {branch_id, quantity, price_override}
     } = req.body;
 
@@ -358,9 +359,9 @@ const createProduct = async (req, res) => {
           model_images, specifications, commission_amount, has_variants,
           track_serial_numbers, track_batches, is_featured,
           is_retail_available, is_wholesale_available, barcode, weight_per_unit,
-          is_online_available, short_description, slug
+          is_online_available, short_description, slug, has_colors
         ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29
         ) RETURNING *
       `, [
         product_code, product_name, description, product_type,
@@ -370,7 +371,7 @@ const createProduct = async (req, res) => {
         JSON.stringify(specifications), commission_amount, has_variants,
         track_serial_numbers, track_batches, is_featured,
         is_retail_available, is_wholesale_available, barcode, weight_per_unit,
-        is_online_available, short_description || null, slug
+        is_online_available, short_description || null, slug, has_colors
       ]);
 
       const product = productResult.rows[0];
@@ -433,7 +434,7 @@ const updateProduct = async (req, res) => {
       'specifications', 'commission_amount', 'has_variants', 'track_serial_numbers',
       'track_batches', 'is_featured', 'is_retail_available', 'is_wholesale_available',
       'barcode', 'weight_per_unit',
-      'is_online_available', 'short_description', 'slug'
+      'is_online_available', 'short_description', 'slug', 'has_colors'
     ];
 
     for (const [key, value] of Object.entries(updates)) {

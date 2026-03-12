@@ -207,7 +207,8 @@ const ProductsPage = () => {
   // Get first product image
   const getImage = (product) => {
     if (product.product_images && Array.isArray(product.product_images) && product.product_images.length > 0) {
-      return product.product_images[0];
+      const firstImage = product.product_images[0];
+      return typeof firstImage === 'object' && firstImage !== null ? firstImage.image_url : firstImage;
     }
     if (product.image_url) return product.image_url;
     return null;

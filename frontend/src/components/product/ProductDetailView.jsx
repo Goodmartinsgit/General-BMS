@@ -71,9 +71,9 @@ const ProductDetailView = ({
 
   // Collect all images
   const allImages = [
-    ...(Array.isArray(product_images) ? product_images : []),
+    ...(Array.isArray(product_images) ? product_images.map(img => typeof img === 'object' && img !== null ? img.image_url : img) : []),
     image_url,
-    ...(Array.isArray(model_images) ? model_images : []),
+    ...(Array.isArray(model_images) ? model_images.map(img => typeof img === 'object' && img !== null ? img.image_url : img) : []),
   ].filter(Boolean);
   const [selectedImage, setSelectedImage] = useState(0);
   const [activeTab, setActiveTab] = useState('overview');

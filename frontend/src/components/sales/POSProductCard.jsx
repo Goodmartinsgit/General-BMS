@@ -11,10 +11,19 @@ const POSProductCard = ({ product }) => {
         product_name,
         selling_price,
         image_url,
+        product_images,
         is_featured,
         quantity_on_hand,
         has_variants
     } = product;
+
+    const displayImage = (() => {
+        if (product_images && Array.isArray(product_images) && product_images.length > 0) {
+            const firstImage = product_images[0];
+            return typeof firstImage === 'object' && firstImage !== null ? firstImage.image_url : firstImage;
+        }
+        return image_url || null;
+    })();
 
     const handleAdd = (e) => {
         e.stopPropagation();
@@ -27,9 +36,9 @@ const POSProductCard = ({ product }) => {
             className="group relative bg-theme-secondary rounded-lg border border-theme p-1.5 sm:p-2 transition-all hover:shadow-md hover:border-accent-gold/30 cursor-pointer overflow-hidden"
         >
             <div className="relative aspect-square rounded-lg overflow-hidden bg-theme-primary mb-1.5 sm:mb-3">
-                {image_url ? (
+                {displayImage ? (
                     <img
-                        src={image_url}
+                        src={displayImage}
                         alt={product_name}
                         className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
                     />

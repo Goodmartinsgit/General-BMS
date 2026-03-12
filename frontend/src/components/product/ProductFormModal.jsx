@@ -222,8 +222,21 @@ const ProductFormModal = ({
     
     setEditLoading(true);
     try {
+      // Prepare payload with synced images and color flags
+      const payload = {
+        ...formData,
+        has_colors: formData.colors && formData.colors.length > 0,
+        product_images: formData.images,
+      };
+
+      // Set primary image URL for backward compatibility
+      if (formData.images && formData.images.length > 0) {
+        const primaryImg = formData.images.find(img => img.is_primary) || formData.images[0];
+        payload.image_url = primaryImg.image_url;
+      }
+
       // First, submit the main product data
-      const response = await onSubmit(formData);
+      const response = await onSubmit(payload);
       
       const productId = product?.id || response?.id;
       

@@ -13,7 +13,7 @@ const ProductListItem = ({ product, onEdit, onDelete, onView, showActions = true
   const { formatCurrency } = useCurrency();
   const {
     product_name, product_code, product_type, cost_price,
-    reorder_level, is_active, is_featured, image_url, brand_name,
+    reorder_level, is_active, is_featured, image_url, brand_name, product_images,
   } = product;
 
   const stockQty     = product.total_stock ?? product.quantity_on_hand ?? 0;
@@ -25,13 +25,21 @@ const ProductListItem = ({ product, onEdit, onDelete, onView, showActions = true
 
   const typeBadgeCls = TYPE_BADGE[product_type] || 'bg-theme-tertiary text-theme-muted border-theme';
 
+  const displayImage = (() => {
+    if (product_images && Array.isArray(product_images) && product_images.length > 0) {
+      const firstImage = product_images[0];
+      return typeof firstImage === 'object' && firstImage !== null ? firstImage.image_url : firstImage;
+    }
+    return image_url || null;
+  })();
+
   return (
     <div className={`bg-theme-secondary border border-theme rounded-xl hover:shadow-theme-sm transition-shadow ${!is_active ? 'opacity-60' : ''} ${compact ? 'p-3' : 'p-4'}`}>
       <div className="flex items-center gap-4">
         {/* Image */}
         <div className={`flex-shrink-0 ${compact ? 'w-10 h-10' : 'w-14 h-14'} bg-theme-tertiary rounded-lg overflow-hidden`}>
-          {image_url ? (
-            <img src={image_url} alt={product_name} className="w-full h-full object-cover" />
+          {displayImage ? (
+            <img src={displayImage} alt={product_name} className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full flex items-center justify-center">
               <Package className={`${compact ? 'w-5 h-5' : 'w-7 h-7'} text-theme-muted opacity-40`} />
