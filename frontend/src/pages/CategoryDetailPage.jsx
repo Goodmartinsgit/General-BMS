@@ -15,7 +15,6 @@ const CategoryDetailPage = ({ categoryId, onClose, onUpdate }) => {
   const navigate = useNavigate();
   const [category, setCategory] = useState(null);
   const [categoryTree, setCategoryTree] = useState([]);
-  const [listingLevel, setListingLevel] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -34,14 +33,12 @@ const CategoryDetailPage = ({ categoryId, onClose, onUpdate }) => {
     setLoading(true);
     setError(null);
     try {
-      const [categoryRes, treeRes, levelRes] = await Promise.all([
+      const [categoryRes, treeRes] = await Promise.all([
         api.get(`/categories/${categoryId}`),
         api.get('/categories/tree'),
-        api.get('/categories/listing-level'),
       ]);
       setCategory(categoryRes.data);
       setCategoryTree(Array.isArray(treeRes.data) ? treeRes.data : []);
-      setListingLevel(levelRes.data?.product_listing_level || 1);
     } catch (err) {
       setError('Failed to load category details.');
       toast.error('Failed to load category details.');
@@ -97,8 +94,8 @@ const CategoryDetailPage = ({ categoryId, onClose, onUpdate }) => {
   if (!categoryId) return null;
 
   const level = category?.level || 1;
-  const isListing = level === listingLevel;
-  const isSelection = level > listingLevel;
+  const isListing = category?.is_listing_category;
+  const isSelection = category?.is_selection_attribute;
 
   return (
     <div className="fixed inset-0 z-60 flex items-center justify-center p-4" onClick={onClose}>
@@ -244,7 +241,7 @@ const CategoryDetailPage = ({ categoryId, onClose, onUpdate }) => {
               <span className="w-2 h-2 rounded-full bg-blue-500" /> Browsing
             </span>
             <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-accent-gold" /> Listing (L{listingLevel})
+              <span className="w-2 h-2 rounded-full bg-accent-gold" /> Listing
             </span>
             <span className="flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-purple-500" /> Selection
@@ -263,7 +260,6 @@ const CategoryDetailPage = ({ categoryId, onClose, onUpdate }) => {
                     <CategoryTreeNode
                       key={node.id}
                       node={node}
-                      listingLevel={listingLevel}
                       highlightId={categoryId}
                       depth={0}
                     />
@@ -309,12 +305,12 @@ const CategoryDetailPage = ({ categoryId, onClose, onUpdate }) => {
 };
 
 // ── Category Tree Node (Recursive) ──────────────────────────────────────────
-const CategoryTreeNode = ({ node, listingLevel, highlightId, depth }) => {
+const CategoryTreeNode = ({ node, highlightId, depth }) => {
   const [expanded, setExpanded] = useState(true); // Auto-expand all for full view
   const hasChildren = node.children && node.children.length > 0;
   const level = node.level || (depth + 1);
-  const isListing = level === listingLevel;
-  const isSelection = level > listingLevel;
+  const isListing = node.is_listing_category;
+  const isSelection = node.is_selection_attribute;
   const isHighlighted = node.id === highlightId;
 
   const levelColor = isListing
@@ -385,7 +381,6 @@ const CategoryTreeNode = ({ node, listingLevel, highlightId, depth }) => {
             <CategoryTreeNode
               key={child.id}
               node={child}
-              listingLevel={listingLevel}
               highlightId={highlightId}
               depth={depth + 1}
             />
