@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   Plus, Edit, Trash2, Tag, Briefcase, RefreshCw, AlertCircle,
   ChevronRight, ChevronDown, FolderTree, Layers, Settings2,
@@ -6,6 +7,7 @@ import {
 } from 'lucide-react';
 import api from '../api/axios';
 import { toast } from 'react-toastify';
+import CategoryDetailPage from './CategoryDetailPage';
 
 const inputClass =
   'w-full px-3 py-2.5 bg-theme-primary border border-theme rounded-lg text-sm text-theme-primary placeholder-theme-muted focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none transition-all';
@@ -40,6 +42,9 @@ const CategoryManagement = () => {
   const [showLevelConfig, setShowLevelConfig] = useState(false);
   const [pendingLevel, setPendingLevel] = useState(1);
   const [savingLevel, setSavingLevel] = useState(false);
+
+  // Category detail modal
+  const [selectedCategoryId, setSelectedCategoryId] = useState(null);
 
   const tab = TABS.find(t => t.key === activeTab);
 
@@ -235,6 +240,7 @@ const CategoryManagement = () => {
             onDelete={setDeleteItem}
             onAddChild={handleOpenAddChild}
             onAddRoot={handleOpenAddRoot}
+            onViewDetails={setSelectedCategoryId}
           />
         )}
       </div>
@@ -279,6 +285,15 @@ const CategoryManagement = () => {
           onSave={handleSaveListingLevel}
           onClose={() => setShowLevelConfig(false)}
           saving={savingLevel}
+        />
+      )}
+
+      {/* Category Detail Modal */}
+      {selectedCategoryId && (
+        <CategoryDetailPage
+          categoryId={selectedCategoryId}
+          onClose={() => setSelectedCategoryId(null)}
+          onUpdate={fetchAll}
         />
       )}
     </div>
@@ -331,7 +346,7 @@ const BrandsTable = ({ brands, onEdit, onDelete }) => {
 };
 
 // ── Category Tree View ──────────────────────────────────────────────────────────
-const CategoryTreeView = ({ tree, listingLevel, onEdit, onDelete, onAddChild, onAddRoot }) => {
+const CategoryTreeView = ({ tree, listingLevel, onEdit, onDelete, onAddChild, onAddRoot, onViewDetails }) => {
   if (tree.length === 0) return (
     <div className="flex flex-col items-center justify-center py-20 gap-4 text-theme-muted">
       <FolderTree size={40} className="opacity-20" />
@@ -354,14 +369,14 @@ const CategoryTreeView = ({ tree, listingLevel, onEdit, onDelete, onAddChild, on
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-purple-500" /> Selection</span>
       </div>
       {tree.map(node => (
-        <CategoryTreeNode key={node.id} node={node} listingLevel={listingLevel} depth={0} onEdit={onEdit} onDelete={onDelete} onAddChild={onAddChild} />
+        <CategoryTreeNode key={node.id} node={node} listingLevel={listingLevel} depth={0} onEdit={onEdit} onDelete={onDelete} onAddChild={onAddChild} onViewDetails={onViewDetails} />
       ))}
     </div>
   );
 };
 
 // ── Single tree node (recursive) ────────────────────────────────────────────────
-const CategoryTreeNode = ({ node, listingLevel, depth, onEdit, onDelete, onAddChild }) => {
+const CategoryTreeNode = ({ node, listingLevel, depth, onEdit, onDelete, onAddChild, onViewDetails }) => {
   const [expanded, setExpanded] = useState(depth < 2);
   const hasChildren = node.children && node.children.length > 0;
   const level = node.level || (depth + 1);
@@ -381,12 +396,16 @@ const CategoryTreeNode = ({ node, listingLevel, depth, onEdit, onDelete, onAddCh
   return (
     <div>
       <div
-        className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border ${nodeBg} transition-all hover:shadow-sm`}
+        onClick={() => onViewDetails(node.id)}
+        className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border ${nodeBg} transition-all hover:shadow-sm cursor-pointer hover:border-accent-gold/40`}
         style={{ marginLeft: depth * 24 }}
       >
         {/* Expand toggle */}
         <button
-          onClick={() => setExpanded(v => !v)}
+          onClick={(e) => {
+            e.stopPropagation();
+            setExpanded(v => !v);
+          }}
           className={`p-0.5 rounded transition-colors ${hasChildren ? 'text-theme-muted hover:text-theme-primary' : 'invisible'}`}
         >
           {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
@@ -430,30 +449,8 @@ const CategoryTreeNode = ({ node, listingLevel, depth, onEdit, onDelete, onAddCh
           </span>
         )}
 
-        {/* Actions */}
-        <div className="flex items-center gap-0.5 ml-2">
-          <button
-            onClick={() => onAddChild(node)}
-            className="p-1.5 text-theme-muted hover:text-emerald-500 hover:bg-emerald-500/10 rounded-lg transition-colors"
-            title="Add Sub-category"
-          >
-            <Plus size={13} />
-          </button>
-          <button
-            onClick={() => onEdit(node)}
-            className="p-1.5 text-theme-muted hover:text-accent-gold hover:bg-accent-gold/10 rounded-lg transition-colors"
-            title="Edit"
-          >
-            <Edit size={13} />
-          </button>
-          <button
-            onClick={() => onDelete(node)}
-            className="p-1.5 text-theme-muted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
-            title="Delete"
-          >
-            <Trash2 size={13} />
-          </button>
-        </div>
+        {/* Right arrow indicator */}
+        <ChevronRight size={14} className="text-theme-muted opacity-50" />
       </div>
 
       {/* Children */}
@@ -468,6 +465,7 @@ const CategoryTreeNode = ({ node, listingLevel, depth, onEdit, onDelete, onAddCh
               onEdit={onEdit}
               onDelete={onDelete}
               onAddChild={onAddChild}
+              onViewDetails={onViewDetails}
             />
           ))}
         </div>
