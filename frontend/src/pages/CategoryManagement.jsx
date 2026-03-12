@@ -37,8 +37,6 @@ const CategoryManagement = () => {
   const [deleteItem, setDeleteItem] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
-  const [deleting, setDeleting] = useState(false);
-
   // Category detail modal
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
 
