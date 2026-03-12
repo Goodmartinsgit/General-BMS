@@ -256,7 +256,14 @@ const createCategory = async (req, res) => {
     res.status(201).json(updated.rows[0]);
   } catch (err) {
     if (err.code === '23505') {
-      return res.status(400).json({ message: 'Category name already exists at this level' });
+      if (err.constraint === 'idx_categories_parent_name' || err.constraint === 'idx_categories_parent_slug') {
+        return res.status(400).json({ 
+          message: parent_category_id 
+            ? 'A category with this name already exists under the same parent category' 
+            : 'A category with this name already exists at the root level'
+        });
+      }
+      return res.status(400).json({ message: 'Category already exists' });
     }
     console.error('Error creating category:', err);
     res.status(500).json({ message: 'Server error' });
@@ -344,7 +351,12 @@ const updateCategory = async (req, res) => {
     res.json(updated.rows[0]);
   } catch (err) {
     if (err.code === '23505') {
-      return res.status(400).json({ message: 'Category name already exists' });
+      if (err.constraint === 'idx_categories_parent_name' || err.constraint === 'idx_categories_parent_slug') {
+        return res.status(400).json({ 
+          message: 'A category with this name already exists under the same parent category'
+        });
+      }
+      return res.status(400).json({ message: 'Category already exists' });
     }
     console.error('Error updating category:', err);
     res.status(500).json({ message: 'Server error' });
