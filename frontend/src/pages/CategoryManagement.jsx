@@ -533,6 +533,9 @@ const CategoryFormModal = ({ item, parentCategory, onClose, onSubmit, submitting
           <ToggleField label="Active" value={formData.is_active} onChange={v => setFormData(p => ({ ...p, is_active: v }))} />
           <ToggleField label="Listing Category" value={formData.is_listing_category} onChange={v => setFormData(p => ({ ...p, is_listing_category: v }))} />
         </div>
+        <p className="text-[10px] text-theme-muted italic">
+          * Enabling this will apply to the entire category level (L{newLevel}) under this branch.
+        </p>
         <ModalFooter onClose={onClose} submitting={submitting} submitLabel={isEdit ? 'Save Changes' : 'Add Category'} />
       </form>
     </ModalShell>

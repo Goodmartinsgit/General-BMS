@@ -58,6 +58,18 @@ const recalcSelectionAttributes = async () => {
  */
 const slugify = (name) =>
   name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+const syncListingLevel = async (categoryId, isListing) => {
+  const cat = await query('SELECT level, path FROM categories WHERE id = $1', [categoryId]);
+  if (cat.rows.length === 0) return;
+  const { level, path } = cat.rows[0];
+  const rootId = path.split('/')[0];
+  await query(
+    `UPDATE categories 
+     SET is_listing_category = $1 
+     WHERE level = $2 AND (path LIKE $3 || '/%' OR id = $3::int)`,
+    [isListing, level, rootId]
+  );
+};
 
 /**
  * Build a nested tree from a flat array of category rows.
@@ -234,6 +246,22 @@ const createCategory = async (req, res) => {
       'UPDATE categories SET level = $1, path = $2 WHERE id = $3',
       [level, path, newCat.id]
     );
+
+    // Sync sibling listing status if this is a listing category or if siblings are already listing
+    if (is_listing_category) {
+      await syncListingLevel(newCat.id, true);
+    } else {
+      // Check if siblings are listing levels
+      const siblings = await query(
+        `SELECT is_listing_category FROM categories 
+         WHERE parent_category_id = $1 AND id != $2 AND is_listing_category = true LIMIT 1`,
+        [parent_category_id || null, newCat.id]
+      );
+      if (siblings.rows.length > 0) {
+        await query('UPDATE categories SET is_listing_category = true WHERE id = $1', [newCat.id]);
+      }
+    }
+
     await recalcSelectionAttributes();
 
     const updated = await query('SELECT * FROM categories WHERE id = $1', [newCat.id]);
@@ -329,6 +357,11 @@ const updateCategory = async (req, res) => {
 
     // Update all descendants
     await updateDescendants(parseInt(id), level, path);
+
+    // Sync listing status across siblings at this level in the same branch
+    if (is_listing_category !== undefined) {
+      await syncListingLevel(id, is_listing_category);
+    }
 
     // Recalculate selection attributes
     await recalcSelectionAttributes();

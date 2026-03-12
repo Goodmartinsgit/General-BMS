@@ -494,7 +494,9 @@ const CategoryFormModal = ({ item, parentCategory, onClose, onSubmit, submitting
             onChange={v => setFormData(p => ({ ...p, is_listing_category: v }))}
           />
         </div>
-
+        <p className="text-[10px] text-theme-muted italic">
+          * Enabling this will apply to the entire category level (L{newLevel}) under this branch.
+        </p>
         <ModalFooter
           onClose={onClose}
           submitting={submitting}
