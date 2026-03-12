@@ -400,6 +400,7 @@ const CategoryFormModal = ({ item, parentCategory, onClose, onSubmit, submitting
     unit_of_measure: item?.unit_of_measure || '',
     parent_category_id: item?.parent_category_id || parentCategory?.id || null,
     is_active: item?.is_active !== false,
+    is_listing_category: item?.is_listing_category || false,
     display_order: item?.display_order || 0,
   });
   const [error, setError] = useState('');
@@ -481,11 +482,18 @@ const CategoryFormModal = ({ item, parentCategory, onClose, onSubmit, submitting
           />
         </div>
 
-        <ToggleField
-          label="Active"
-          value={formData.is_active}
-          onChange={v => setFormData(p => ({ ...p, is_active: v }))}
-        />
+        <div className="grid grid-cols-2 gap-4">
+          <ToggleField
+            label="Active"
+            value={formData.is_active}
+            onChange={v => setFormData(p => ({ ...p, is_active: v }))}
+          />
+          <ToggleField
+            label="Listing Category"
+            value={formData.is_listing_category}
+            onChange={v => setFormData(p => ({ ...p, is_listing_category: v }))}
+          />
+        </div>
 
         <ModalFooter
           onClose={onClose}
