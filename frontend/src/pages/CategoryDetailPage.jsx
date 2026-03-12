@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Edit, Trash2, Plus, FolderTree, Layers, Ruler,
-  Package, RefreshCw, AlertCircle, ChevronRight, ChevronDown, X
+  Package, RefreshCw, AlertCircle, X
 } from 'lucide-react';
 import api from '../api/axios';
 import { toast } from 'react-toastify';
@@ -222,7 +222,7 @@ const CategoryDetailPage = ({ categoryId, onClose, onUpdate }) => {
             </div>
             </div>
 
-            {/* Full Category Tree */}
+            {/* Full Category Tree — Visual Hierarchical Layout */}
             <div className="bg-theme-primary border border-theme rounded-xl shadow-theme-sm overflow-hidden">
               <div className="px-6 py-4 border-b border-theme">
                 <h3 className="text-base font-semibold text-theme-primary flex items-center gap-2">
@@ -234,20 +234,20 @@ const CategoryDetailPage = ({ categoryId, onClose, onUpdate }) => {
                 </p>
               </div>
 
-              <div className="p-4 space-y-1">
+              <div className="p-6">
                 {/* Legend */}
-                <div className="flex items-center gap-4 mb-4 px-2 text-[11px] text-theme-muted">
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-blue-500" /> Browsing
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-accent-gold" /> Listing
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-purple-500" /> Selection
-            </span>
-                  <span className="flex items-center gap-1">
-                    <span className="w-3 h-3 rounded bg-accent-gold/20 border-2 border-accent-gold" /> Current
+                <div className="flex items-center gap-4 mb-6 text-[11px] text-theme-muted">
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-blue-500" /> Browsing
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-accent-gold" /> Listing
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-purple-500" /> Selection
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <span className="w-4 h-4 rounded bg-accent-gold/20 border-2 border-accent-gold" /> Current
                   </span>
                 </div>
 
@@ -256,14 +256,18 @@ const CategoryDetailPage = ({ categoryId, onClose, onUpdate }) => {
                     No categories in the tree
                   </div>
                 ) : (
-                  categoryTree.map(node => (
-                    <CategoryTreeNode
-                      key={node.id}
-                      node={node}
-                      highlightId={categoryId}
-                      depth={0}
-                    />
-                  ))
+                  <div className="overflow-x-auto pb-4">
+                    <div className="inline-flex flex-col items-center min-w-full">
+                      {categoryTree.map(node => (
+                        <div key={node.id} className="mb-6 last:mb-0">
+                          <HierarchicalTreeNode
+                            node={node}
+                            highlightId={categoryId}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
@@ -304,88 +308,108 @@ const CategoryDetailPage = ({ categoryId, onClose, onUpdate }) => {
   );
 };
 
-// ── Category Tree Node (Recursive) ──────────────────────────────────────────
-const CategoryTreeNode = ({ node, highlightId, depth }) => {
-  const [expanded, setExpanded] = useState(true); // Auto-expand all for full view
+// ── Visual Hierarchical Tree Node (top-down org-chart style) ────────────────
+const HierarchicalTreeNode = ({ node, highlightId }) => {
   const hasChildren = node.children && node.children.length > 0;
-  const level = node.level || (depth + 1);
+  const level = node.level || 1;
   const isListing = node.is_listing_category;
   const isSelection = node.is_selection_attribute;
   const isHighlighted = node.id === highlightId;
 
-  const levelColor = isListing
-    ? 'bg-accent-gold/10 text-accent-gold border-accent-gold/30'
-    : isSelection
-      ? 'bg-purple-500/10 text-purple-500 border-purple-500/30'
-      : 'bg-blue-500/10 text-blue-500 border-blue-500/30';
-
-  const nodeBg = isHighlighted
-    ? 'bg-accent-gold/20 border-accent-gold ring-2 ring-accent-gold/30'
+  // Node styling
+  const borderColor = isHighlighted
+    ? 'border-accent-gold'
     : isListing
-      ? 'bg-accent-gold/5 border-accent-gold/20'
-      : 'bg-theme-primary border-theme';
+      ? 'border-accent-gold/40'
+      : isSelection
+        ? 'border-purple-500/40'
+        : 'border-blue-500/40';
+
+  const bgColor = isHighlighted
+    ? 'bg-accent-gold/15'
+    : isListing
+      ? 'bg-accent-gold/5'
+      : isSelection
+        ? 'bg-purple-500/5'
+        : 'bg-blue-500/5';
+
+  const dotColor = isListing
+    ? 'bg-accent-gold'
+    : isSelection
+      ? 'bg-purple-500'
+      : 'bg-blue-500';
+
+  const typeLabel = isListing ? 'Listing' : isSelection ? 'Selection' : 'Browse';
+
+  const connectorColor = 'var(--tree-line, rgba(148,163,184,0.35))';
 
   return (
-    <div>
+    <div className="flex flex-col items-center">
+      {/* ── Node Box ── */}
       <div
-        className={`flex items-center gap-2 px-3 py-2.5 rounded-lg border ${nodeBg} transition-all`}
-        style={{ marginLeft: depth * 24 }}
+        className={`relative px-4 py-2.5 rounded-xl border-2 ${borderColor} ${bgColor} text-center transition-all ${
+          isHighlighted ? 'ring-2 ring-accent-gold/30 shadow-lg shadow-accent-gold/10' : 'shadow-sm'
+        }`}
+        style={{ minWidth: 110 }}
       >
-        {/* Expand toggle */}
-        <button
-          onClick={(e) => {
-            e.stopPropagation();
-            setExpanded(v => !v);
-          }}
-          className={`p-0.5 rounded transition-colors ${hasChildren ? 'text-theme-muted hover:text-theme-primary' : 'invisible'}`}
-        >
-          {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-        </button>
-
-        {/* Level badge */}
-        <span className={`flex-shrink-0 px-1.5 py-0.5 text-[10px] font-bold uppercase rounded border ${levelColor}`}>
-          L{level}
-        </span>
-
-        {/* Name */}
-        <span className={`flex-1 text-sm font-medium truncate ${isHighlighted ? 'text-accent-gold font-semibold' : 'text-theme-primary'}`}>
-          {node.category_name}
-        </span>
-
-        {/* Unit of measure */}
-        {node.unit_of_measure && (
-          <span className="flex items-center gap-1 text-[11px] text-theme-muted bg-theme-tertiary px-2 py-0.5 rounded-full">
-            <Ruler size={10} /> {node.unit_of_measure}
+        <div className="flex items-center justify-center gap-1.5 mb-0.5">
+          <span className={`w-2 h-2 rounded-full flex-shrink-0 ${dotColor}`} />
+          <span
+            className={`text-xs font-semibold whitespace-nowrap ${
+              isHighlighted ? 'text-accent-gold' : 'text-theme-primary'
+            }`}
+          >
+            {node.category_name}
           </span>
-        )}
-
-        {/* Product count */}
-        {node.product_count > 0 && (
-          <span className="text-[11px] text-accent-gold bg-accent-gold/10 px-2 py-0.5 rounded-full font-medium">
-            {node.product_count}
-          </span>
-        )}
-
-        {/* Children count */}
-        {hasChildren && (
-          <span className="text-[11px] text-theme-muted bg-theme-tertiary px-2 py-0.5 rounded-full">
-            {node.children.length}
-          </span>
-        )}
+        </div>
+        <div className="text-[9px] text-theme-muted uppercase font-semibold tracking-wide">
+          L{level} &middot; {typeLabel}
+        </div>
+        {/* Metadata pills */}
+        <div className="flex items-center justify-center gap-1 mt-1.5">
+          {node.product_count > 0 && (
+            <span className="text-[9px] text-accent-gold bg-accent-gold/10 px-1.5 py-px rounded-full font-medium">
+              {node.product_count} prod
+            </span>
+          )}
+          {node.unit_of_measure && (
+            <span className="text-[9px] text-theme-muted bg-theme-tertiary px-1.5 py-px rounded-full">
+              {node.unit_of_measure}
+            </span>
+          )}
+        </div>
       </div>
 
-      {/* Children */}
-      {expanded && hasChildren && (
-        <div className="mt-1 space-y-1">
-          {node.children.map(child => (
-            <CategoryTreeNode
-              key={child.id}
-              node={child}
-              highlightId={highlightId}
-              depth={depth + 1}
-            />
-          ))}
-        </div>
+      {/* ── Connector lines to children ── */}
+      {hasChildren && (
+        <>
+          {/* Vertical line down from parent */}
+          <div className="w-px h-6" style={{ backgroundColor: connectorColor }} />
+
+          {/* Children row */}
+          <div className="relative flex items-start">
+            {/* Horizontal line spanning from first child center to last child center */}
+            {node.children.length > 1 && (
+              <div
+                className="absolute top-0 h-px"
+                style={{
+                  backgroundColor: connectorColor,
+                  left: `calc(${100 / (node.children.length * 2)}% + 0px)`,
+                  right: `calc(${100 / (node.children.length * 2)}% + 0px)`,
+                }}
+              />
+            )}
+
+            {/* Child nodes */}
+            {node.children.map((child) => (
+              <div key={child.id} className="flex flex-col items-center px-3">
+                {/* Vertical stub up from horizontal line to child */}
+                <div className="w-px h-6" style={{ backgroundColor: connectorColor }} />
+                <HierarchicalTreeNode node={child} highlightId={highlightId} />
+              </div>
+            ))}
+          </div>
+        </>
       )}
     </div>
   );
