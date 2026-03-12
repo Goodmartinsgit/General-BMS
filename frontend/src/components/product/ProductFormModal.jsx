@@ -91,22 +91,46 @@ const ProductFormModal = ({
     fetchListingData();
   }, []);
   
-  // Fetch color inventory when editing a product
+  // Fetch color inventory and existing colors/images when editing a product
   useEffect(() => {
-    const fetchColorInventory = async () => {
+    const fetchProductData = async () => {
       if (!product?.id || !isOpen) return;
       setLoadingColorInventory(true);
       try {
-        const res = await api.get(`/products/${product.id}/color-inventory`);
-        setColorInventory(Array.isArray(res.data) ? res.data : []);
+        const [inventoryRes, colorsRes, imagesRes] = await Promise.all([
+          api.get(`/products/${product.id}/color-inventory`),
+          api.get(`/products/${product.id}/colors`),
+          api.get(`/products/${product.id}/images`),
+        ]);
+        
+        setColorInventory(Array.isArray(inventoryRes.data) ? inventoryRes.data : []);
+        
+        // Load existing colors into form
+        const existingColors = Array.isArray(colorsRes.data) ? colorsRes.data : [];
+        if (existingColors.length > 0) {
+          setFormData(prev => ({
+            ...prev,
+            colors: existingColors,
+            has_colors: true,
+          }));
+        }
+        
+        // Load existing images into form
+        const existingImages = Array.isArray(imagesRes.data) ? imagesRes.data : [];
+        if (existingImages.length > 0) {
+          setFormData(prev => ({
+            ...prev,
+            images: existingImages,
+          }));
+        }
       } catch (error) {
-        console.error('Failed to load color inventory:', error);
+        console.error('Failed to load product data:', error);
         setColorInventory([]);
       } finally {
         setLoadingColorInventory(false);
       }
     };
-    fetchColorInventory();
+    fetchProductData();
   }, [product?.id, isOpen]);
 
   useEffect(() => {
