@@ -24,7 +24,6 @@ const CategoryManagement = () => {
   const [activeTab, setActiveTab] = useState('categories');
   const [brands, setBrands] = useState([]);
   const [categoryTree, setCategoryTree] = useState([]);
-  const [listingLevel, setListingLevel] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -38,10 +37,7 @@ const CategoryManagement = () => {
   const [deleteItem, setDeleteItem] = useState(null);
   const [deleting, setDeleting] = useState(false);
 
-  // Listing level config
-  const [showLevelConfig, setShowLevelConfig] = useState(false);
-  const [pendingLevel, setPendingLevel] = useState(1);
-  const [savingLevel, setSavingLevel] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // Category detail modal
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
@@ -52,15 +48,12 @@ const CategoryManagement = () => {
     setLoading(true);
     setError(null);
     try {
-      const [brandsRes, treeRes, levelsRes] = await Promise.all([
+      const [brandsRes, treeRes] = await Promise.all([
         api.get('/products/brands'),
         api.get('/categories/tree'),
-        api.get('/categories/listing-level'),
       ]);
       setBrands(Array.isArray(brandsRes.data) ? brandsRes.data : []);
       setCategoryTree(Array.isArray(treeRes.data) ? treeRes.data : []);
-      setListingLevel(levelsRes.data?.product_listing_level || 1);
-      setPendingLevel(levelsRes.data?.product_listing_level || 1);
     } catch {
       setError('Failed to load data.');
     } finally {
@@ -129,20 +122,6 @@ const CategoryManagement = () => {
     }
   };
 
-  const handleSaveListingLevel = async () => {
-    setSavingLevel(true);
-    try {
-      await api.put('/categories/listing-level', { level: pendingLevel });
-      setListingLevel(pendingLevel);
-      setShowLevelConfig(false);
-      toast.success(`Product listing level set to Level ${pendingLevel}`);
-      fetchAll();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to update listing level.');
-    } finally {
-      setSavingLevel(false);
-    }
-  };
 
   const handleOpenAddRoot = () => {
     setEditItem(null);
@@ -160,15 +139,6 @@ const CategoryManagement = () => {
     setShowModal(true);
   };
 
-  // Compute max level for listing level picker
-  const getMaxLevel = (nodes, max = 0) => {
-    for (const n of nodes) {
-      if ((n.level || 1) > max) max = n.level || 1;
-      if (n.children?.length) max = getMaxLevel(n.children, max);
-    }
-    return max;
-  };
-  const maxLevel = Math.max(getMaxLevel(categoryTree), 1);
 
   return (
     <div className="space-y-6 max-w-5xl mx-auto pb-10">
@@ -179,15 +149,6 @@ const CategoryManagement = () => {
           <p className="text-sm text-theme-muted mt-0.5">Manage product brands and hierarchical categories</p>
         </div>
         <div className="flex items-center gap-2">
-          {activeTab === 'categories' && (
-            <button
-              onClick={() => setShowLevelConfig(true)}
-              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-theme-secondary bg-theme-primary border border-theme rounded-lg hover:bg-theme-tertiary transition-colors"
-            >
-              <Settings2 size={14} />
-              Listing Level: <span className="font-bold text-accent-gold">L{listingLevel}</span>
-            </button>
-          )}
           <button
             onClick={activeTab === 'brands' ? () => { setEditItem(null); setShowModal(true); } : handleOpenAddRoot}
             className="flex items-center gap-2 px-4 py-2 bg-accent-gold text-white rounded-lg text-sm font-semibold hover:bg-yellow-600 transition-colors shadow-sm"
@@ -235,7 +196,6 @@ const CategoryManagement = () => {
         ) : (
           <CategoryTreeView
             tree={categoryTree}
-            listingLevel={listingLevel}
             onEdit={handleOpenEdit}
             onDelete={setDeleteItem}
             onAddChild={handleOpenAddChild}
@@ -276,17 +236,6 @@ const CategoryManagement = () => {
         />
       )}
 
-      {/* Listing Level Config Modal */}
-      {showLevelConfig && (
-        <ListingLevelModal
-          pendingLevel={pendingLevel}
-          setPendingLevel={setPendingLevel}
-          maxLevel={maxLevel}
-          onSave={handleSaveListingLevel}
-          onClose={() => setShowLevelConfig(false)}
-          saving={savingLevel}
-        />
-      )}
 
       {/* Category Detail Modal */}
       {selectedCategoryId && (
@@ -346,7 +295,7 @@ const BrandsTable = ({ brands, onEdit, onDelete }) => {
 };
 
 // ── Category Tree View ──────────────────────────────────────────────────────────
-const CategoryTreeView = ({ tree, listingLevel, onEdit, onDelete, onAddChild, onAddRoot, onViewDetails }) => {
+const CategoryTreeView = ({ tree, onEdit, onDelete, onAddChild, onAddRoot, onViewDetails }) => {
   if (tree.length === 0) return (
     <div className="flex flex-col items-center justify-center py-20 gap-4 text-theme-muted">
       <FolderTree size={40} className="opacity-20" />
@@ -365,23 +314,23 @@ const CategoryTreeView = ({ tree, listingLevel, onEdit, onDelete, onAddChild, on
       {/* Legend */}
       <div className="flex items-center gap-4 mb-4 px-2 text-[11px] text-theme-muted">
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500" /> Browsing</span>
-        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-accent-gold" /> Listing (L{listingLevel})</span>
+        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-accent-gold" /> Listing</span>
         <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-purple-500" /> Selection</span>
       </div>
       {tree.map(node => (
-        <CategoryTreeNode key={node.id} node={node} listingLevel={listingLevel} depth={0} onEdit={onEdit} onDelete={onDelete} onAddChild={onAddChild} onViewDetails={onViewDetails} />
+        <CategoryTreeNode key={node.id} node={node} depth={0} onEdit={onEdit} onDelete={onDelete} onAddChild={onAddChild} onViewDetails={onViewDetails} />
       ))}
     </div>
   );
 };
 
 // ── Single tree node (recursive) ────────────────────────────────────────────────
-const CategoryTreeNode = ({ node, listingLevel, depth, onEdit, onDelete, onAddChild, onViewDetails }) => {
+const CategoryTreeNode = ({ node, depth, onEdit, onDelete, onAddChild, onViewDetails }) => {
   const [expanded, setExpanded] = useState(depth < 2);
   const hasChildren = node.children && node.children.length > 0;
   const level = node.level || (depth + 1);
-  const isListing = level === listingLevel;
-  const isSelection = level > listingLevel;
+  const isListing = node.is_listing_category;
+  const isSelection = node.is_selection_attribute;
 
   const levelColor = isListing
     ? 'bg-accent-gold/10 text-accent-gold border-accent-gold/30'
@@ -460,7 +409,6 @@ const CategoryTreeNode = ({ node, listingLevel, depth, onEdit, onDelete, onAddCh
             <CategoryTreeNode
               key={child.id}
               node={child}
-              listingLevel={listingLevel}
               depth={depth + 1}
               onEdit={onEdit}
               onDelete={onDelete}
@@ -523,6 +471,7 @@ const CategoryFormModal = ({ item, parentCategory, onClose, onSubmit, submitting
     unit_of_measure: item?.unit_of_measure || '',
     parent_category_id: item?.parent_category_id || parentCategory?.id || null,
     is_active: item?.is_active !== false,
+    is_listing_category: item?.is_listing_category || false,
     display_order: item?.display_order || 0,
   });
   const [error, setError] = useState('');
@@ -582,58 +531,16 @@ const CategoryFormModal = ({ item, parentCategory, onClose, onSubmit, submitting
             className={inputClass} placeholder="0" />
         </div>
 
-        <ToggleField label="Active" value={formData.is_active} onChange={v => setFormData(p => ({ ...p, is_active: v }))} />
+        <div className="grid grid-cols-2 gap-4">
+          <ToggleField label="Active" value={formData.is_active} onChange={v => setFormData(p => ({ ...p, is_active: v }))} />
+          <ToggleField label="Listing Category" value={formData.is_listing_category} onChange={v => setFormData(p => ({ ...p, is_listing_category: v }))} />
+        </div>
         <ModalFooter onClose={onClose} submitting={submitting} submitLabel={isEdit ? 'Save Changes' : 'Add Category'} />
       </form>
     </ModalShell>
   );
 };
 
-// ── Listing Level Config Modal ──────────────────────────────────────────────────
-const ListingLevelModal = ({ pendingLevel, setPendingLevel, maxLevel, onSave, onClose, saving }) => (
-  <ModalShell title="Product Listing Level" onClose={onClose}>
-    <div className="p-5 space-y-4">
-      <p className="text-sm text-theme-muted">
-        Set which category tree level is used for <strong className="text-theme-primary">product listings</strong>.
-        Levels above become browsing categories. Levels below become selection attributes (size, color, etc.).
-      </p>
-
-      <div className="space-y-2">
-        {Array.from({ length: Math.max(maxLevel, 3) }, (_, i) => i + 1).map(lvl => (
-          <button
-            key={lvl}
-            onClick={() => setPendingLevel(lvl)}
-            className={`w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-all ${
-              pendingLevel === lvl
-                ? 'bg-accent-gold/10 border-accent-gold/40 ring-2 ring-accent-gold/20'
-                : 'bg-theme-primary border-theme hover:border-accent-gold/20'
-            }`}
-          >
-            <span className="flex items-center gap-3">
-              <span className={`px-2 py-0.5 text-xs font-bold rounded ${
-                pendingLevel === lvl ? 'bg-accent-gold text-white' : 'bg-theme-tertiary text-theme-muted'
-              }`}>
-                L{lvl}
-              </span>
-              <span className="text-sm font-medium text-theme-primary">Level {lvl}</span>
-            </span>
-            <span className="text-[11px] text-theme-muted">
-              {lvl < pendingLevel ? 'Browsing' : lvl === pendingLevel ? '★ Listing' : 'Selection'}
-            </span>
-          </button>
-        ))}
-      </div>
-
-      <div className="bg-theme-primary border border-theme rounded-lg p-3 text-[11px] text-theme-muted space-y-1">
-        <p><strong className="text-blue-500">Browsing</strong> (L1–L{Math.max(pendingLevel - 1, 0)}): Used for navigation and filtering</p>
-        <p><strong className="text-accent-gold">Listing</strong> (L{pendingLevel}): Products are listed here with prices</p>
-        <p><strong className="text-purple-500">Selection</strong> (L{pendingLevel + 1}+): Attribute pickers (size, color, etc.)</p>
-      </div>
-
-      <ModalFooter onClose={onClose} submitting={saving} submitLabel="Save Listing Level" />
-    </div>
-  </ModalShell>
-);
 
 // ── Delete Confirm Dialog ───────────────────────────────────────────────────────
 const DeleteConfirmDialog = ({ item, tab, onClose, onConfirm, deleting }) => (

@@ -41,18 +41,16 @@ const updateDescendants = async (parentId, parentLevel, parentPath) => {
   }
 };
 
-/**
- * Recalculate is_selection_attribute across all categories based on product_listing_level.
- */
 const recalcSelectionAttributes = async () => {
-  const setting = await query(
-    "SELECT setting_value FROM settings WHERE setting_key = 'product_listing_level'"
-  );
-  const listingLevel = setting.rows.length ? parseInt(setting.rows[0].setting_value) : 1;
-  await query(
-    'UPDATE categories SET is_selection_attribute = (level > $1)',
-    [listingLevel]
-  );
+  await query(`
+    UPDATE categories c
+    SET is_selection_attribute = EXISTS (
+      SELECT 1 FROM categories anc
+      WHERE (c.path LIKE anc.path || '/%')
+        AND anc.id != c.id
+        AND anc.is_listing_category = true
+    )
+  `);
 };
 
 /**
@@ -87,7 +85,7 @@ const getCategories = async (req, res) => {
     const result = await query(
       `SELECT c.id, c.category_name, c.description, c.parent_category_id,
               c.level, c.path, c.slug, c.unit_of_measure,
-              c.is_selection_attribute, c.is_active, c.display_order,
+              c.is_selection_attribute, c.is_listing_category, c.is_active, c.display_order,
               c.icon, c.image_url, c.category_type,
               c.created_at, c.updated_at,
               COUNT(DISTINCT p.id)::int AS product_count,
@@ -117,7 +115,7 @@ const getCategoryTree = async (req, res) => {
     const result = await query(
       `SELECT c.id, c.category_name, c.description, c.parent_category_id,
               c.level, c.path, c.slug, c.unit_of_measure,
-              c.is_selection_attribute, c.is_active, c.display_order,
+              c.is_selection_attribute, c.is_listing_category, c.is_active, c.display_order,
               c.icon, c.image_url,
               COUNT(DISTINCT p.id)::int AS product_count
        FROM categories c
@@ -132,10 +130,6 @@ const getCategoryTree = async (req, res) => {
   }
 };
 
-/**
- * GET /api/categories/levels
- * Returns all distinct levels with their category counts.
- */
 const getCategoryLevels = async (req, res) => {
   try {
     const result = await query(
@@ -146,14 +140,9 @@ const getCategoryLevels = async (req, res) => {
        ORDER BY level`
     );
 
-    const setting = await query(
-      "SELECT setting_value FROM settings WHERE setting_key = 'product_listing_level'"
-    );
-    const listingLevel = setting.rows.length ? parseInt(setting.rows[0].setting_value) : 1;
-
     res.json({
       levels: result.rows,
-      product_listing_level: listingLevel,
+      product_listing_level: 1, // Kept for backwards compatibility
     });
   } catch (err) {
     console.error('Error fetching category levels:', err);
@@ -207,7 +196,7 @@ const createCategory = async (req, res) => {
   try {
     const {
       category_name, description, parent_category_id,
-      unit_of_measure, display_order, icon, image_url,
+      unit_of_measure, display_order, icon, image_url, is_listing_category
     } = req.body;
 
     if (!category_name?.trim()) {
@@ -220,8 +209,8 @@ const createCategory = async (req, res) => {
     const result = await query(
       `INSERT INTO categories
         (category_name, description, parent_category_id, slug,
-         unit_of_measure, display_order, icon, image_url)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+         unit_of_measure, display_order, icon, image_url, is_listing_category)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING *`,
       [
         category_name.trim(),
@@ -232,6 +221,7 @@ const createCategory = async (req, res) => {
         display_order || 0,
         icon || null,
         image_url || null,
+        is_listing_category || false,
       ]
     );
 
@@ -240,17 +230,11 @@ const createCategory = async (req, res) => {
     // Compute level and path
     const { level, path } = await computeLevelAndPath(parent_category_id, newCat.id);
 
-    // Determine if this is a selection attribute
-    const setting = await query(
-      "SELECT setting_value FROM settings WHERE setting_key = 'product_listing_level'"
-    );
-    const listingLevel = setting.rows.length ? parseInt(setting.rows[0].setting_value) : 1;
-    const isSelection = level > listingLevel;
-
     await query(
-      'UPDATE categories SET level = $1, path = $2, is_selection_attribute = $3 WHERE id = $4',
-      [level, path, isSelection, newCat.id]
+      'UPDATE categories SET level = $1, path = $2 WHERE id = $3',
+      [level, path, newCat.id]
     );
+    await recalcSelectionAttributes();
 
     const updated = await query('SELECT * FROM categories WHERE id = $1', [newCat.id]);
     res.status(201).json(updated.rows[0]);
@@ -279,7 +263,7 @@ const updateCategory = async (req, res) => {
     const { id } = req.params;
     const {
       category_name, description, parent_category_id,
-      unit_of_measure, is_active, display_order, icon, image_url,
+      unit_of_measure, is_active, display_order, icon, image_url, is_listing_category
     } = req.body;
 
     // Check if reparenting would create a cycle
@@ -311,8 +295,9 @@ const updateCategory = async (req, res) => {
          display_order = COALESCE($7, display_order),
          icon = COALESCE($8, icon),
          image_url = COALESCE($9, image_url),
+         is_listing_category = COALESCE($10, is_listing_category),
          updated_at = NOW()
-       WHERE id = $10 RETURNING *`,
+       WHERE id = $11 RETURNING *`,
       [
         category_name?.trim() || null,
         description ?? null,
@@ -323,6 +308,7 @@ const updateCategory = async (req, res) => {
         display_order ?? null,
         icon || null,
         image_url || null,
+        is_listing_category ?? null,
         id,
       ]
     );
@@ -560,13 +546,15 @@ const saveProductAssignments = async (req, res) => {
 
         await query(
           `INSERT INTO product_category_assignments
-            (product_id, category_id, category_level, price_override, stock_allocated, is_leaf, display_order)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+            (product_id, category_id, category_level, price_override, cost_price_override, image_url, stock_allocated, is_leaf, display_order)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
           [
             productId,
             a.category_id,
             catLevel,
             a.price_override || null,
+            a.cost_price_override || null,
+            a.image_url || null,
             parseInt(a.stock_allocated) || 0,
             a.is_leaf || false,
             a.display_order || 0,
@@ -614,7 +602,7 @@ const getSubcategoryTree = async (req, res) => {
 
     const result = await query(
       `SELECT id, category_name, description, parent_category_id,
-              level, path, unit_of_measure, is_selection_attribute,
+              level, path, unit_of_measure, is_selection_attribute, is_listing_category,
               is_active, display_order
        FROM categories
        WHERE path LIKE $1 || '/%'

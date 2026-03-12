@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react';
-import { X, Package, Tag, DollarSign, Database, Plus, Check, RefreshCw, Globe, Layers } from 'lucide-react';
+import { X, Package, Tag, DollarSign, Database, Plus, Check, RefreshCw, Globe, Layers, AlertCircle } from 'lucide-react';
 import Modal from '../ui/Modal';
 import CloudinaryUpload from '../common/CloudinaryUpload';
 import ProductColorManager from './ProductColorManager';
@@ -60,36 +59,29 @@ const ProductFormModal = ({
   const [errors, setErrors] = useState({});
   const [newTag, setNewTag] = useState('');
 
-  // Hierarchical category assignments
+  const [allCategoriesList, setAllCategoriesList] = useState([]);
   const [listingCategories, setListingCategories] = useState([]);
   const [categoryAssignments, setCategoryAssignments] = useState([]);
   const [assignmentErrors, setAssignmentErrors] = useState({});
-  const [listingLevel, setListingLevel] = useState(1);
   
   // Color inventory data
   const [colorInventory, setColorInventory] = useState([]);
   const [loadingColorInventory, setLoadingColorInventory] = useState(false);
 
-  // Fetch listing-level categories and color inventory
+  // Fetch all active categories
   useEffect(() => {
-    const fetchListingData = async () => {
+    const fetchCats = async () => {
       try {
-        const [levelRes, catsRes] = await Promise.all([
-          api.get('/categories/listing-level'),
-          api.get('/categories'),
-        ]);
-        const lvl = levelRes.data?.product_listing_level || 1;
-        setListingLevel(lvl);
-        // Filter categories at listing level for the dropdown
+        const catsRes = await api.get('/categories');
         const allCats = Array.isArray(catsRes.data) ? catsRes.data : [];
-        setListingCategories(allCats.filter(c => c.level === lvl && c.is_active));
+        setAllCategoriesList(allCats.filter(c => c.is_active));
       } catch {
-        // Fallback: use passed categories
-        setListingCategories(categories);
+        setAllCategoriesList(categories.filter(c => c.is_active !== false));
       }
     };
-    fetchListingData();
-  }, []);
+    fetchCats();
+  }, [categories]);
+
   
   // Fetch color inventory and existing colors/images when editing a product
   useEffect(() => {
@@ -202,17 +194,29 @@ const ProductFormModal = ({
     }
   };
 
+  const selectedCatObj = allCategoriesList.find(c => c.id === parseInt(formData.category_id));
+  const isListingSelected = selectedCatObj?.is_listing_category;
+  const hasSubcategoryPricing = categoryAssignments.some(a => parseFloat(a.price_override) > 0 || parseFloat(a.cost_price_override) > 0);
+
   const validate = () => {
     const newErrors = {};
     if (!formData.product_name.trim()) newErrors.product_name = 'Product name is required';
-    if (!formData.retail_price || parseFloat(formData.retail_price) <= 0)
-      newErrors.retail_price = 'Valid selling price is required';
+    if (!formData.retail_price || parseFloat(formData.retail_price) <= 0) {
+      if (!isListingSelected && !hasSubcategoryPricing) {
+        newErrors.retail_price = 'Valid selling price is required';
+      }
+    }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async () => {
-    if (!validate()) return;
+    if (!validate()) {
+      if (errors.retail_price && document.querySelector('.pricing-section')) {
+        document.querySelector('.pricing-section').scrollIntoView({ behavior: 'smooth' });
+      }
+      return;
+    }
 
     // Block save if stock assignments are imbalanced
     if (Object.keys(assignmentErrors).length > 0) {
@@ -222,9 +226,21 @@ const ProductFormModal = ({
     
     setEditLoading(true);
     try {
+      let mainRetailPrice = formData.retail_price;
+      let mainCostPrice = formData.cost_price;
+
+      if (hasSubcategoryPricing) {
+        const firstPriced = categoryAssignments.find(a => parseFloat(a.price_override) > 0);
+        const firstCost = categoryAssignments.find(a => parseFloat(a.cost_price_override) > 0);
+        if (!mainRetailPrice && firstPriced) mainRetailPrice = firstPriced.price_override;
+        if (!mainCostPrice && firstCost) mainCostPrice = firstCost.cost_price_override;
+      }
+
       // Prepare payload with synced images and color flags
       const payload = {
         ...formData,
+        retail_price: mainRetailPrice || 0,
+        cost_price: mainCostPrice || 0,
         has_colors: formData.colors && formData.colors.length > 0,
         product_images: formData.images,
       };
@@ -238,9 +254,13 @@ const ProductFormModal = ({
       // First, submit the main product data
       const response = await onSubmit(payload);
       
-      const productId = product?.id || response?.id;
+      const isMultiple = response?.multiple;
+      const createdProducts = isMultiple ? response.products : [product || response];
       
-      if (productId) {
+      for (const p of createdProducts) {
+        const productId = p?.id;
+        if (!productId) continue;
+
         let updatedColorsMap = {};
         
         // Save colors if any
@@ -276,16 +296,33 @@ const ProductFormModal = ({
           }
         }
 
-        // Save category assignments (hierarchical stock/price)
+        // Save category assignments 
         if (categoryAssignments && categoryAssignments.length > 0) {
           try {
-            await api.post(`/categories/assignments/${productId}`, {
-              assignments: categoryAssignments,
-            });
+            let validAssignments = categoryAssignments;
+            if (isMultiple) {
+              const isDescendant = (childId, ancestorId, categoriesList) => {
+                if (childId === ancestorId) return true;
+                const child = categoriesList.find(c => c.id === childId);
+                if (!child || !child.parent_category_id) return false;
+                return isDescendant(child.parent_category_id, ancestorId, categoriesList);
+              };
+
+              const thisProdCat = allCategoriesList.find(c => c.id === p.category_id);
+              if (thisProdCat) {
+                validAssignments = categoryAssignments.filter(a => 
+                  isDescendant(a.category_id, p.category_id, allCategoriesList)
+                );
+              }
+            }
+            if (validAssignments.length > 0) {
+              await api.post(`/categories/assignments/${productId}`, {
+                assignments: validAssignments,
+              });
+            }
           } catch (error) {
             console.error('Error saving category assignments:', error);
-            const msg = error.response?.data?.message || 'Failed to save category stock allocation';
-            toast.error(msg);
+            toast.error(error.response?.data?.message || 'Failed to save product category assignments');
           }
         }
       }
@@ -421,7 +458,7 @@ const ProductFormModal = ({
               <label className={labelClass}>
                 <span className="flex items-center gap-1">
                   <Layers size={12} />
-                  Category (Level {listingLevel})
+                  Category
                 </span>
               </label>
               <select
@@ -430,14 +467,26 @@ const ProductFormModal = ({
                 className={inputClass}
               >
                 <option value="">Select Category</option>
-                {(listingCategories.length > 0 ? listingCategories : categories).map((c) => (
+                {allCategoriesList.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.parent_category_id ? '↳ ' : ''}{c.category_name}
+                    {c.parent_category_id ? '↳ ' : ''}{c.category_name} {c.is_listing_category ? ' (Listing)' : ''}
                   </option>
                 ))}
               </select>
             </div>
           </div>
+
+          {isListingSelected && (
+            <div className="flex items-start gap-3 p-3 mt-4 bg-blue-500/10 border border-blue-500/20 rounded-lg text-blue-400">
+              <AlertCircle size={16} className="mt-0.5 shrink-0" />
+              <div className="text-sm">
+                <p className="font-semibold">Multiple Products Generation</p>
+                <p className="opacity-90 mt-0.5">
+                  The selected category is a Listing Category. When you submit, a separate product will automatically be generated for each of its children using this template.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Color Inventory Display (Read-only when editing) */}
           {isEditMode && colorInventory.length > 0 && (
@@ -506,8 +555,9 @@ const ProductFormModal = ({
         </div>
 
         {/* Pricing Section */}
-        <div className="space-y-4">
-          <h3 className={sectionHeadClass}>Pricing</h3>
+        {!hasSubcategoryPricing && (
+          <div className="space-y-4 pricing-section">
+            <h3 className={sectionHeadClass}>Pricing</h3>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
@@ -554,6 +604,7 @@ const ProductFormModal = ({
             </div>
           )}
         </div>
+        )}
 
         {/* Inventory Section */}
         <div className="space-y-4">

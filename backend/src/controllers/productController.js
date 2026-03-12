@@ -341,68 +341,109 @@ const createProduct = async (req, res) => {
     // Generate product code
     const product_code = await generateProductCode(product_type);
 
-    // Auto-generate slug from product name if not provided
-    const slug = rawSlug ||
+    // Auto-generate slug from product name if not provided (base logic)
+    const baseSlug = rawSlug ||
       product_name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-') +
       '-' + Date.now();
+
+    // Check if category is a listing category
+    const catCheck = await query(`SELECT is_listing_category FROM categories WHERE id = $1`, [category_id]);
+    const isListingCategory = catCheck.rows[0]?.is_listing_category;
 
     // Begin transaction
     await query('BEGIN');
 
     try {
-      // Insert product
-      const productResult = await query(`
-        INSERT INTO products (
-          product_code, product_name, description, product_type,
-          category_id, brand_id, base_unit, retail_price, wholesale_base_price,
-          cost_price, tax_rate, reorder_level, max_stock_level, product_images,
-          model_images, specifications, commission_amount, has_variants,
+      let productsToCreate = [];
+
+      if (isListingCategory) {
+        // Fetch direct children
+        const childrenRes = await query(`SELECT id, category_name FROM categories WHERE parent_category_id = $1 AND is_active = true`, [category_id]);
+        if (childrenRes.rows.length === 0) {
+          // Fallback if no children exist
+          productsToCreate.push({
+            name: product_name, catId: category_id, slug: baseSlug, code: product_code
+          });
+        } else {
+          for (let i = 0; i < childrenRes.rows.length; i++) {
+            const child = childrenRes.rows[i];
+            const childCode = `${product_code}-${i + 1}`;
+            productsToCreate.push({
+              name: `${product_name} (${child.category_name})`,
+              catId: child.id,
+              slug: `${baseSlug}-${child.id}`,
+              code: childCode
+            });
+          }
+        }
+      } else {
+        productsToCreate.push({
+          name: product_name, catId: category_id, slug: baseSlug, code: product_code
+        });
+      }
+
+      const createdProducts = [];
+
+      for (const p of productsToCreate) {
+        // Insert product
+        const productResult = await query(`
+          INSERT INTO products (
+            product_code, product_name, description, product_type,
+            category_id, brand_id, base_unit, retail_price, wholesale_base_price,
+            cost_price, tax_rate, reorder_level, max_stock_level, product_images,
+            model_images, specifications, commission_amount, has_variants,
+            track_serial_numbers, track_batches, is_featured,
+            is_retail_available, is_wholesale_available, barcode, weight_per_unit,
+            is_online_available, short_description, slug, has_colors
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29
+          ) RETURNING *
+        `, [
+          p.code, p.name, description, product_type,
+          p.catId, brand_id, base_unit, retail_price, wholesale_base_price,
+          cost_price, tax_rate, reorder_level, max_stock_level,
+          JSON.stringify(product_images), JSON.stringify(model_images),
+          JSON.stringify(specifications), commission_amount, has_variants,
           track_serial_numbers, track_batches, is_featured,
           is_retail_available, is_wholesale_available, barcode, weight_per_unit,
-          is_online_available, short_description, slug, has_colors
-        ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29
-        ) RETURNING *
-      `, [
-        product_code, product_name, description, product_type,
-        category_id, brand_id, base_unit, retail_price, wholesale_base_price,
-        cost_price, tax_rate, reorder_level, max_stock_level,
-        JSON.stringify(product_images), JSON.stringify(model_images),
-        JSON.stringify(specifications), commission_amount, has_variants,
-        track_serial_numbers, track_batches, is_featured,
-        is_retail_available, is_wholesale_available, barcode, weight_per_unit,
-        is_online_available, short_description || null, slug, has_colors
-      ]);
+          is_online_available, short_description || null, p.slug, has_colors
+        ]);
 
-      const product = productResult.rows[0];
+        const product = productResult.rows[0];
+        createdProducts.push(product);
 
-      // Allocate stock to branches if provided
-      if (branch_stock_allocation && branch_stock_allocation.length > 0) {
-        for (const allocation of branch_stock_allocation) {
-          await query(`
-            INSERT INTO inventory (product_id, branch_id, quantity_on_hand, branch_price_override)
-            VALUES ($1, $2, $3, $4)
-            ON CONFLICT (product_id, branch_id)
-            DO UPDATE SET
-              quantity_on_hand = inventory.quantity_on_hand + EXCLUDED.quantity_on_hand,
-              branch_price_override = COALESCE(EXCLUDED.branch_price_override, inventory.branch_price_override)
-          `, [product.id, allocation.branch_id, allocation.quantity || 0, allocation.price_override]);
-
-          // Log stock movement
-          if (allocation.quantity > 0) {
+        // Allocate stock to branches if provided
+        if (branch_stock_allocation && branch_stock_allocation.length > 0) {
+          for (const allocation of branch_stock_allocation) {
             await query(`
-              INSERT INTO stock_movements (
-                product_id, branch_id, movement_type, quantity,
-                quantity_before, quantity_after, reference_type, notes
-              ) VALUES ($1, $2, 'receipt', $3, 0, $3, 'initial_stock', 'Initial stock allocation')
-            `, [product.id, allocation.branch_id, allocation.quantity]);
+              INSERT INTO inventory (product_id, branch_id, quantity_on_hand, branch_price_override)
+              VALUES ($1, $2, $3, $4)
+              ON CONFLICT (product_id, branch_id)
+              DO UPDATE SET
+                quantity_on_hand = inventory.quantity_on_hand + EXCLUDED.quantity_on_hand,
+                branch_price_override = COALESCE(EXCLUDED.branch_price_override, inventory.branch_price_override)
+            `, [product.id, allocation.branch_id, allocation.quantity || 0, allocation.price_override]);
+
+            // Log stock movement
+            if (allocation.quantity > 0) {
+              await query(`
+                INSERT INTO stock_movements (
+                  product_id, branch_id, movement_type, quantity,
+                  quantity_before, quantity_after, reference_type, notes
+                ) VALUES ($1, $2, 'receipt', $3, 0, $3, 'initial_stock', 'Initial stock allocation')
+              `, [product.id, allocation.branch_id, allocation.quantity]);
+            }
           }
         }
       }
 
       await query('COMMIT');
 
-      res.status(201).json(product);
+      if (isListingCategory) {
+        res.status(201).json({ multiple: true, products: createdProducts });
+      } else {
+        res.status(201).json(createdProducts[0]);
+      }
     } catch (error) {
       await query('ROLLBACK');
       throw error;

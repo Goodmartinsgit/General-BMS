@@ -8,8 +8,6 @@ const {
   createCategory,
   updateCategory,
   deleteCategory,
-  getListingLevel,
-  setListingLevel,
   getProductAssignments,
   saveProductAssignments,
   getSubcategoryTree,
@@ -22,8 +20,6 @@ const authorize = require('../middleware/permissionMiddleware');
 router.get('/', authenticateToken, authorize('view_products'), getCategories);
 router.get('/tree', authenticateToken, authorize('view_products'), getCategoryTree);
 router.get('/levels', authenticateToken, authorize('view_products'), getCategoryLevels);
-router.get('/listing-level', authenticateToken, authorize('view_products'), getListingLevel);
-router.put('/listing-level', authenticateToken, authorize('manage_products'), setListingLevel);
 
 // Category assignments (product stock/price per node)
 router.get('/assignments/:productId', authenticateToken, authorize('view_products'), getProductAssignments);
