@@ -8,6 +8,7 @@ import CategoryStockAssigner from './CategoryStockAssigner';
 import { batchSaveColors, batchSaveImages } from '../../api/productColors';
 import api from '../../api/axios';
 import { toast } from 'react-toastify';
+import { useCurrency } from '../../context/CurrencyContext';
 
 const inputClass =
   'w-full px-3 py-2.5 bg-theme-primary border border-theme rounded-lg text-sm text-theme-primary placeholder-theme-muted focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none transition-all';
@@ -24,6 +25,7 @@ const ProductFormModal = ({
   categories = [],
   loading = false,
 }) => {
+  const { formatCurrency } = useCurrency();
   const isEditMode = !!product;
   const [editLoading, setEditLoading] = useState(false);
 
@@ -63,8 +65,12 @@ const ProductFormModal = ({
   const [categoryAssignments, setCategoryAssignments] = useState([]);
   const [assignmentErrors, setAssignmentErrors] = useState({});
   const [listingLevel, setListingLevel] = useState(1);
+  
+  // Color inventory data
+  const [colorInventory, setColorInventory] = useState([]);
+  const [loadingColorInventory, setLoadingColorInventory] = useState(false);
 
-  // Fetch listing-level categories
+  // Fetch listing-level categories and color inventory
   useEffect(() => {
     const fetchListingData = async () => {
       try {
@@ -84,6 +90,24 @@ const ProductFormModal = ({
     };
     fetchListingData();
   }, []);
+  
+  // Fetch color inventory when editing a product
+  useEffect(() => {
+    const fetchColorInventory = async () => {
+      if (!product?.id || !isOpen) return;
+      setLoadingColorInventory(true);
+      try {
+        const res = await api.get(`/products/${product.id}/color-inventory`);
+        setColorInventory(Array.isArray(res.data) ? res.data : []);
+      } catch (error) {
+        console.error('Failed to load color inventory:', error);
+        setColorInventory([]);
+      } finally {
+        setLoadingColorInventory(false);
+      }
+    };
+    fetchColorInventory();
+  }, [product?.id, isOpen]);
 
   useEffect(() => {
     if (product) {
@@ -377,6 +401,57 @@ const ProductFormModal = ({
               </select>
             </div>
           </div>
+
+          {/* Color Inventory Display (Read-only when editing) */}
+          {isEditMode && colorInventory.length > 0 && (
+            <div className="space-y-3">
+              <h4 className="text-xs font-semibold text-accent-gold uppercase tracking-wider flex items-center gap-2">
+                <Package size={12} />
+                Current Stock by Color & Category
+              </h4>
+              <div className="border border-theme rounded-lg overflow-hidden">
+                <div className="bg-theme-tertiary px-4 py-2 grid grid-cols-4 gap-2 text-xs font-semibold text-theme-muted uppercase">
+                  <div>Color</div>
+                  <div>Category</div>
+                  <div className="text-right">Stock</div>
+                  <div className="text-right">Price</div>
+                </div>
+                <div className="divide-y divide-theme max-h-64 overflow-y-auto">
+                  {loadingColorInventory ? (
+                    <div className="flex items-center justify-center py-8 gap-2 text-theme-muted">
+                      <RefreshCw size={14} className="animate-spin" />
+                      <span className="text-sm">Loading inventory...</span>
+                    </div>
+                  ) : (
+                    colorInventory.map((item, idx) => (
+                      <div key={idx} className="px-4 py-2.5 grid grid-cols-4 gap-2 text-sm hover:bg-theme-tertiary transition-colors">
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-4 h-4 rounded border border-theme flex-shrink-0"
+                            style={{ backgroundColor: item.color_hex || '#ccc' }}
+                            title={item.color_hex}
+                          />
+                          <span className="font-medium text-theme-primary truncate">{item.color_name || 'Default'}</span>
+                        </div>
+                        <div className="text-theme-secondary truncate" title={item.category_path}>
+                          {item.category_name || '-'}
+                        </div>
+                        <div className="text-right font-semibold text-theme-primary">
+                          {item.stock_allocated || 0}
+                        </div>
+                        <div className="text-right font-medium text-accent-gold">
+                          {item.price_override ? formatCurrency(item.price_override) : '-'}
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+              <p className="text-xs text-theme-muted italic">
+                To modify stock allocation, use the Inventory Management page or Stock Movements.
+              </p>
+            </div>
+          )}
 
           {/* Hierarchical Stock & Price Allocation */}
           {formData.category_id && (
