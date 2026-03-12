@@ -328,8 +328,14 @@ const createProduct = async (req, res) => {
     } = req.body;
 
     // Validate required fields
-    if (!product_name || !retail_price) {
-      return res.status(400).json({ message: 'Product name and retail price are required' });
+    if (!product_name) {
+      return res.status(400).json({ message: 'Product name is required' });
+    }
+    if (retail_price === undefined || retail_price === null || retail_price === '') {
+      // Allow 0 retail_price when subcategory pricing is used (listing categories)
+      if (!category_id) {
+        return res.status(400).json({ message: 'Retail price is required' });
+      }
     }
 
     // Validate product type
@@ -400,8 +406,8 @@ const createProduct = async (req, res) => {
           ) RETURNING *
         `, [
           p.code, p.name, description, product_type,
-          p.catId, brand_id, base_unit, retail_price, wholesale_base_price,
-          cost_price, tax_rate, reorder_level, max_stock_level,
+          p.catId, brand_id, base_unit, retail_price || 0, wholesale_base_price,
+          cost_price || 0, tax_rate, reorder_level, max_stock_level,
           JSON.stringify(product_images), JSON.stringify(model_images),
           JSON.stringify(specifications), commission_amount, has_variants,
           track_serial_numbers, track_batches, is_featured,
@@ -410,6 +416,53 @@ const createProduct = async (req, res) => {
         ]);
 
         const product = productResult.rows[0];
+
+        // For multi-product generation, auto-create selection-attribute assignments
+        // for the nested categories beneath each child product's category
+        if (isListingCategory) {
+          const catPath = await query('SELECT path FROM categories WHERE id = $1', [p.catId]);
+          if (catPath.rows.length > 0) {
+            const descendants = await query(
+              `SELECT id, level, parent_category_id
+               FROM categories
+               WHERE path LIKE $1 || '/%' AND is_active = true
+               ORDER BY level, display_order`,
+              [catPath.rows[0].path]
+            );
+            // Insert a root assignment for the product's own category
+            const rootCatLevel = await query('SELECT level FROM categories WHERE id = $1', [p.catId]);
+            await query(
+              `INSERT INTO product_category_assignments
+                (product_id, category_id, category_level, stock_allocated, is_leaf)
+               VALUES ($1, $2, $3, 0, $4)
+               ON CONFLICT (product_id, category_id) DO NOTHING`,
+              [product.id, p.catId, rootCatLevel.rows[0]?.level || 1, descendants.rows.length === 0]
+            );
+            // Insert assignments for all descendants (selection attributes)
+            for (const desc of descendants.rows) {
+              const isLeaf = !descendants.rows.some(d => d.parent_category_id === desc.id);
+              await query(
+                `INSERT INTO product_category_assignments
+                  (product_id, category_id, category_level, stock_allocated, is_leaf)
+                 VALUES ($1, $2, $3, 0, $4)
+                 ON CONFLICT (product_id, category_id) DO NOTHING`,
+                [product.id, desc.id, desc.level, isLeaf]
+              );
+            }
+          }
+        }
+
+        // Fetch the selection attributes for response
+        const selectionAttrs = await query(
+          `SELECT pca.*, c.category_name, c.parent_category_id, c.level as cat_level
+           FROM product_category_assignments pca
+           JOIN categories c ON c.id = pca.category_id
+           WHERE pca.product_id = $1
+           ORDER BY c.level, c.display_order`,
+          [product.id]
+        );
+        product.selection_attributes = selectionAttrs.rows;
+
         createdProducts.push(product);
 
         // Allocate stock to branches if provided

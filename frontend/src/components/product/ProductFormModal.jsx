@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { X, Package, Tag, DollarSign, Database, Plus, Check, RefreshCw, Globe, Layers, AlertCircle } from 'lucide-react';
 import Modal from '../ui/Modal';
 import CloudinaryUpload from '../common/CloudinaryUpload';
@@ -196,13 +197,21 @@ const ProductFormModal = ({
 
   const selectedCatObj = allCategoriesList.find(c => c.id === parseInt(formData.category_id));
   const isListingSelected = selectedCatObj?.is_listing_category;
-  const hasSubcategoryPricing = categoryAssignments.some(a => parseFloat(a.price_override) > 0 || parseFloat(a.cost_price_override) > 0);
+  // Check if the selected category has children (i.e. multi-level categorization)
+  const categoryHasChildren = formData.category_id && allCategoriesList.some(
+    c => c.parent_category_id === parseInt(formData.category_id)
+  );
+  const hasSubcategoryPricing = categoryAssignments.length > 0 && categoryAssignments.some(
+    a => parseFloat(a.price_override) > 0 || parseFloat(a.cost_price_override) > 0
+  );
+  // Hide global pricing when category has subcategories AND any subcategory-level price is set
+  const hideGlobalPricing = categoryHasChildren && hasSubcategoryPricing;
 
   const validate = () => {
     const newErrors = {};
     if (!formData.product_name.trim()) newErrors.product_name = 'Product name is required';
     if (!formData.retail_price || parseFloat(formData.retail_price) <= 0) {
-      if (!isListingSelected && !hasSubcategoryPricing) {
+      if (!isListingSelected && !hideGlobalPricing) {
         newErrors.retail_price = 'Valid selling price is required';
       }
     }
@@ -296,24 +305,21 @@ const ProductFormModal = ({
           }
         }
 
-        // Save category assignments 
+        // Save category assignments (overwrite the auto-created ones with user data)
         if (categoryAssignments && categoryAssignments.length > 0) {
           try {
+            const isDescendant = (childId, ancestorId, categoriesList) => {
+              if (childId === ancestorId) return true;
+              const child = categoriesList.find(c => c.id === childId);
+              if (!child || !child.parent_category_id) return false;
+              return isDescendant(child.parent_category_id, ancestorId, categoriesList);
+            };
+
             let validAssignments = categoryAssignments;
             if (isMultiple) {
-              const isDescendant = (childId, ancestorId, categoriesList) => {
-                if (childId === ancestorId) return true;
-                const child = categoriesList.find(c => c.id === childId);
-                if (!child || !child.parent_category_id) return false;
-                return isDescendant(child.parent_category_id, ancestorId, categoriesList);
-              };
-
-              const thisProdCat = allCategoriesList.find(c => c.id === p.category_id);
-              if (thisProdCat) {
-                validAssignments = categoryAssignments.filter(a => 
-                  isDescendant(a.category_id, p.category_id, allCategoriesList)
-                );
-              }
+              validAssignments = categoryAssignments.filter(a =>
+                isDescendant(a.category_id, p.category_id, allCategoriesList)
+              );
             }
             if (validAssignments.length > 0) {
               await api.post(`/categories/assignments/${productId}`, {
@@ -554,8 +560,8 @@ const ProductFormModal = ({
           )}
         </div>
 
-        {/* Pricing Section */}
-        {!hasSubcategoryPricing && (
+        {/* Pricing Section — hidden when subcategory-level pricing is active */}
+        {!hideGlobalPricing && (
           <div className="space-y-4 pricing-section">
             <h3 className={sectionHeadClass}>Pricing</h3>
 

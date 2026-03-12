@@ -154,7 +154,6 @@ const getCategoryLevels = async (req, res) => {
 
     res.json({
       levels: result.rows,
-      product_listing_level: 1, // Kept for backwards compatibility
     });
   } catch (err) {
     console.error('Error fetching category levels:', err);
@@ -420,52 +419,6 @@ const deleteCategory = async (req, res) => {
   }
 };
 
-/**
- * GET /api/categories/listing-level
- * Returns the configured product listing level.
- */
-const getListingLevel = async (req, res) => {
-  try {
-    const result = await query(
-      "SELECT setting_value FROM settings WHERE setting_key = 'product_listing_level'"
-    );
-    const level = result.rows.length ? parseInt(result.rows[0].setting_value) : 1;
-    res.json({ product_listing_level: level });
-  } catch (err) {
-    console.error('Error fetching listing level:', err);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
-/**
- * PUT /api/categories/listing-level
- * Set the product listing level. Triggers recalculation of is_selection_attribute.
- */
-const setListingLevel = async (req, res) => {
-  try {
-    const { level } = req.body;
-    if (!level || level < 1) {
-      return res.status(400).json({ message: 'Level must be a positive integer' });
-    }
-
-    await query(
-      `INSERT INTO settings (setting_key, setting_value, setting_type, category, description)
-       VALUES ('product_listing_level', $1, 'number', 'products', 'Category level for product listing')
-       ON CONFLICT (setting_key)
-       DO UPDATE SET setting_value = $1, updated_at = NOW()`,
-      [String(level)]
-    );
-
-    // Recalculate all categories
-    await recalcSelectionAttributes();
-
-    res.json({ product_listing_level: level, message: 'Listing level updated' });
-  } catch (err) {
-    console.error('Error setting listing level:', err);
-    res.status(500).json({ message: 'Server error' });
-  }
-};
-
 // ============================================================================
 // PRODUCT CATEGORY ASSIGNMENTS (Stock & Price per selection-level node)
 // ============================================================================
@@ -683,8 +636,6 @@ module.exports = {
   createCategory,
   updateCategory,
   deleteCategory,
-  getListingLevel,
-  setListingLevel,
   getProductAssignments,
   saveProductAssignments,
   getSubcategoryTree,

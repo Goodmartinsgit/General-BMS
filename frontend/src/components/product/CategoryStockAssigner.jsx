@@ -63,13 +63,6 @@ const CategoryStockAssigner = ({
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Notify parent about changes
-  useEffect(() => {
-    if (onChange) {
-      onChange(assignments, validationErrors);
-    }
-  }, [assignments, validationErrors]);
-
   // Update a single node's assignment
   const updateAssignment = (catId, field, value) => {
     setAssignments(prev => {
@@ -141,7 +134,8 @@ const CategoryStockAssigner = ({
     if (onChange) {
       onChange(getAssignmentsForSave(), validationErrors);
     }
-  }, [assignments, validationErrors]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assignments, validationErrors, tree]);
 
   if (!categoryId) return null;
 
@@ -195,20 +189,38 @@ const CategoryStockAssigner = ({
         )}
       </div>
 
-      {/* Tree */}
-      <div className="border border-theme rounded-lg overflow-hidden divide-y divide-theme">
-        {tree.map(node => (
-          <AssignmentNode
-            key={node.id}
-            node={node}
-            depth={0}
-            assignments={assignments}
-            validationErrors={validationErrors}
-            onUpdate={updateAssignment}
-            basePrice={basePrice}
-            formatCurrency={formatCurrency}
-          />
-        ))}
+      {/* Info banner */}
+      <div className="flex items-start gap-2 p-2.5 bg-accent-gold/5 border border-accent-gold/20 rounded-lg text-xs text-theme-secondary">
+        <AlertCircle size={13} className="mt-0.5 shrink-0 text-accent-gold" />
+        <span>Setting cost or selling prices here will override the global pricing section above. Images attached here will be linked to the respective subcategory.</span>
+      </div>
+
+      {/* Column headers */}
+      <div className="border border-theme rounded-lg overflow-hidden">
+        <div className="flex items-center gap-2 px-3 py-2 bg-theme-tertiary border-b border-theme text-[10px] font-semibold text-theme-muted uppercase tracking-wider">
+          <span className="w-[18px]" />
+          <span className="flex-1">Category</span>
+          <span className="w-28 text-center">Stock</span>
+          <div className="flex items-center gap-3">
+            <span className="w-28 text-center">Cost Price</span>
+            <span className="w-28 text-center">Sell Price</span>
+            <span className="min-w-[36px] text-center">Image</span>
+          </div>
+        </div>
+        <div className="divide-y divide-theme">
+          {tree.map(node => (
+            <AssignmentNode
+              key={node.id}
+              node={node}
+              depth={0}
+              assignments={assignments}
+              validationErrors={validationErrors}
+              onUpdate={updateAssignment}
+              basePrice={basePrice}
+              formatCurrency={formatCurrency}
+            />
+          ))}
+        </div>
       </div>
 
       {/* Summary */}
@@ -306,8 +318,11 @@ const AssignmentNode = ({ node, depth, assignments, validationErrors, onUpdate, 
         )}
 
         {/* Name */}
-        <div className="flex-1 min-w-0">
-          <span className="text-sm font-medium text-theme-primary">{node.category_name}</span>
+        <div className="flex-1 min-w-0 flex items-center gap-1.5">
+          <span className="text-sm font-medium text-theme-primary truncate">{node.category_name}</span>
+          {!hasChildren && (
+            <span className="flex-shrink-0 px-1.5 py-0.5 text-[9px] font-semibold rounded bg-purple-500/10 text-purple-500 uppercase">Leaf</span>
+          )}
         </div>
 
         {/* Stock input */}
