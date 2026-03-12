@@ -187,14 +187,20 @@ const ProductsPage = () => {
   const handleEditSubmit = async (formData) => {
     setEditLoading(true);
     try {
-      const res = await api.put(`/products/${editProduct.id}`, formData);
-      toast.success('Product updated successfully');
+      let res;
+      if (editProduct) {
+        res = await api.put(`/products/${editProduct.id}`, formData);
+        toast.success('Product updated successfully');
+      } else {
+        res = await api.post('/products', formData);
+        toast.success('Product created successfully');
+      }
       handleEditClose();
       fetchProducts();
       fetchStatistics();
       return res.data;
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to update product');
+      toast.error(error.response?.data?.message || `Failed to ${editProduct ? 'update' : 'create'} product`);
       throw error;
     } finally {
       setEditLoading(false);
@@ -603,7 +609,7 @@ const ProductsPage = () => {
 
   const headerActions = canEdit ? (
     <button
-      onClick={() => navigate('/products/new')}
+      onClick={() => { setEditProduct(null); setEditModalOpen(true); }}
       className="bg-accent-gold text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm hover:bg-accent-goldDark transition flex items-center justify-center gap-1.5 sm:gap-2 w-full sm:w-auto"
     >
       <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Add Product
@@ -815,7 +821,7 @@ const ProductsPage = () => {
           </p>
           {canEdit && (
             <button
-              onClick={() => navigate('/products/new')}
+              onClick={() => { setEditProduct(null); setEditModalOpen(true); }}
               className="inline-flex items-center gap-2 px-6 py-3 bg-accent-gold text-white font-semibold rounded-lg hover:bg-accent-goldDark transition-colors"
             >
               <Plus className="w-5 h-5" />
