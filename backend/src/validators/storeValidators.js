@@ -94,7 +94,7 @@ exports.checkoutSchema = Joi.object({
   bankChannelId: Joi.when('paymentMethod', {
     is: 'bank_transfer',
     then: Joi.number().integer().required(),
-    otherwise: Joi.optional(),
+    otherwise: Joi.any().optional().allow(null),
   }),
   notes: Joi.string().max(500).optional().allow(''),
 });
