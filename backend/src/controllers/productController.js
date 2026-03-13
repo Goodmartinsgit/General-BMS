@@ -388,13 +388,35 @@ const createProduct = async (req, res) => {
             name: product_name, catId: parseInt(category_id), slug: baseSlug, code: product_code
           });
         } else {
+          // Check for existing products with the same base name under these listing categories
+          const listingCatIds = listingLevelCategories.map(lc => lc.id);
+          const existingProducts = await query(
+            `SELECT id, product_name, category_id FROM products
+             WHERE category_id = ANY($1) AND deleted_at IS NULL
+               AND product_name LIKE $2 || ' (%'`,
+            [listingCatIds, product_name.replace(/\s*\(.*\)\s*$/, '')]
+          );
+          const existingCatIds = new Set(existingProducts.rows.map(p => p.category_id));
+
+          if (existingCatIds.size === listingLevelCategories.length) {
+            return res.status(400).json({
+              message: `Products for "${product_name}" already exist for all listing-level categories. Edit the existing products instead.`,
+              existing_products: existingProducts.rows,
+            });
+          }
+
           const baseCodeMatch = product_code.match(/^([A-Z]+)-(\d+)$/);
           const codePrefix = baseCodeMatch ? baseCodeMatch[1] : 'PRD';
           const baseNum = baseCodeMatch ? parseInt(baseCodeMatch[2]) : 1;
+          let codeOffset = 0;
 
           for (let i = 0; i < listingLevelCategories.length; i++) {
             const listingCat = listingLevelCategories[i];
-            const childNum = baseNum + i;
+            // Skip if a product already exists for this listing-level category
+            if (existingCatIds.has(listingCat.id)) continue;
+
+            const childNum = baseNum + codeOffset;
+            codeOffset++;
             const childCode = `${codePrefix}-${String(childNum).padStart(4, '0')}`;
             const childSlug = product_name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')
               + '-' + listingCat.category_name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')
@@ -404,6 +426,13 @@ const createProduct = async (req, res) => {
               catId: listingCat.id,
               slug: childSlug,
               code: childCode
+            });
+          }
+
+          if (productsToCreate.length === 0) {
+            return res.status(400).json({
+              message: `Products for "${product_name}" already exist for all listing-level categories.`,
+              existing_products: existingProducts.rows,
             });
           }
         }
@@ -586,6 +615,34 @@ const updateProduct = async (req, res) => {
       const baseName = productName.replace(/\s*\(.*\)\s*$/, '');
       const slugTs = Date.now();
 
+      // Check for existing products that already cover some listing-level categories
+      const listingCatIds = listingLevelCategories.map(lc => lc.id);
+      const alreadyExpandedProducts = await query(
+        `SELECT id, product_name, category_id FROM products
+         WHERE category_id = ANY($1) AND deleted_at IS NULL
+           AND id != $2
+           AND product_name LIKE $3 || ' (%'`,
+        [listingCatIds, parseInt(id), baseName]
+      );
+      const alreadyCoveredCatIds = new Set(alreadyExpandedProducts.rows.map(p => p.category_id));
+      // Also include the current product's category if it already matches a listing-level cat
+      if (listingCatIds.includes(existingProduct.category_id)) {
+        alreadyCoveredCatIds.delete(existingProduct.category_id); // allow re-assignment of original
+      }
+
+      // Filter to only listing categories that need new products
+      const catsNeedingProducts = listingLevelCategories.filter(
+        lc => !alreadyCoveredCatIds.has(lc.id)
+      );
+
+      if (catsNeedingProducts.length === 0) {
+        // All listing-level categories already have products — just do a standard update
+        return res.status(400).json({
+          message: `Products for "${baseName}" already exist for all listing-level categories.`,
+          existing_products: alreadyExpandedProducts.rows,
+        });
+      }
+
       await query('BEGIN');
       try {
         // Generate codes for new products
@@ -595,8 +652,8 @@ const updateProduct = async (req, res) => {
 
         const createdProducts = [];
 
-        for (let i = 0; i < listingLevelCategories.length; i++) {
-          const listingCat = listingLevelCategories[i];
+        for (let i = 0; i < catsNeedingProducts.length; i++) {
+          const listingCat = catsNeedingProducts[i];
           const childName = `${baseName} (${listingCat.category_name})`;
           const childSlug = baseName.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')
             + '-' + listingCat.category_name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')
@@ -735,6 +792,40 @@ const updateProduct = async (req, res) => {
             [product.id]
           );
           product.selection_attributes = selectionAttrs.rows;
+        }
+
+        // Copy colors and images from the original product to all newly created products
+        const originalProductId = parseInt(id);
+        const existingColors = await query(
+          'SELECT * FROM product_colors WHERE product_id = $1 ORDER BY display_order',
+          [originalProductId]
+        );
+        const existingImages = await query(
+          'SELECT * FROM product_images_v2 WHERE product_id = $1 ORDER BY display_order',
+          [originalProductId]
+        );
+
+        for (let i = 1; i < createdProducts.length; i++) {
+          const newProd = createdProducts[i];
+          // Copy colors
+          const colorIdMap = {}; // old color id -> new color id
+          for (const color of existingColors.rows) {
+            const newColor = await query(
+              `INSERT INTO product_colors (product_id, color_name, color_code, display_order, is_active)
+               VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+              [newProd.id, color.color_name, color.color_code, color.display_order, color.is_active]
+            );
+            colorIdMap[color.id] = newColor.rows[0].id;
+          }
+          // Copy images
+          for (const img of existingImages.rows) {
+            const newColorId = img.color_id ? (colorIdMap[img.color_id] || null) : null;
+            await query(
+              `INSERT INTO product_images_v2 (product_id, image_url, color_id, is_primary, display_order, alt_text)
+               VALUES ($1, $2, $3, $4, $5, $6)`,
+              [newProd.id, img.image_url, newColorId, img.is_primary, img.display_order, img.alt_text]
+            );
+          }
         }
 
         await query('COMMIT');

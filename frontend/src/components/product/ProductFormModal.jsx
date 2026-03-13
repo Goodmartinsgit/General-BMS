@@ -318,16 +318,26 @@ const ProductFormModal = ({
       const isMultiple = response?.multiple;
       const createdProducts = isMultiple ? response.products : [product || response];
       
-      for (const p of createdProducts) {
+      for (let idx = 0; idx < createdProducts.length; idx++) {
+        const p = createdProducts[idx];
         const productId = p?.id;
         if (!productId) continue;
 
         let updatedColorsMap = {};
 
+        // For expanded products (idx > 0 during edit), the backend already copied
+        // existing colors/images. We only need to save NEW colors/images for those.
+        const isExpandedCopy = isMultiple && isEditMode && idx > 0;
+
+        // Determine which colors to save for this product
+        const colorsToSave = isExpandedCopy
+          ? formData.colors.filter(c => c.isNew)
+          : formData.colors;
+
         // Save colors if any
-        if (formData.colors && formData.colors.length > 0) {
+        if (colorsToSave && colorsToSave.length > 0) {
           try {
-            const savedColors = await batchSaveColors(productId, formData.colors);
+            const savedColors = await batchSaveColors(productId, colorsToSave);
             savedColors.forEach(sc => {
               if (sc._tempId) updatedColorsMap[sc._tempId] = sc.id;
             });
@@ -337,10 +347,15 @@ const ProductFormModal = ({
           }
         }
 
+        // Determine which images to save for this product
+        const imagesToProcess = isExpandedCopy
+          ? formData.images.filter(img => img.isNew)
+          : formData.images;
+
         // Save images if any
-        if (formData.images && formData.images.length > 0) {
+        if (imagesToProcess && imagesToProcess.length > 0) {
           try {
-            const imagesToSave = formData.images.map(img => {
+            const imagesToSave = imagesToProcess.map(img => {
               let resolvedColorId = img.color_id;
               if (resolvedColorId && updatedColorsMap[resolvedColorId]) {
                 resolvedColorId = updatedColorsMap[resolvedColorId];

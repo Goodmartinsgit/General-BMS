@@ -107,21 +107,20 @@ const CategoryStockAssigner = ({
   };
 
   // Get flat list of assignments for saving
+  // Include ALL nodes in the tree so parent-child balancing works on the backend
   const getAssignmentsForSave = () => {
     const result = [];
     const flattenTree = (nodes) => {
       for (const node of nodes) {
-        const a = assignments[node.id];
-        if (a && (a.stock_allocated > 0 || a.price_override || a.cost_price_override || a.image_url)) {
-          result.push({
-            category_id: node.id,
-            stock_allocated: parseInt(a.stock_allocated) || 0,
-            price_override: a.price_override ? parseFloat(a.price_override) : null,
-            cost_price_override: a.cost_price_override ? parseFloat(a.cost_price_override) : null,
-            image_url: a.image_url || null,
-            is_leaf: !node.children || node.children.length === 0,
-          });
-        }
+        const a = assignments[node.id] || {};
+        result.push({
+          category_id: node.id,
+          stock_allocated: parseInt(a.stock_allocated) || 0,
+          price_override: a.price_override ? parseFloat(a.price_override) : null,
+          cost_price_override: a.cost_price_override ? parseFloat(a.cost_price_override) : null,
+          image_url: a.image_url || null,
+          is_leaf: !node.children || node.children.length === 0,
+        });
         if (node.children) flattenTree(node.children);
       }
     };

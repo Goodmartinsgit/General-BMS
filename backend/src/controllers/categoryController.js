@@ -326,6 +326,13 @@ const updateCategory = async (req, res) => {
       }
     }
 
+    // Capture the old category name before updating (for product name propagation)
+    let oldCategoryName = null;
+    if (category_name) {
+      const oldCatRes = await query('SELECT category_name FROM categories WHERE id = $1', [id]);
+      oldCategoryName = oldCatRes.rows[0]?.category_name || null;
+    }
+
     const slug = category_name ? slugify(category_name) : undefined;
 
     const result = await query(
@@ -381,6 +388,33 @@ const updateCategory = async (req, res) => {
 
     // Recalculate selection attributes
     await recalcSelectionAttributes();
+
+    // If category name changed, propagate to linked product names
+    // Products whose category_id matches this category and whose name ends with
+    // "(oldCategoryName)" get updated to use "(newCategoryName)" instead
+    const newCatName = category_name?.trim();
+    if (newCatName && oldCategoryName && newCatName !== oldCategoryName) {
+      const linkedProducts = await query(
+        `SELECT id, product_name FROM products
+         WHERE category_id = $1 AND deleted_at IS NULL
+           AND product_name LIKE $2`,
+        [id, `% (${oldCategoryName})`]
+      );
+      for (const prod of linkedProducts.rows) {
+        const updatedName = prod.product_name.replace(
+          ` (${oldCategoryName})`, ` (${newCatName})`
+        );
+        if (updatedName !== prod.product_name) {
+          const updatedSlug = updatedName.toLowerCase()
+            .replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')
+            + '-' + Date.now();
+          await query(
+            `UPDATE products SET product_name = $1, slug = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $3`,
+            [updatedName, updatedSlug, prod.id]
+          );
+        }
+      }
+    }
 
     const updated = await query('SELECT * FROM categories WHERE id = $1', [id]);
     res.json(updated.rows[0]);
