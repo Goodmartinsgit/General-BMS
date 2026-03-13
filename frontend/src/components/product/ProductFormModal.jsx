@@ -89,6 +89,8 @@ const ProductFormModal = ({
   const [listingCategories, setListingCategories] = useState([]);
   const [categoryAssignments, setCategoryAssignments] = useState([]);
   const [assignmentErrors, setAssignmentErrors] = useState({});
+  const [listingLevelCats, setListingLevelCats] = useState([]);
+  const [loadingListingLevel, setLoadingListingLevel] = useState(false);
   
   // Color inventory data
   const [colorInventory, setColorInventory] = useState([]);
@@ -221,7 +223,28 @@ const ProductFormModal = ({
   };
 
   const selectedCatObj = allCategoriesList.find(c => c.id === parseInt(formData.category_id));
-  const isListingSelected = selectedCatObj?.is_listing_category;
+
+  // Fetch listing-level categories within the selected root category's tree
+  useEffect(() => {
+    const fetchListingLevel = async () => {
+      if (!formData.category_id) {
+        setListingLevelCats([]);
+        return;
+      }
+      setLoadingListingLevel(true);
+      try {
+        const res = await api.get(`/categories/${formData.category_id}/listing-level`);
+        setListingLevelCats(Array.isArray(res.data) ? res.data : []);
+      } catch {
+        setListingLevelCats([]);
+      } finally {
+        setLoadingListingLevel(false);
+      }
+    };
+    fetchListingLevel();
+  }, [formData.category_id]);
+
+  const isListingSelected = listingLevelCats.length > 0;
   // Check if the selected category has children (i.e. multi-level categorization)
   const categoryHasChildren = formData.category_id && allCategoriesList.some(
     c => c.parent_category_id === parseInt(formData.category_id)
@@ -517,7 +540,7 @@ const ProductFormModal = ({
                 <option value="">Select Category</option>
                 {rootCategories.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.category_name} {c.is_listing_category ? ' (Listing)' : ''}
+                    {c.category_name}
                   </option>
                 ))}
               </select>
@@ -531,11 +554,28 @@ const ProductFormModal = ({
             <div className="flex items-start gap-3 p-3 mt-4 bg-blue-500/10 border border-blue-500/20 rounded-lg text-blue-400">
               <AlertCircle size={16} className="mt-0.5 shrink-0" />
               <div className="text-sm">
-                <p className="font-semibold">Multiple Products Generation</p>
+                <p className="font-semibold">Multiple Products Generation ({listingLevelCats.length} products)</p>
                 <p className="opacity-90 mt-0.5">
-                  The selected category is a Listing Category. When you submit, a separate product will automatically be generated for each of its children using this template.
+                  The selected category tree has a listing level. When you submit, a separate product will be created for each listing-level category:
+                </p>
+                <ul className="mt-1.5 space-y-0.5 opacity-90">
+                  {listingLevelCats.map(lc => (
+                    <li key={lc.id} className="flex items-center gap-1.5">
+                      <span className="w-1 h-1 rounded-full bg-blue-400 shrink-0" />
+                      {formData.product_name ? `${formData.product_name} (${lc.category_name})` : lc.category_name}
+                    </li>
+                  ))}
+                </ul>
+                <p className="opacity-75 mt-1.5 text-xs">
+                  Each product will carry its respective selection categories for attributes.
                 </p>
               </div>
+            </div>
+          )}
+          {loadingListingLevel && formData.category_id && (
+            <div className="flex items-center gap-2 p-3 mt-2 text-theme-muted text-sm">
+              <RefreshCw size={14} className="animate-spin" />
+              Checking category structure...
             </div>
           )}
 

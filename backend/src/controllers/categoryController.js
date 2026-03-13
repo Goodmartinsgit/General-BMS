@@ -645,6 +645,36 @@ const getCategoriesByLevel = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/categories/:id/listing-level
+ * Get the listing-level categories within a root category's tree.
+ * Used by the product form to show which products will be auto-generated.
+ */
+const getListingLevelCategories = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const rootCat = await query('SELECT id, path FROM categories WHERE id = $1', [parseInt(id)]);
+    if (rootCat.rows.length === 0) {
+      return res.status(404).json({ message: 'Category not found' });
+    }
+    const rootPath = rootCat.rows[0].path;
+
+    const result = await query(
+      `SELECT id, category_name, level, path, parent_category_id
+       FROM categories
+       WHERE is_listing_category = true AND is_active = true
+         AND (path LIKE $1 || '/%' OR id = $2)
+       ORDER BY level, display_order, category_name`,
+      [rootPath, parseInt(id)]
+    );
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching listing-level categories:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
   getCategories,
   getCategoryTree,
@@ -657,4 +687,5 @@ module.exports = {
   saveProductAssignments,
   getSubcategoryTree,
   getCategoriesByLevel,
+  getListingLevelCategories,
 };

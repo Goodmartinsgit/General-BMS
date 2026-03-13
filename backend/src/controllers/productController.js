@@ -355,12 +355,25 @@ const createProduct = async (req, res) => {
       product_name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-') +
       '-' + slugTs;
 
-    // Check if category is a listing category
-    let isListingCategory = false;
+    // Find listing-level categories within the root category's tree
+    let listingLevelCategories = [];
     if (category_id) {
-      const catCheck = await query(`SELECT is_listing_category FROM categories WHERE id = $1`, [parseInt(category_id)]);
-      isListingCategory = catCheck.rows[0]?.is_listing_category || false;
+      const rootCat = await query(`SELECT id, path FROM categories WHERE id = $1`, [parseInt(category_id)]);
+      if (rootCat.rows.length > 0) {
+        const rootPath = rootCat.rows[0].path;
+        // Find all categories in this tree that are marked as listing categories
+        const listingRes = await query(
+          `SELECT id, category_name, level, path, parent_category_id
+           FROM categories
+           WHERE is_listing_category = true AND is_active = true
+             AND (path LIKE $1 || '/%' OR id = $2)
+           ORDER BY level, display_order, category_name`,
+          [rootPath, parseInt(category_id)]
+        );
+        listingLevelCategories = listingRes.rows;
+      }
     }
+    const hasListingLevel = listingLevelCategories.length > 0;
 
     // Begin transaction
     await query('BEGIN');
@@ -368,31 +381,27 @@ const createProduct = async (req, res) => {
     try {
       let productsToCreate = [];
 
-      if (isListingCategory) {
-        // Fetch direct children
-        const childrenRes = await query(`SELECT id, category_name FROM categories WHERE parent_category_id = $1 AND is_active = true ORDER BY display_order, category_name`, [parseInt(category_id)]);
-        if (childrenRes.rows.length === 0) {
-          // Fallback if no children exist
+      if (hasListingLevel) {
+        // Create one product per listing-level category
+        if (listingLevelCategories.length === 0) {
           productsToCreate.push({
             name: product_name, catId: parseInt(category_id), slug: baseSlug, code: product_code
           });
         } else {
-          // Generate a unique code for each child product
-          // Use the base code number and increment for each child
           const baseCodeMatch = product_code.match(/^([A-Z]+)-(\d+)$/);
           const codePrefix = baseCodeMatch ? baseCodeMatch[1] : 'PRD';
           const baseNum = baseCodeMatch ? parseInt(baseCodeMatch[2]) : 1;
 
-          for (let i = 0; i < childrenRes.rows.length; i++) {
-            const child = childrenRes.rows[i];
+          for (let i = 0; i < listingLevelCategories.length; i++) {
+            const listingCat = listingLevelCategories[i];
             const childNum = baseNum + i;
             const childCode = `${codePrefix}-${String(childNum).padStart(4, '0')}`;
             const childSlug = product_name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')
-              + '-' + child.category_name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')
+              + '-' + listingCat.category_name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')
               + '-' + slugTs;
             productsToCreate.push({
-              name: `${product_name} (${child.category_name})`,
-              catId: child.id,
+              name: `${product_name} (${listingCat.category_name})`,
+              catId: listingCat.id,
               slug: childSlug,
               code: childCode
             });
@@ -434,8 +443,8 @@ const createProduct = async (req, res) => {
         const product = productResult.rows[0];
 
         // For multi-product generation, auto-create selection-attribute assignments
-        // for the nested categories beneath each child product's category
-        if (isListingCategory) {
+        // for the nested categories beneath each listing-level product's category
+        if (hasListingLevel) {
           const catPath = await query('SELECT path FROM categories WHERE id = $1', [p.catId]);
           if (catPath.rows.length > 0) {
             const descendants = await query(
@@ -508,7 +517,7 @@ const createProduct = async (req, res) => {
 
       await query('COMMIT');
 
-      if (isListingCategory) {
+      if (hasListingLevel) {
         res.status(201).json({ multiple: true, products: createdProducts });
       } else {
         res.status(201).json(createdProducts[0]);
