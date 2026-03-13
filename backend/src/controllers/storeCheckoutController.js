@@ -82,11 +82,11 @@ const checkout = async (req, res) => {
               p.is_online_available, p.retail_price,
               pv.sku as variant_sku, pv.selling_price as variant_price,
               COALESCE(
-                (SELECT SUM(quantity_available) FROM inventory WHERE product_id = ci.product_id),
+                (SELECT SUM(COALESCE(quantity_on_hand,0) - COALESCE(quantity_reserved,0)) FROM inventory WHERE product_id = ci.product_id),
                 0
               ) as stock_qty,
               COALESCE(
-                (SELECT SUM(quantity_available) FROM variant_inventory WHERE variant_id = ci.variant_id),
+                (SELECT SUM(COALESCE(quantity_on_hand,0) - COALESCE(quantity_reserved,0)) FROM variant_inventory WHERE variant_id = ci.variant_id),
                 0
               ) as variant_stock_qty
        FROM cart_items ci
