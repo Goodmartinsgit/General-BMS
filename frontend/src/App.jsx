@@ -11,6 +11,7 @@ import { FiscalPeriodProvider } from './context/FiscalPeriodContext';
 import { BranchProvider } from './context/BranchContext';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import DraftNotificationToast from './components/common/DraftNotificationToast';
 
 // Product & Catalog Pages
 import ProductsPage from './pages/ProductsPage';
@@ -326,6 +327,7 @@ function App() {
                     </Route>
                 </Routes>
                 <ToastContainer position="top-right" autoClose={3000} />
+                <DraftNotificationToast />
             </CurrencyProvider>
             </BrandingProvider>
         </ThemeProvider>

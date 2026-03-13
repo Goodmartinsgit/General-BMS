@@ -182,6 +182,9 @@ const ProductsPage = () => {
     const params = new URLSearchParams(searchParams);
     params.delete('edit');
     navigate({ search: params.toString() }, { replace: true });
+    // Refresh data in case a product was created/edited
+    fetchProducts();
+    fetchStatistics();
   };
 
   const handleEditSubmit = async (formData) => {
@@ -195,9 +198,7 @@ const ProductsPage = () => {
         res = await api.post('/products', formData);
         toast.success('Product created successfully');
       }
-      handleEditClose();
-      fetchProducts();
-      fetchStatistics();
+      // Return data first — modal will close itself after post-save work (colors, images, assignments)
       return res.data;
     } catch (error) {
       toast.error(error.response?.data?.message || `Failed to ${editProduct ? 'update' : 'create'} product`);

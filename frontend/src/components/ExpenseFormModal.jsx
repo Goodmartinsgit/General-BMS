@@ -2,20 +2,42 @@ import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
 import api from '../api/axios';
 import { useCurrency } from '../context/CurrencyContext';
+import useFormDraft from '../hooks/useFormDraft';
+import DraftRecoveryBanner from './common/DraftRecoveryBanner';
+
+const defaultExpenseData = {
+    branch_id: '',
+    category_id: '',
+    amount: '',
+    description: '',
+    expense_date: new Date().toISOString().split('T')[0],
+    status: 'pending',
+    receipt_url: ''
+};
 
 const ExpenseFormModal = ({ isOpen, onClose, onSubmit, expense }) => {
     const { symbol } = useCurrency();
     const [branches, setBranches] = useState([]);
     const [categories, setCategories] = useState([]);
-    const [formData, setFormData] = useState({
-        branch_id: '',
-        category_id: '',
-        amount: '',
-        description: '',
-        expense_date: new Date().toISOString().split('T')[0],
-        status: 'pending',
-        receipt_url: ''
+    const [formData, setFormData] = useState(defaultExpenseData);
+
+    const isEditMode = !!expense;
+    const draftKey = isEditMode ? `expense_edit_${expense?.id}` : 'expense_create';
+    const { draftData, hasDraft, applyDraft, dismissDraft, saveDraft, clearDraft } = useFormDraft(draftKey, {
+        label: isEditMode ? `Edit Expense` : 'New Expense',
+        entityType: 'expense',
+        initialData: defaultExpenseData,
+        isOpen,
     });
+
+    useEffect(() => { saveDraft(formData); }, [formData, saveDraft]);
+
+    const handleRestoreDraft = () => {
+        if (draftData) {
+            setFormData(prev => ({ ...prev, ...draftData }));
+            applyDraft();
+        }
+    };
 
     useEffect(() => {
         if (isOpen) {
@@ -82,6 +104,7 @@ const ExpenseFormModal = ({ isOpen, onClose, onSubmit, expense }) => {
 
     const handleSubmit = (e) => {
         e.preventDefault();
+        clearDraft();
         onSubmit(formData);
     };
 
@@ -98,6 +121,13 @@ const ExpenseFormModal = ({ isOpen, onClose, onSubmit, expense }) => {
                 </div>
 
                 <form onSubmit={handleSubmit} className="p-6">
+                    <DraftRecoveryBanner
+                        visible={hasDraft}
+                        label={isEditMode ? 'Edit Expense' : 'New Expense'}
+                        updatedAt={draftData?._savedAt}
+                        onRestore={handleRestoreDraft}
+                        onDiscard={dismissDraft}
+                    />
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                         <div className="col-span-1 md:col-span-2 pb-2 border-b border-theme">
                             <h3 className="text-sm font-semibold text-accent-gold uppercase">Expense Details</h3>

@@ -1,17 +1,39 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
+import useFormDraft from '../hooks/useFormDraft';
+import DraftRecoveryBanner from './common/DraftRecoveryBanner';
+
+const defaultSupplierData = {
+    supplier_name: '',
+    contact_person: '',
+    email: '',
+    phone_number: '',
+    whatsapp_number: '',
+    address: '',
+    payment_terms: '',
+    notes: ''
+};
 
 const SupplierFormModal = ({ isOpen, onClose, onSubmit, supplier }) => {
-    const [formData, setFormData] = useState({
-        supplier_name: '',
-        contact_person: '',
-        email: '',
-        phone_number: '',
-        whatsapp_number: '',
-        address: '',
-        payment_terms: '',
-        notes: ''
+    const [formData, setFormData] = useState(defaultSupplierData);
+
+    const isEditMode = !!supplier;
+    const draftKey = isEditMode ? `supplier_edit_${supplier?.id}` : 'supplier_create';
+    const { draftData, hasDraft, applyDraft, dismissDraft, saveDraft, clearDraft } = useFormDraft(draftKey, {
+        label: isEditMode ? `Edit: ${supplier?.supplier_name || 'Supplier'}` : 'New Supplier',
+        entityType: 'supplier',
+        initialData: defaultSupplierData,
+        isOpen,
     });
+
+    useEffect(() => { saveDraft(formData); }, [formData, saveDraft]);
+
+    const handleRestoreDraft = () => {
+        if (draftData) {
+            setFormData(prev => ({ ...prev, ...draftData }));
+            applyDraft();
+        }
+    };
 
     useEffect(() => {
         if (supplier) {
@@ -51,6 +73,7 @@ const SupplierFormModal = ({ isOpen, onClose, onSubmit, supplier }) => {
 
     const handleSubmit = (e) => {
         e.preventDefault();
+        clearDraft();
         onSubmit(formData);
     };
 
@@ -64,6 +87,13 @@ const SupplierFormModal = ({ isOpen, onClose, onSubmit, supplier }) => {
                     </button>
                 </div>
                 <form onSubmit={handleSubmit} className="p-6">
+                    <DraftRecoveryBanner
+                        visible={hasDraft}
+                        label={isEditMode ? `Edit: ${supplier?.supplier_name}` : 'New Supplier'}
+                        updatedAt={draftData?._savedAt}
+                        onRestore={handleRestoreDraft}
+                        onDiscard={dismissDraft}
+                    />
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                         <div className="col-span-1 md:col-span-2 pb-2 border-b border-theme">
                             <h3 className="text-sm font-semibold text-accent-gold uppercase">Basic Information</h3>

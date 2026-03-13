@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { X, Plus, Trash2 } from 'lucide-react';
+import useFormDraft from '../hooks/useFormDraft';
+import DraftRecoveryBanner from './common/DraftRecoveryBanner';
 
 const emptyLineItem = {
     description: '',
@@ -10,16 +12,38 @@ const emptyLineItem = {
     tax_rate: 0
 };
 
+const defaultBillData = {
+    vendor_id: '',
+    bill_date: '',
+    due_date: '',
+    reference: '',
+    notes: '',
+    status: 'draft'
+};
+
 const BillFormModal = ({ isOpen, onClose, onSubmit, bill }) => {
-    const [formData, setFormData] = useState({
-        vendor_id: '',
-        bill_date: '',
-        due_date: '',
-        reference: '',
-        notes: '',
-        status: 'draft'
-    });
+    const [formData, setFormData] = useState(defaultBillData);
     const [lineItems, setLineItems] = useState([{ ...emptyLineItem }]);
+
+    const isEditMode = !!bill;
+    const draftKey = isEditMode ? `bill_edit_${bill?.id}` : 'bill_create';
+    const { draftData, hasDraft, applyDraft, dismissDraft, saveDraft, clearDraft } = useFormDraft(draftKey, {
+        label: isEditMode ? `Edit Bill #${bill?.bill_number || bill?.id}` : 'New Bill',
+        entityType: 'bill',
+        initialData: defaultBillData,
+        isOpen,
+    });
+
+    useEffect(() => { saveDraft({ ...formData, _lineItems: lineItems }); }, [formData, lineItems, saveDraft]);
+
+    const handleRestoreDraft = () => {
+        if (draftData) {
+            const { _lineItems, _savedAt, ...rest } = draftData;
+            setFormData(prev => ({ ...prev, ...rest }));
+            if (_lineItems && _lineItems.length > 0) setLineItems(_lineItems);
+            applyDraft();
+        }
+    };
     const [vendors, setVendors] = useState([]);
     const [glAccounts, setGlAccounts] = useState([]);
     const [loadingData, setLoadingData] = useState(false);
@@ -119,6 +143,7 @@ const BillFormModal = ({ isOpen, onClose, onSubmit, bill }) => {
 
     const handleSubmit = (e) => {
         e.preventDefault();
+        clearDraft();
         onSubmit({
             ...formData,
             line_items: lineItems.map(item => ({
@@ -147,6 +172,13 @@ const BillFormModal = ({ isOpen, onClose, onSubmit, bill }) => {
                     </button>
                 </div>
                 <form onSubmit={handleSubmit} className="p-6">
+                    <DraftRecoveryBanner
+                        visible={hasDraft}
+                        label={isEditMode ? `Edit Bill #${bill?.bill_number || bill?.id}` : 'New Bill'}
+                        updatedAt={draftData?._savedAt}
+                        onRestore={handleRestoreDraft}
+                        onDiscard={dismissDraft}
+                    />
                     {/* Header Fields */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                         <div className="col-span-1 md:col-span-2 pb-2 border-b border-theme">

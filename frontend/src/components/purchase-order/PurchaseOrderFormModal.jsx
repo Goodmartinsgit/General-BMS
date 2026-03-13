@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Search, Package, Minus } from 'lucide-react';
 import Modal from '../ui/Modal';
 import api from '../../api/axios';
+import useFormDraft from '../../hooks/useFormDraft';
+import DraftRecoveryBanner from '../common/DraftRecoveryBanner';
 
 const inputClass =
   'w-full px-3 py-2.5 bg-theme-primary border border-theme rounded-lg text-sm text-theme-primary placeholder-theme-muted focus:outline-none focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 transition-all';
@@ -20,15 +22,28 @@ const PurchaseOrderFormModal = ({
 }) => {
   const isEdit = !!purchaseOrder;
 
-  const [formData, setFormData] = useState({
-    supplier_id: '',
-    branch_id: '',
-    expected_delivery_date: '',
-    notes: '',
-    items: [],
-  });
+  const defaultPOData = { supplier_id: '', branch_id: '', expected_delivery_date: '', notes: '', items: [] };
+  const [formData, setFormData] = useState(defaultPOData);
 
   const [errors, setErrors] = useState({});
+
+  const draftKey = isEdit ? `po_edit_${purchaseOrder?.id}` : 'po_create';
+  const { draftData, hasDraft, applyDraft, dismissDraft, saveDraft, clearDraft } = useFormDraft(draftKey, {
+    label: isEdit ? `Edit PO #${purchaseOrder?.po_number || purchaseOrder?.id}` : 'New Purchase Order',
+    entityType: 'purchase_order',
+    initialData: defaultPOData,
+    isOpen,
+  });
+
+  useEffect(() => { saveDraft(formData); }, [formData, saveDraft]);
+
+  const handleRestoreDraft = () => {
+    if (draftData) {
+      const { _savedAt, ...rest } = draftData;
+      setFormData(prev => ({ ...prev, ...rest }));
+      applyDraft();
+    }
+  };
 
   // Product search state
   const [searchQuery, setSearchQuery] = useState('');
@@ -131,6 +146,7 @@ const PurchaseOrderFormModal = ({
 
   const handleSubmit = () => {
     if (!validate()) return;
+    clearDraft();
     onSubmit({
       supplier_id:            formData.supplier_id,
       branch_id:              formData.branch_id,
@@ -171,6 +187,13 @@ const PurchaseOrderFormModal = ({
       }
     >
       <div className="space-y-6">
+        <DraftRecoveryBanner
+          visible={hasDraft}
+          label={isEdit ? `Edit PO #${purchaseOrder?.po_number || purchaseOrder?.id}` : 'New Purchase Order'}
+          updatedAt={draftData?._savedAt}
+          onRestore={handleRestoreDraft}
+          onDiscard={dismissDraft}
+        />
 
         {/* ── Basic Info ── */}
         <div className="space-y-4">

@@ -96,8 +96,6 @@ const ProductCatalog = () => {
     try {
       const res = await api.post('/products', productData);
       toast.success('Product created');
-      setShowForm(false); setSelectedProduct(null);
-      fetchProducts(); fetchStats();
       return res.data;
     } catch (e) {
       toast.error(e.response?.data?.message || 'Failed to create product');
@@ -109,8 +107,6 @@ const ProductCatalog = () => {
     try {
       const res = await api.put(`/products/${selectedProduct.id}`, productData);
       toast.success('Product updated');
-      setShowForm(false); setSelectedProduct(null);
-      fetchProducts(); fetchStats();
       return res.data;
     } catch (e) {
       toast.error(e.response?.data?.message || 'Failed to update product');
@@ -365,7 +361,7 @@ const ProductCatalog = () => {
       {/* Product Form Modal */}
       <ProductFormModal
         isOpen={showForm}
-        onClose={() => { setShowForm(false); setSelectedProduct(null); }}
+        onClose={() => { setShowForm(false); setSelectedProduct(null); fetchProducts(); fetchStats(); }}
         onSubmit={selectedProduct ? handleUpdate : handleCreate}
         product={selectedProduct}
         brands={brands}

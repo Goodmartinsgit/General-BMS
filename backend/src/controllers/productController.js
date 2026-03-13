@@ -350,13 +350,17 @@ const createProduct = async (req, res) => {
     const product_code = await generateProductCode(product_type);
 
     // Auto-generate slug from product name if not provided (base logic)
+    const slugTs = Date.now();
     const baseSlug = rawSlug ||
       product_name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-') +
-      '-' + Date.now();
+      '-' + slugTs;
 
     // Check if category is a listing category
-    const catCheck = await query(`SELECT is_listing_category FROM categories WHERE id = $1`, [category_id]);
-    const isListingCategory = catCheck.rows[0]?.is_listing_category;
+    let isListingCategory = false;
+    if (category_id) {
+      const catCheck = await query(`SELECT is_listing_category FROM categories WHERE id = $1`, [parseInt(category_id)]);
+      isListingCategory = catCheck.rows[0]?.is_listing_category || false;
+    }
 
     // Begin transaction
     await query('BEGIN');
@@ -366,27 +370,37 @@ const createProduct = async (req, res) => {
 
       if (isListingCategory) {
         // Fetch direct children
-        const childrenRes = await query(`SELECT id, category_name FROM categories WHERE parent_category_id = $1 AND is_active = true`, [category_id]);
+        const childrenRes = await query(`SELECT id, category_name FROM categories WHERE parent_category_id = $1 AND is_active = true ORDER BY display_order, category_name`, [parseInt(category_id)]);
         if (childrenRes.rows.length === 0) {
           // Fallback if no children exist
           productsToCreate.push({
-            name: product_name, catId: category_id, slug: baseSlug, code: product_code
+            name: product_name, catId: parseInt(category_id), slug: baseSlug, code: product_code
           });
         } else {
+          // Generate a unique code for each child product
+          // Use the base code number and increment for each child
+          const baseCodeMatch = product_code.match(/^([A-Z]+)-(\d+)$/);
+          const codePrefix = baseCodeMatch ? baseCodeMatch[1] : 'PRD';
+          const baseNum = baseCodeMatch ? parseInt(baseCodeMatch[2]) : 1;
+
           for (let i = 0; i < childrenRes.rows.length; i++) {
             const child = childrenRes.rows[i];
-            const childCode = `${product_code}-${i + 1}`;
+            const childNum = baseNum + i;
+            const childCode = `${codePrefix}-${String(childNum).padStart(4, '0')}`;
+            const childSlug = product_name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')
+              + '-' + child.category_name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')
+              + '-' + slugTs;
             productsToCreate.push({
               name: `${product_name} (${child.category_name})`,
               catId: child.id,
-              slug: `${baseSlug}-${child.id}`,
+              slug: childSlug,
               code: childCode
             });
           }
         }
       } else {
         productsToCreate.push({
-          name: product_name, catId: category_id, slug: baseSlug, code: product_code
+          name: product_name, catId: category_id ? parseInt(category_id) : null, slug: baseSlug, code: product_code
         });
       }
 
@@ -407,13 +421,13 @@ const createProduct = async (req, res) => {
             $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29
           ) RETURNING *
         `, [
-          p.code, p.name, description, product_type,
-          p.catId, brand_id, base_unit, retail_price || 0, wholesale_base_price,
-          cost_price || 0, tax_rate, reorder_level, max_stock_level,
+          p.code, p.name, description || null, product_type,
+          p.catId || null, brand_id || null, base_unit, retail_price || 0, wholesale_base_price || null,
+          cost_price || 0, tax_rate || 0, reorder_level || null, max_stock_level || null,
           JSON.stringify(product_images), JSON.stringify(model_images),
-          JSON.stringify(specifications), commission_amount, has_variants,
+          JSON.stringify(specifications), commission_amount || 0, has_variants,
           track_serial_numbers, track_batches, is_featured,
-          is_retail_available, is_wholesale_available, barcode, weight_per_unit,
+          is_retail_available, is_wholesale_available, barcode || null, weight_per_unit || null,
           is_online_available, short_description || null, p.slug, has_colors
         ]);
 
@@ -477,7 +491,7 @@ const createProduct = async (req, res) => {
               DO UPDATE SET
                 quantity_on_hand = inventory.quantity_on_hand + EXCLUDED.quantity_on_hand,
                 branch_price_override = COALESCE(EXCLUDED.branch_price_override, inventory.branch_price_override)
-            `, [product.id, allocation.branch_id, allocation.quantity || 0, allocation.price_override]);
+            `, [product.id, allocation.branch_id, allocation.quantity || 0, allocation.price_override || null]);
 
             // Log stock movement
             if (allocation.quantity > 0) {
@@ -533,12 +547,25 @@ const updateProduct = async (req, res) => {
       'is_online_available', 'short_description', 'slug', 'has_colors'
     ];
 
+    // Integer/numeric columns that must not receive empty strings
+    const integerFields = [
+      'category_id', 'brand_id', 'reorder_level', 'max_stock_level',
+    ];
+    const numericFields = [
+      'retail_price', 'wholesale_base_price', 'cost_price', 'tax_rate',
+      'commission_amount', 'weight_per_unit',
+    ];
+
     for (const [key, value] of Object.entries(updates)) {
       if (allowedFields.includes(key)) {
         updateFields.push(`${key} = $${paramCounter}`);
         // Stringify JSON fields
         if (['product_images', 'model_images', 'specifications'].includes(key)) {
           values.push(JSON.stringify(value));
+        } else if (integerFields.includes(key)) {
+          values.push(value === '' || value === undefined ? null : value);
+        } else if (numericFields.includes(key)) {
+          values.push(value === '' || value === undefined ? null : value);
         } else {
           values.push(value);
         }

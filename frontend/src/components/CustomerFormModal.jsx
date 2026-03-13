@@ -1,26 +1,48 @@
 import React, { useState, useEffect } from 'react';
 import { X } from 'lucide-react';
+import useFormDraft from '../hooks/useFormDraft';
+import DraftRecoveryBanner from './common/DraftRecoveryBanner';
+
+const defaultCustomerData = {
+    customer_number: '',
+    customer_type: 'Retail',
+    customer_name: '',
+    contact_person: '',
+    email: '',
+    phone_number: '',
+    alternative_phone: '',
+    address: '',
+    city: '',
+    state: '',
+    country: 'Nigeria',
+    tax_id: '',
+    price_tier_id: '',
+    referred_by: '',
+    credit_limit: 0,
+    payment_terms_days: 0,
+    is_active: true
+};
 
 const CustomerFormModal = ({ isOpen, onClose, onSubmit, customer, priceTiers, referrers = [] }) => {
-    const [formData, setFormData] = useState({
-        customer_number: '',
-        customer_type: 'Retail',
-        customer_name: '',
-        contact_person: '',
-        email: '',
-        phone_number: '',
-        alternative_phone: '',
-        address: '',
-        city: '',
-        state: '',
-        country: 'Nigeria',
-        tax_id: '',
-        price_tier_id: '',
-        referred_by: '',
-        credit_limit: 0,
-        payment_terms_days: 0,
-        is_active: true
+    const [formData, setFormData] = useState(defaultCustomerData);
+
+    const isEditMode = !!customer;
+    const draftKey = isEditMode ? `customer_edit_${customer?.id}` : 'customer_create';
+    const { draftData, hasDraft, applyDraft, dismissDraft, saveDraft, clearDraft } = useFormDraft(draftKey, {
+        label: isEditMode ? `Edit: ${customer?.customer_name || 'Customer'}` : 'New Customer',
+        entityType: 'customer',
+        initialData: defaultCustomerData,
+        isOpen,
     });
+
+    useEffect(() => { saveDraft(formData); }, [formData, saveDraft]);
+
+    const handleRestoreDraft = () => {
+        if (draftData) {
+            setFormData(prev => ({ ...prev, ...draftData }));
+            applyDraft();
+        }
+    };
 
 
     useEffect(() => {
@@ -81,6 +103,7 @@ const CustomerFormModal = ({ isOpen, onClose, onSubmit, customer, priceTiers, re
 
     const handleSubmit = (e) => {
         e.preventDefault();
+        clearDraft();
         onSubmit(formData);
     };
 
@@ -94,6 +117,13 @@ const CustomerFormModal = ({ isOpen, onClose, onSubmit, customer, priceTiers, re
                     </button>
                 </div>
                 <form onSubmit={handleSubmit} className="p-6">
+                    <DraftRecoveryBanner
+                        visible={hasDraft}
+                        label={isEditMode ? `Edit: ${customer?.customer_name}` : 'New Customer'}
+                        updatedAt={draftData?._savedAt}
+                        onRestore={handleRestoreDraft}
+                        onDiscard={dismissDraft}
+                    />
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                         <div className="col-span-1 lg:col-span-3 pb-2 border-b border-theme">
                             <h3 className="text-sm font-semibold text-accent-gold uppercase">Basic Information</h3>

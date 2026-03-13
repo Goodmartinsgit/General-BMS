@@ -2,17 +2,37 @@ import React, { useState, useEffect } from 'react';
 import { X, Eye, EyeOff, Copy, Check, RefreshCw } from 'lucide-react';
 import { toast } from 'react-toastify';
 import usersAPI from '../api/users';
+import useFormDraft from '../hooks/useFormDraft';
+import DraftRecoveryBanner from './common/DraftRecoveryBanner';
+
+const defaultUserData = {
+  full_name: '',
+  email: '',
+  phone_number: '',
+  role_id: '',
+  password: '',
+  generate_password: true
+};
 
 const CreateUserModal = ({ isOpen, onClose, onSuccess }) => {
   const [manageableRoles, setManageableRoles] = useState([]);
-  const [formData, setFormData] = useState({
-    full_name: '',
-    email: '',
-    phone_number: '',
-    role_id: '',
-    password: '',
-    generate_password: true
+  const [formData, setFormData] = useState(defaultUserData);
+
+  const { draftData, hasDraft, applyDraft, dismissDraft, saveDraft, clearDraft } = useFormDraft('user_create', {
+    label: 'New User',
+    entityType: 'user',
+    initialData: defaultUserData,
+    isOpen,
   });
+
+  useEffect(() => { saveDraft(formData); }, [formData, saveDraft]);
+
+  const handleRestoreDraft = () => {
+    if (draftData) {
+      setFormData(prev => ({ ...prev, ...draftData }));
+      applyDraft();
+    }
+  };
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [createdUser, setCreatedUser] = useState(null);
@@ -62,6 +82,7 @@ const CreateUserModal = ({ isOpen, onClose, onSuccess }) => {
 
       const res = await usersAPI.create(payload);
       const data = res.data;
+      clearDraft();
 
       if (data.temporary_password) {
         setTemporaryPassword(data.temporary_password);
@@ -164,6 +185,13 @@ const CreateUserModal = ({ isOpen, onClose, onSuccess }) => {
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <DraftRecoveryBanner
+            visible={hasDraft}
+            label="New User"
+            updatedAt={draftData?._savedAt}
+            onRestore={handleRestoreDraft}
+            onDiscard={dismissDraft}
+          />
           {/* Role */}
           <div>
             <label className="block text-xs font-medium text-theme-muted uppercase tracking-wider mb-1.5">Role *</label>

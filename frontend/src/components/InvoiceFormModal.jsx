@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
 import { X, Plus, Trash2 } from 'lucide-react';
+import useFormDraft from '../hooks/useFormDraft';
+import DraftRecoveryBanner from './common/DraftRecoveryBanner';
 
 const emptyLineItem = {
     description: '',
@@ -10,15 +12,38 @@ const emptyLineItem = {
     tax_rate: 0
 };
 
+const defaultInvoiceData = {
+    customer_id: '',
+    invoice_date: '',
+    due_date: '',
+    notes: '',
+    status: 'draft'
+};
+
 const InvoiceFormModal = ({ isOpen, onClose, onSubmit, invoice }) => {
-    const [formData, setFormData] = useState({
-        customer_id: '',
-        invoice_date: '',
-        due_date: '',
-        notes: '',
-        status: 'draft'
-    });
+    const [formData, setFormData] = useState(defaultInvoiceData);
     const [lineItems, setLineItems] = useState([{ ...emptyLineItem }]);
+
+    const isEditMode = !!invoice;
+    const draftKey = isEditMode ? `invoice_edit_${invoice?.id}` : 'invoice_create';
+    const { draftData, hasDraft, applyDraft, dismissDraft, saveDraft, clearDraft } = useFormDraft(draftKey, {
+        label: isEditMode ? `Edit Invoice #${invoice?.invoice_number || invoice?.id}` : 'New Invoice',
+        entityType: 'invoice',
+        initialData: defaultInvoiceData,
+        isOpen,
+    });
+
+    // Auto-save form data + line items together
+    useEffect(() => { saveDraft({ ...formData, _lineItems: lineItems }); }, [formData, lineItems, saveDraft]);
+
+    const handleRestoreDraft = () => {
+        if (draftData) {
+            const { _lineItems, _savedAt, ...rest } = draftData;
+            setFormData(prev => ({ ...prev, ...rest }));
+            if (_lineItems && _lineItems.length > 0) setLineItems(_lineItems);
+            applyDraft();
+        }
+    };
     const [customers, setCustomers] = useState([]);
     const [products, setProducts] = useState([]);
     const [loadingData, setLoadingData] = useState(false);
@@ -131,6 +156,7 @@ const InvoiceFormModal = ({ isOpen, onClose, onSubmit, invoice }) => {
 
     const handleSubmit = (e) => {
         e.preventDefault();
+        clearDraft();
         onSubmit({
             ...formData,
             line_items: lineItems.map(item => ({
@@ -159,6 +185,13 @@ const InvoiceFormModal = ({ isOpen, onClose, onSubmit, invoice }) => {
                     </button>
                 </div>
                 <form onSubmit={handleSubmit} className="p-6">
+                    <DraftRecoveryBanner
+                        visible={hasDraft}
+                        label={isEditMode ? `Edit Invoice #${invoice?.invoice_number || invoice?.id}` : 'New Invoice'}
+                        updatedAt={draftData?._savedAt}
+                        onRestore={handleRestoreDraft}
+                        onDiscard={dismissDraft}
+                    />
                     {/* Header Fields */}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                         <div className="col-span-1 md:col-span-2 pb-2 border-b border-theme">

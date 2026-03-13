@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react';
 import { X, Package, Tag, DollarSign, Database, Plus, Check, RefreshCw, Globe, Layers, AlertCircle } from 'lucide-react';
 import Modal from '../ui/Modal';
 import CloudinaryUpload from '../common/CloudinaryUpload';
+import DraftRecoveryBanner from '../common/DraftRecoveryBanner';
 import ProductColorManager from './ProductColorManager';
 import ProductImageManager from './ProductImageManager';
 import CategoryStockAssigner from './CategoryStockAssigner';
+import useFormDraft from '../../hooks/useFormDraft';
 import { batchSaveColors, batchSaveImages } from '../../api/productColors';
 import api from '../../api/axios';
 import { toast } from 'react-toastify';
@@ -29,7 +31,7 @@ const ProductFormModal = ({
   const isEditMode = !!product;
   const [editLoading, setEditLoading] = useState(false);
 
-  const [formData, setFormData] = useState({
+  const defaultFormData = {
     product_name: '',
     product_code: '',
     product_type: 'physical',
@@ -47,15 +49,38 @@ const ProductFormModal = ({
     is_featured: false,
     image_url: '',
     tags: [],
-    // Online store fields
     is_online_available: false,
     slug: '',
     short_description: '',
-    // Color and image management
     has_colors: false,
     colors: [],
     images: [],
+  };
+
+  const [formData, setFormData] = useState(defaultFormData);
+
+  // Draft auto-save
+  const draftKey = isEditMode ? `product_edit_${product?.id}` : 'product_create';
+  const { draftData, hasDraft, applyDraft, dismissDraft, saveDraft, clearDraft } = useFormDraft(draftKey, {
+    label: isEditMode ? `Edit: ${product?.product_name || 'Product'}` : 'New Product',
+    entityType: 'product',
+    initialData: defaultFormData,
+    isOpen,
   });
+
+  // Auto-save form data on every change
+  useEffect(() => {
+    saveDraft(formData);
+  }, [formData, saveDraft]);
+
+  // Handle draft restoration
+  const handleRestoreDraft = () => {
+    if (draftData) {
+      setFormData(prev => ({ ...prev, ...draftData }));
+      applyDraft();
+      toast.info('Draft restored successfully');
+    }
+  };
 
   const [errors, setErrors] = useState({});
   const [newTag, setNewTag] = useState('');
@@ -207,9 +232,13 @@ const ProductFormModal = ({
   // Hide global pricing when category has subcategories AND any subcategory-level price is set
   const hideGlobalPricing = categoryHasChildren && hasSubcategoryPricing;
 
+  // Root categories only (no parent) for the dropdown
+  const rootCategories = allCategoriesList.filter(c => !c.parent_category_id);
+
   const validate = () => {
     const newErrors = {};
     if (!formData.product_name.trim()) newErrors.product_name = 'Product name is required';
+    if (!formData.category_id) newErrors.category_id = 'Category is required';
     if (!formData.retail_price || parseFloat(formData.retail_price) <= 0) {
       if (!isListingSelected && !hideGlobalPricing) {
         newErrors.retail_price = 'Valid selling price is required';
@@ -271,7 +300,7 @@ const ProductFormModal = ({
         if (!productId) continue;
 
         let updatedColorsMap = {};
-        
+
         // Save colors if any
         if (formData.colors && formData.colors.length > 0) {
           try {
@@ -284,7 +313,7 @@ const ProductFormModal = ({
             toast.error('Product saved but some colors failed to save');
           }
         }
-        
+
         // Save images if any
         if (formData.images && formData.images.length > 0) {
           try {
@@ -332,6 +361,10 @@ const ProductFormModal = ({
           }
         }
       }
+
+      // Clear draft and close modal after all post-save work is complete
+      clearDraft();
+      onClose();
     } catch (error) {
       // Error already handled by onSubmit
     } finally {
@@ -387,6 +420,15 @@ const ProductFormModal = ({
       }
     >
       <div className="space-y-6">
+        {/* Draft Recovery Banner */}
+        <DraftRecoveryBanner
+          visible={hasDraft}
+          label={isEditMode ? `Edit: ${product?.product_name}` : 'New Product'}
+          updatedAt={draftData?._savedAt}
+          onRestore={handleRestoreDraft}
+          onDiscard={dismissDraft}
+        />
+
         {/* Details Section */}
         <div className="space-y-4">
           <h3 className={sectionHeadClass}>Basic Information</h3>
@@ -464,21 +506,24 @@ const ProductFormModal = ({
               <label className={labelClass}>
                 <span className="flex items-center gap-1">
                   <Layers size={12} />
-                  Category
+                  Category <span className="text-red-500">*</span>
                 </span>
               </label>
               <select
                 value={formData.category_id}
                 onChange={(e) => handleChange('category_id', e.target.value)}
-                className={inputClass}
+                className={`${inputClass} ${errors.category_id ? 'border-red-500/60 focus:border-red-500' : ''}`}
               >
                 <option value="">Select Category</option>
-                {allCategoriesList.map((c) => (
+                {rootCategories.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.parent_category_id ? '↳ ' : ''}{c.category_name} {c.is_listing_category ? ' (Listing)' : ''}
+                    {c.category_name} {c.is_listing_category ? ' (Listing)' : ''}
                   </option>
                 ))}
               </select>
+              {errors.category_id && (
+                <p className="mt-1 text-xs text-red-500">{errors.category_id}</p>
+              )}
             </div>
           </div>
 
