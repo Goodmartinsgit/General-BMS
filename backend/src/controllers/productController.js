@@ -541,7 +541,211 @@ const updateProduct = async (req, res) => {
     const { id } = req.params;
     const updates = req.body;
 
-    // Build dynamic update query
+    // Fetch existing product
+    const existingRes = await query('SELECT * FROM products WHERE id = $1 AND deleted_at IS NULL', [id]);
+    if (existingRes.rows.length === 0) {
+      return res.status(404).json({ message: 'Product not found' });
+    }
+    const existingProduct = existingRes.rows[0];
+
+    // Determine the effective category_id (use updated value if provided, else existing)
+    const effectiveCatId = (updates.category_id !== undefined && updates.category_id !== '')
+      ? parseInt(updates.category_id)
+      : existingProduct.category_id;
+
+    // Check if this product's category is a root category that has listing-level children
+    let listingLevelCategories = [];
+    if (effectiveCatId) {
+      const catCheck = await query('SELECT id, path, parent_category_id, is_listing_category FROM categories WHERE id = $1', [effectiveCatId]);
+      if (catCheck.rows.length > 0) {
+        const cat = catCheck.rows[0];
+        // Only expand if the product is assigned to a root category (no parent)
+        // and that root tree has listing-level categories
+        if (!cat.parent_category_id) {
+          const rootPath = cat.path;
+          const listingRes = await query(
+            `SELECT id, category_name, level, path, parent_category_id
+             FROM categories
+             WHERE is_listing_category = true AND is_active = true
+               AND (path LIKE $1 || '/%' OR id = $2)
+             ORDER BY level, display_order, category_name`,
+            [rootPath, effectiveCatId]
+          );
+          listingLevelCategories = listingRes.rows;
+        }
+      }
+    }
+
+    const shouldExpand = listingLevelCategories.length > 0;
+
+    if (shouldExpand) {
+      // Expand: update the original product to become the first listing-level product,
+      // and create new products for the remaining listing-level categories
+      const productName = updates.product_name || existingProduct.product_name;
+      // Strip any existing parenthetical suffix from the product name for the base name
+      const baseName = productName.replace(/\s*\(.*\)\s*$/, '');
+      const slugTs = Date.now();
+
+      await query('BEGIN');
+      try {
+        // Generate codes for new products
+        const existingCode = existingProduct.product_code;
+        const baseCodeMatch = existingCode.match(/^([A-Z]+)-(\d+)$/);
+        const codePrefix = baseCodeMatch ? baseCodeMatch[1] : 'PRD';
+
+        const createdProducts = [];
+
+        for (let i = 0; i < listingLevelCategories.length; i++) {
+          const listingCat = listingLevelCategories[i];
+          const childName = `${baseName} (${listingCat.category_name})`;
+          const childSlug = baseName.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')
+            + '-' + listingCat.category_name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')
+            + '-' + slugTs;
+
+          if (i === 0) {
+            // Update the original product to become the first listing-level product
+            const updateResult = await query(`
+              UPDATE products SET
+                product_name = $1, category_id = $2, slug = $3,
+                description = COALESCE($4, description),
+                product_type = COALESCE($5, product_type),
+                brand_id = $6,
+                retail_price = COALESCE($7, retail_price),
+                cost_price = COALESCE($8, cost_price),
+                product_images = COALESCE($9, product_images),
+                has_colors = COALESCE($10, has_colors),
+                is_online_available = COALESCE($11, is_online_available),
+                short_description = COALESCE($12, short_description),
+                reorder_level = COALESCE($13, reorder_level),
+                has_variants = COALESCE($14, has_variants),
+                track_serial_numbers = COALESCE($15, track_serial_numbers),
+                track_batches = COALESCE($16, track_batches),
+                is_featured = COALESCE($17, is_featured),
+                updated_at = CURRENT_TIMESTAMP
+              WHERE id = $18 RETURNING *
+            `, [
+              childName, listingCat.id, childSlug,
+              updates.description !== undefined ? updates.description : null,
+              updates.product_type || null,
+              updates.brand_id === '' ? null : (updates.brand_id || existingProduct.brand_id),
+              updates.retail_price !== undefined ? (updates.retail_price || 0) : null,
+              updates.cost_price !== undefined ? (updates.cost_price || 0) : null,
+              updates.product_images ? JSON.stringify(updates.product_images) : null,
+              updates.has_colors !== undefined ? updates.has_colors : null,
+              updates.is_online_available !== undefined ? updates.is_online_available : null,
+              updates.short_description !== undefined ? updates.short_description : null,
+              updates.reorder_level !== undefined ? (updates.reorder_level || null) : null,
+              updates.has_variants !== undefined ? updates.has_variants : null,
+              updates.track_serial_numbers !== undefined ? updates.track_serial_numbers : null,
+              updates.track_batches !== undefined ? updates.track_batches : null,
+              updates.is_featured !== undefined ? updates.is_featured : null,
+              id
+            ]);
+            createdProducts.push(updateResult.rows[0]);
+          } else {
+            // Create new products for the remaining listing-level categories
+            const childCode = await generateProductCode(updates.product_type || existingProduct.product_type);
+            const newProduct = await query(`
+              INSERT INTO products (
+                product_code, product_name, description, product_type,
+                category_id, brand_id, base_unit, retail_price, wholesale_base_price,
+                cost_price, tax_rate, reorder_level, max_stock_level, product_images,
+                model_images, specifications, commission_amount, has_variants,
+                track_serial_numbers, track_batches, is_featured,
+                is_retail_available, is_wholesale_available, barcode, weight_per_unit,
+                is_online_available, short_description, slug, has_colors
+              ) VALUES (
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29
+              ) RETURNING *
+            `, [
+              childCode, childName,
+              updates.description !== undefined ? updates.description : existingProduct.description,
+              updates.product_type || existingProduct.product_type,
+              listingCat.id,
+              updates.brand_id === '' ? null : (updates.brand_id || existingProduct.brand_id),
+              existingProduct.base_unit,
+              updates.retail_price !== undefined ? (updates.retail_price || 0) : existingProduct.retail_price,
+              existingProduct.wholesale_base_price,
+              updates.cost_price !== undefined ? (updates.cost_price || 0) : existingProduct.cost_price,
+              existingProduct.tax_rate,
+              updates.reorder_level !== undefined ? updates.reorder_level : existingProduct.reorder_level,
+              existingProduct.max_stock_level,
+              updates.product_images ? JSON.stringify(updates.product_images) : existingProduct.product_images,
+              existingProduct.model_images,
+              existingProduct.specifications,
+              existingProduct.commission_amount,
+              updates.has_variants !== undefined ? updates.has_variants : existingProduct.has_variants,
+              updates.track_serial_numbers !== undefined ? updates.track_serial_numbers : existingProduct.track_serial_numbers,
+              updates.track_batches !== undefined ? updates.track_batches : existingProduct.track_batches,
+              updates.is_featured !== undefined ? updates.is_featured : existingProduct.is_featured,
+              existingProduct.is_retail_available,
+              existingProduct.is_wholesale_available,
+              existingProduct.barcode,
+              existingProduct.weight_per_unit,
+              updates.is_online_available !== undefined ? updates.is_online_available : existingProduct.is_online_available,
+              updates.short_description !== undefined ? updates.short_description : existingProduct.short_description,
+              childSlug,
+              updates.has_colors !== undefined ? updates.has_colors : existingProduct.has_colors
+            ]);
+            createdProducts.push(newProduct.rows[0]);
+          }
+
+          // Auto-create selection-attribute assignments for each product
+          const product = createdProducts[createdProducts.length - 1];
+          const catPath = await query('SELECT path FROM categories WHERE id = $1', [listingCat.id]);
+          if (catPath.rows.length > 0) {
+            // Clear existing assignments for this product
+            await query('DELETE FROM product_category_assignments WHERE product_id = $1', [product.id]);
+
+            const descendants = await query(
+              `SELECT id, level, parent_category_id
+               FROM categories
+               WHERE path LIKE $1 || '/%' AND is_active = true
+               ORDER BY level, display_order`,
+              [catPath.rows[0].path]
+            );
+            // Root assignment
+            const rootCatLevel = await query('SELECT level FROM categories WHERE id = $1', [listingCat.id]);
+            await query(
+              `INSERT INTO product_category_assignments
+                (product_id, category_id, category_level, stock_allocated, is_leaf)
+               VALUES ($1, $2, $3, 0, $4)
+               ON CONFLICT (product_id, category_id) DO NOTHING`,
+              [product.id, listingCat.id, rootCatLevel.rows[0]?.level || 1, descendants.rows.length === 0]
+            );
+            for (const desc of descendants.rows) {
+              const isLeaf = !descendants.rows.some(d => d.parent_category_id === desc.id);
+              await query(
+                `INSERT INTO product_category_assignments
+                  (product_id, category_id, category_level, stock_allocated, is_leaf)
+                 VALUES ($1, $2, $3, 0, $4)
+                 ON CONFLICT (product_id, category_id) DO NOTHING`,
+                [product.id, desc.id, desc.level, isLeaf]
+              );
+            }
+          }
+
+          // Fetch selection attributes for response
+          const selectionAttrs = await query(
+            `SELECT pca.*, c.category_name, c.parent_category_id, c.level as cat_level
+             FROM product_category_assignments pca
+             JOIN categories c ON c.id = pca.category_id
+             WHERE pca.product_id = $1
+             ORDER BY c.level, c.display_order`,
+            [product.id]
+          );
+          product.selection_attributes = selectionAttrs.rows;
+        }
+
+        await query('COMMIT');
+        return res.json({ multiple: true, products: createdProducts });
+      } catch (error) {
+        await query('ROLLBACK');
+        throw error;
+      }
+    }
+
+    // Standard update (no expansion needed)
     const updateFields = [];
     const values = [];
     let paramCounter = 1;

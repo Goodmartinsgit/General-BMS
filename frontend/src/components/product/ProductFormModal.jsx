@@ -554,17 +554,24 @@ const ProductFormModal = ({
             <div className="flex items-start gap-3 p-3 mt-4 bg-blue-500/10 border border-blue-500/20 rounded-lg text-blue-400">
               <AlertCircle size={16} className="mt-0.5 shrink-0" />
               <div className="text-sm">
-                <p className="font-semibold">Multiple Products Generation ({listingLevelCats.length} products)</p>
+                <p className="font-semibold">
+                  {isEditMode ? 'Product Expansion' : 'Multiple Products Generation'} ({listingLevelCats.length} products)
+                </p>
                 <p className="opacity-90 mt-0.5">
-                  The selected category tree has a listing level. When you submit, a separate product will be created for each listing-level category:
+                  {isEditMode
+                    ? 'This product will be expanded into separate products for each listing-level category. Colors, images, and settings will be copied to all:'
+                    : 'The selected category tree has a listing level. When you submit, a separate product will be created for each listing-level category:'}
                 </p>
                 <ul className="mt-1.5 space-y-0.5 opacity-90">
-                  {listingLevelCats.map(lc => (
-                    <li key={lc.id} className="flex items-center gap-1.5">
-                      <span className="w-1 h-1 rounded-full bg-blue-400 shrink-0" />
-                      {formData.product_name ? `${formData.product_name} (${lc.category_name})` : lc.category_name}
-                    </li>
-                  ))}
+                  {listingLevelCats.map(lc => {
+                    const baseName = (formData.product_name || '').replace(/\s*\(.*\)\s*$/, '');
+                    return (
+                      <li key={lc.id} className="flex items-center gap-1.5">
+                        <span className="w-1 h-1 rounded-full bg-blue-400 shrink-0" />
+                        {baseName ? `${baseName} (${lc.category_name})` : lc.category_name}
+                      </li>
+                    );
+                  })}
                 </ul>
                 <p className="opacity-75 mt-1.5 text-xs">
                   Each product will carry its respective selection categories for attributes.

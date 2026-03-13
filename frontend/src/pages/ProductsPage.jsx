@@ -193,10 +193,18 @@ const ProductsPage = () => {
       let res;
       if (editProduct) {
         res = await api.put(`/products/${editProduct.id}`, formData);
-        toast.success('Product updated successfully');
+        if (res.data?.multiple) {
+          toast.success(`Product expanded into ${res.data.products.length} products`);
+        } else {
+          toast.success('Product updated successfully');
+        }
       } else {
         res = await api.post('/products', formData);
-        toast.success('Product created successfully');
+        if (res.data?.multiple) {
+          toast.success(`${res.data.products.length} products created successfully`);
+        } else {
+          toast.success('Product created successfully');
+        }
       }
       // Return data first — modal will close itself after post-save work (colors, images, assignments)
       return res.data;
