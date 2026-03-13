@@ -15,12 +15,14 @@ const generateProductCode = async (productType = 'physical') => {
     bundle: 'BDL'
   };
   const prefix = prefixMap[productType] || 'PRD';
-  const countResult = await query(
-    `SELECT COUNT(*) as count FROM products WHERE product_type = $1`,
-    [productType]
+  const maxResult = await query(
+    `SELECT MAX(CAST(SUBSTRING(product_code FROM '[0-9]+$') AS INTEGER)) as max_num
+     FROM products
+     WHERE product_code LIKE $1 || '-%'`,
+    [prefix]
   );
-  const count = parseInt(countResult.rows[0].count) + 1;
-  return `${prefix}-${String(count).padStart(4, '0')}`;
+  const nextNum = (parseInt(maxResult.rows[0].max_num) || 0) + 1;
+  return `${prefix}-${String(nextNum).padStart(4, '0')}`;
 };
 
 /**
