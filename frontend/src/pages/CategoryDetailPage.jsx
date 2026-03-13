@@ -524,7 +524,7 @@ const CategoryFormModal = ({ item, parentCategory, onClose, onSubmit, submitting
           />
         </div>
         <p className="text-[10px] text-theme-muted italic">
-          * Enabling this will apply to the entire category level (L{newLevel}) under this branch.
+          * Only one level per category tree can be the listing level. Enabling this on L{newLevel} will automatically remove listing from any other level in this tree.
         </p>
         <ModalFooter
           onClose={onClose}

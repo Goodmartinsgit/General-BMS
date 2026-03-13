@@ -58,17 +58,34 @@ const recalcSelectionAttributes = async () => {
  */
 const slugify = (name) =>
   name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+/**
+ * Enforce single-listing-level rule per tree:
+ * Only ONE level within a root tree can be is_listing_category = true.
+ * When setting a new level as listing, clear listing from all other levels first.
+ */
 const syncListingLevel = async (categoryId, isListing) => {
   const cat = await query('SELECT level, path FROM categories WHERE id = $1', [categoryId]);
   if (cat.rows.length === 0) return;
   const { level, path } = cat.rows[0];
   const rootId = path.split('/')[0];
+
+  // First: clear listing from ALL categories in this tree
   await query(
-    `UPDATE categories 
-     SET is_listing_category = $1 
-     WHERE level = $2 AND (path LIKE $3 || '/%' OR id = $3::int)`,
-    [isListing, level, rootId]
+    `UPDATE categories
+     SET is_listing_category = false
+     WHERE path LIKE $1 || '/%' OR id = $1::int`,
+    [rootId]
   );
+
+  // Then: if enabling, set listing on all categories at the target level in this tree
+  if (isListing) {
+    await query(
+      `UPDATE categories
+       SET is_listing_category = true
+       WHERE level = $1 AND (path LIKE $2 || '/%' OR id = $2::int)`,
+      [level, rootId]
+    );
+  }
 };
 
 /**
