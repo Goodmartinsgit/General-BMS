@@ -136,9 +136,9 @@ const getProductBySlug = async (req, res) => {
     let options = [];
     if (product.has_variants) {
       const varResult = await query(
-        `SELECT pv.*, vi.quantity_available as stock
+        `SELECT pv.*, vi.total_available as stock
          FROM product_variants pv
-         LEFT JOIN (SELECT variant_id, SUM(quantity_available) as quantity_available FROM variant_inventory GROUP BY variant_id) vi ON vi.variant_id = pv.id
+         LEFT JOIN (SELECT variant_id, SUM(COALESCE(quantity_on_hand,0) - COALESCE(quantity_reserved,0)) as total_available FROM variant_inventory GROUP BY variant_id) vi ON vi.variant_id = pv.id
          WHERE pv.product_id = $1 AND pv.deleted_at IS NULL`,
         [product.id]
       );
