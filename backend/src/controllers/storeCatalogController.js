@@ -131,8 +131,9 @@ const getProductBySlug = async (req, res) => {
 
     const product = result.rows[0];
 
-    // Get variants if product has them
+    // Get variants and options if product has them
     let variants = [];
+    let options = [];
     if (product.has_variants) {
       const varResult = await query(
         `SELECT pv.*, vi.quantity_available as stock
@@ -141,13 +142,39 @@ const getProductBySlug = async (req, res) => {
          WHERE pv.product_id = $1 AND pv.deleted_at IS NULL`,
         [product.id]
       );
-      variants = varResult.rows;
+      variants = varResult.rows.map(v => ({
+        id: String(v.id),
+        name: v.variant_name || '',
+        sku: v.sku,
+        price: parseFloat(v.retail_price || v.price || 0),
+        compareAtPrice: v.cost_price ? parseFloat(v.cost_price) : null,
+        inStock: (parseInt(v.stock) || 0) > 0,
+        stockQuantity: parseInt(v.stock) || 0,
+        options: v.variant_values || {},
+        image: v.image_url ? { id: String(v.id), url: v.image_url, alt: '', position: 0 } : undefined,
+      }));
+
+      // Derive options from variant_values across all variants
+      const optionMap = new Map();
+      for (const v of variants) {
+        if (v.options && typeof v.options === 'object') {
+          for (const [key, value] of Object.entries(v.options)) {
+            if (!optionMap.has(key)) optionMap.set(key, new Set());
+            optionMap.get(key).add(value);
+          }
+        }
+      }
+      let optIdx = 0;
+      for (const [name, valuesSet] of optionMap) {
+        options.push({ id: String(optIdx++), name, values: Array.from(valuesSet) });
+      }
     }
 
-    // Get category assignments (selection-level attributes with stock/price)
+    // Get category assignments (selection-level attributes with stock/price/image)
     let categoryAssignments = [];
     const assignResult = await query(
-      `SELECT pca.category_id, pca.price_override, pca.stock_allocated, pca.is_leaf,
+      `SELECT pca.category_id, pca.price_override, pca.cost_price_override,
+              pca.stock_allocated, pca.is_leaf, pca.image_url,
               c.category_name, c.level, c.parent_category_id, c.unit_of_measure, c.slug as category_slug
        FROM product_category_assignments pca
        JOIN categories c ON c.id = pca.category_id
@@ -163,14 +190,57 @@ const getProductBySlug = async (req, res) => {
       parentCategoryId: a.parent_category_id,
       unitOfMeasure: a.unit_of_measure,
       priceOverride: a.price_override ? parseFloat(a.price_override) : null,
+      costPriceOverride: a.cost_price_override ? parseFloat(a.cost_price_override) : null,
+      imageUrl: a.image_url || null,
       stockAllocated: parseInt(a.stock_allocated) || 0,
       isLeaf: a.is_leaf,
+    }));
+
+    // Get product colors
+    let colors = [];
+    const colorResult = await query(
+      `SELECT id, color_name, color_code, display_order
+       FROM product_colors
+       WHERE product_id = $1 AND is_active = true
+       ORDER BY display_order, id`,
+      [product.id]
+    );
+    colors = colorResult.rows.map(c => ({
+      id: c.id,
+      name: c.color_name,
+      code: c.color_code,
+      displayOrder: c.display_order,
+    }));
+
+    // Get structured product images from product_images_v2
+    let structuredImages = [];
+    const imgResult = await query(
+      `SELECT pi.id, pi.image_url, pi.alt_text, pi.display_order, pi.is_primary, pi.color_id
+       FROM product_images_v2 pi
+       WHERE pi.product_id = $1
+       ORDER BY pi.is_primary DESC, pi.display_order, pi.id`,
+      [product.id]
+    );
+    structuredImages = imgResult.rows.map(img => ({
+      id: String(img.id),
+      url: img.image_url,
+      alt: img.alt_text || '',
+      position: img.display_order || 0,
+      isPrimary: img.is_primary,
+      colorId: img.color_id,
     }));
 
     // Increment view count
     query(`UPDATE products SET view_count = view_count + 1 WHERE id = $1`, [product.id]).catch(() => {});
 
-    res.json({ ...formatProductDetail(product), variants, categoryAssignments });
+    const detail = formatProductDetail(product);
+    // Use structured images if available, otherwise fall back to legacy JSONB images
+    if (structuredImages.length > 0) {
+      detail.images = structuredImages;
+      detail.thumbnail = structuredImages[0]?.url || detail.image;
+    }
+
+    res.json({ ...detail, variants, options, categoryAssignments, colors });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -207,12 +277,15 @@ const getCategories = async (req, res) => {
       productCount: parseInt(r.product_count) || 0,
     }));
 
+    // Filter out selection-attribute categories from browsing navigation
+    const browsable = mapped.filter(c => !c.isSelectionAttribute);
+
     if (format === 'tree') {
-      return res.json(buildStoreCategoryTree(mapped));
+      return res.json(buildStoreCategoryTree(browsable));
     }
 
     // Default: return nested tree for browsing-level categories
-    res.json(buildStoreCategoryTree(mapped));
+    res.json(buildStoreCategoryTree(browsable));
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -324,7 +397,14 @@ const trackOrder = async (req, res) => {
 };
 
 function formatProduct(row) {
-  const images = Array.isArray(row.images) ? row.images : (row.images || []);
+  const rawImages = Array.isArray(row.images) ? row.images : (row.images || []);
+  // Normalize images to { id, url, alt, position } objects
+  const images = rawImages.map((img, i) => {
+    if (typeof img === 'string') return { id: String(i), url: img, alt: '', position: i };
+    if (img && typeof img === 'object') return { id: String(img.id || i), url: img.url || img.image_url || '', alt: img.alt || img.alt_text || '', position: img.position ?? img.display_order ?? i };
+    return null;
+  }).filter(Boolean);
+  const thumbnail = images[0]?.url || null;
   return {
     id: row.id,
     slug: row.slug || String(row.id),
@@ -334,7 +414,7 @@ function formatProduct(row) {
     price: parseFloat(row.price || row.retail_price || 0),
     compareAtPrice: row.compare_at_price ? parseFloat(row.compare_at_price) : null,
     images: images,
-    image: images[0] || null,
+    thumbnail: thumbnail,
     inStock: Boolean(row.in_stock),
     stockQuantity: parseInt(row.stock_quantity || 0),
     hasVariants: Boolean(row.has_variants),
