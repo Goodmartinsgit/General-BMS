@@ -97,6 +97,12 @@ const CategoryDetailPage = ({ categoryId, onClose, onUpdate }) => {
   const isListing = category?.is_listing_category;
   const isSelection = category?.is_selection_attribute;
 
+  // Find the single root tree that contains this category (using its path)
+  const rootId = category?.path ? parseInt(category.path.split('/')[0]) : null;
+  const relevantTree = rootId
+    ? categoryTree.filter(node => node.id === rootId)
+    : categoryTree;
+
   return (
     <div className="fixed inset-0 z-60 flex items-center justify-center p-4" onClick={onClose}>
       <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
@@ -251,20 +257,19 @@ const CategoryDetailPage = ({ categoryId, onClose, onUpdate }) => {
                   </span>
                 </div>
 
-                {categoryTree.length === 0 ? (
+                {relevantTree.length === 0 ? (
                   <div className="text-center py-10 text-theme-muted text-sm">
                     No categories in the tree
                   </div>
                 ) : (
                   <div className="overflow-x-auto pb-4">
                     <div className="inline-flex flex-col items-center min-w-full">
-                      {categoryTree.map(node => (
-                        <div key={node.id} className="mb-6 last:mb-0">
-                          <HierarchicalTreeNode
-                            node={node}
-                            highlightId={categoryId}
-                          />
-                        </div>
+                      {relevantTree.map(node => (
+                        <HierarchicalTreeNode
+                          key={node.id}
+                          node={node}
+                          highlightId={categoryId}
+                        />
                       ))}
                     </div>
                   </div>
