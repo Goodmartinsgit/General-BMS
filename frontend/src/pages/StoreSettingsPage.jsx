@@ -291,7 +291,7 @@ const defaultStoreConfig = {
     commerce: {
         tax_rate: 0,
         shipping_methods: [],
-        payment_methods: { paystack: true, bank_transfer: false },
+        payment_methods: { paystack: true, manual: false },
     },
     advanced: {
         maintenance_mode: false, maintenance_message: '',
@@ -397,7 +397,7 @@ const StoreSettingsPage = () => {
                 commerce: {
                     tax_rate: d.tax_rate || 0,
                     shipping_methods: parseJson(d.shipping_methods, []),
-                    payment_methods: parseJson(d.payment_methods, { paystack: true, bank_transfer: false }),
+                    payment_methods: parseJson(d.payment_methods, { paystack: true, manual: false }),
                 },
 
                 // Advanced (mapped from flat columns)
@@ -1080,8 +1080,8 @@ const StoreSettingsPage = () => {
                         <div>
                             <SectionLabel>Payment Methods</SectionLabel>
                             <div className="space-y-3">
-                                <Toggle checked={!!config.commerce.payment_methods?.paystack} onChange={v => set('commerce.payment_methods.paystack', v)} label="Paystack (card payments)" />
-                                <Toggle checked={!!config.commerce.payment_methods?.bank_transfer} onChange={v => set('commerce.payment_methods.bank_transfer', v)} label="Bank Transfer" />
+                                <Toggle checked={!!config.commerce.payment_methods?.paystack} onChange={v => set('commerce.payment_methods.paystack', v)} label="Paystack (Card, Bank Transfer, USSD)" />
+                                <Toggle checked={!!config.commerce.payment_methods?.manual} onChange={v => set('commerce.payment_methods.manual', v)} label="Manual Payment / Bank Transfer (customer transfers to your bank account)" />
                             </div>
                         </div>
                         <div>

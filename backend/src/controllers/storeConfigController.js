@@ -304,7 +304,7 @@ function formatConfig(row) {
     customDomain: row.custom_domain,
     currency: row.currency,
     shippingMethods: row.shipping_methods || [],
-    paymentMethods: row.payment_methods || ['paystack', 'bank_transfer'],
+    paymentMethods: row.payment_methods || { paystack: true, manual: false },
     taxRate: row.tax_rate,
     // App Builder extended content
     homeSections: row.home_sections || {},
