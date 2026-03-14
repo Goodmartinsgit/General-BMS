@@ -151,7 +151,7 @@ const uploadProofOfPayment = async (req, res) => {
     const { orderId } = req.params;
 
     const orderRes = await query(
-      `SELECT * FROM online_orders WHERE id = $1 AND customer_id = $2 AND payment_method = 'bank_transfer'`,
+      `SELECT * FROM online_orders WHERE id = $1 AND customer_id = $2 AND payment_method IN ('bank_transfer', 'manual')`,
       [orderId, customerId]
     );
     if (orderRes.rows.length === 0) return res.status(404).json({ message: 'Order not found' });

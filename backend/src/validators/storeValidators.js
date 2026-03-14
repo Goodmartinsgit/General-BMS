@@ -90,9 +90,9 @@ exports.checkoutSchema = Joi.object({
     country: Joi.string().default('Nigeria'),
     phone: Joi.string().optional().allow(''),
   }).optional(),
-  paymentMethod: Joi.string().valid('paystack', 'bank_transfer').required(),
+  paymentMethod: Joi.string().valid('paystack', 'bank_transfer', 'manual').required(),
   bankChannelId: Joi.when('paymentMethod', {
-    is: 'bank_transfer',
+    is: Joi.valid('bank_transfer', 'manual'),
     then: Joi.number().integer().required(),
     otherwise: Joi.any().optional().allow(null),
   }),

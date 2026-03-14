@@ -158,9 +158,10 @@ const checkout = async (req, res) => {
     const taxAmount = parseFloat(((subtotal - couponDiscount) * taxRate).toFixed(2));
     const total = parseFloat((subtotal - couponDiscount + taxAmount + shippingAmount).toFixed(2));
 
-    // Validate bank channel if bank_transfer
+    // Validate bank channel if bank_transfer or manual
+    const isManualPayment = paymentMethod === 'bank_transfer' || paymentMethod === 'manual';
     let bankChannelRow = null;
-    if (paymentMethod === 'bank_transfer') {
+    if (isManualPayment) {
       if (!bankChannelId) {
         return res.status(400).json({ message: 'Bank channel is required for bank transfer' });
       }
@@ -202,7 +203,7 @@ const checkout = async (req, res) => {
     }
 
     // Determine payment status
-    const paymentStatus = paymentMethod === 'bank_transfer' ? 'AWAITING_CONFIRMATION' : 'PENDING';
+    const paymentStatus = isManualPayment ? 'AWAITING_CONFIRMATION' : 'PENDING';
     const orderStatus = 'PENDING';
     const statusHistory = [
       { status: 'PENDING', timestamp: now.toISOString(), note: 'Order placed' },
@@ -334,7 +335,7 @@ const checkout = async (req, res) => {
       },
     };
 
-    if (paymentMethod === 'bank_transfer' && bankChannelRow) {
+    if (isManualPayment && bankChannelRow) {
       responsePayload.bankChannel = {
         id: bankChannelRow.id,
         channelName: bankChannelRow.channel_name,
@@ -411,12 +412,12 @@ const uploadProofOfPayment = async (req, res) => {
     let orderRes;
     if (customerId) {
       orderRes = await query(
-        `SELECT * FROM online_orders WHERE id = $1 AND customer_id = $2 AND payment_method = 'bank_transfer'`,
+        `SELECT * FROM online_orders WHERE id = $1 AND customer_id = $2 AND payment_method IN ('bank_transfer', 'manual')`,
         [orderId, customerId]
       );
     } else if (email) {
       orderRes = await query(
-        `SELECT * FROM online_orders WHERE id = $1 AND LOWER(customer_email) = LOWER($2) AND payment_method = 'bank_transfer'`,
+        `SELECT * FROM online_orders WHERE id = $1 AND LOWER(customer_email) = LOWER($2) AND payment_method IN ('bank_transfer', 'manual')`,
         [orderId, email]
       );
     } else {

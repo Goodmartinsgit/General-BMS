@@ -277,10 +277,10 @@ const updateOrderStatus = async (req, res) => {
       params
     );
 
-    // When moving to CONFIRMED for a bank_transfer order with PAID payment, deduct inventory
+    // When moving to CONFIRMED for a manual/bank_transfer order with PAID payment, deduct inventory
     if (
       newStatus === 'CONFIRMED' &&
-      order.payment_method === 'bank_transfer' &&
+      (order.payment_method === 'bank_transfer' || order.payment_method === 'manual') &&
       order.payment_status === 'PAID'
     ) {
       await deductInventory(client, id);
