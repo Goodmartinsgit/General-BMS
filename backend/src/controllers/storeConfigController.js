@@ -4,10 +4,20 @@ const { query, pool } = require('../config/db');
 const getConfigBySlug = async (req, res) => {
   try {
     const { slug } = req.params;
+    // First try active store, then fall back to any store with this slug
+    // (so maintenance / inactive stores still return config instead of 404)
     let result = await query(
       `SELECT * FROM store_config WHERE store_slug = $1 AND is_active = true`,
       [slug]
     );
+
+    if (result.rows.length === 0) {
+      // Check for inactive/maintenance store
+      result = await query(
+        `SELECT * FROM store_config WHERE store_slug = $1`,
+        [slug]
+      );
+    }
 
     // Auto-seed a default row if the table is empty, so the storefront works on first run
     if (result.rows.length === 0) {
@@ -20,7 +30,7 @@ const getConfigBySlug = async (req, res) => {
           [slug]
         );
         result = await query(
-          `SELECT * FROM store_config WHERE store_slug = $1 AND is_active = true`,
+          `SELECT * FROM store_config WHERE store_slug = $1`,
           [slug]
         );
       }
@@ -37,12 +47,18 @@ const getConfigBySlug = async (req, res) => {
   }
 };
 
-// GET /api/store/config  (no slug — returns first active store)
+// GET /api/store/config  (no slug — returns first active store, or maintenance store)
 const getDefaultConfig = async (req, res) => {
   try {
-    const result = await query(
+    // Prefer active store; fall back to any store (maintenance/inactive)
+    let result = await query(
       `SELECT * FROM store_config WHERE is_active = true ORDER BY id LIMIT 1`
     );
+    if (result.rows.length === 0) {
+      result = await query(
+        `SELECT * FROM store_config ORDER BY id LIMIT 1`
+      );
+    }
     if (result.rows.length === 0) {
       return res.status(404).json({ code: 'TENANT_NOT_FOUND', message: 'No active store found' });
     }
@@ -58,10 +74,17 @@ const getDefaultConfig = async (req, res) => {
 const getConfigByDomain = async (req, res) => {
   try {
     const { domain } = req.params;
-    const result = await query(
+    let result = await query(
       `SELECT * FROM store_config WHERE custom_domain = $1 AND is_active = true`,
       [domain]
     );
+    if (result.rows.length === 0) {
+      // Fall back to inactive/maintenance store with this domain
+      result = await query(
+        `SELECT * FROM store_config WHERE custom_domain = $1`,
+        [domain]
+      );
+    }
     if (result.rows.length === 0) {
       return res.status(404).json({ code: 'TENANT_NOT_FOUND', message: 'Store not found' });
     }
