@@ -8,6 +8,14 @@ export const setAccessTokenGetter = (getter) => {
     getAccessToken = getter;
 };
 
+// Logout callback – AuthContext registers this so the interceptor
+// can force a full React-level logout when the refresh token is dead.
+let onSessionExpired = null;
+
+export const setSessionExpiredHandler = (handler) => {
+    onSessionExpired = handler;
+};
+
 const api = axios.create({
     baseURL: BASE_URL,
     withCredentials: true
@@ -73,6 +81,8 @@ api.interceptors.response.use(
             } catch (refreshError) {
                 setAccessTokenGetter(() => null);
                 processQueue(refreshError, null);
+                // Refresh token is invalid/expired – force full logout
+                if (onSessionExpired) onSessionExpired();
                 return Promise.reject(refreshError);
             } finally {
                 isRefreshing = false;

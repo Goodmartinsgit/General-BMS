@@ -1,11 +1,12 @@
-import React, { createContext, useState, useEffect, useContext, useCallback } from 'react';
-import api, { setAccessTokenGetter } from '../api/axios';
+import React, { createContext, useState, useEffect, useContext, useCallback, useRef } from 'react';
+import api, { setAccessTokenGetter, setSessionExpiredHandler } from '../api/axios';
 
 const AuthContext = createContext({});
 
 export const AuthProvider = ({ children }) => {
     const [auth, setAuth] = useState({});
     const [loading, setLoading] = useState(true);
+    const mountedRef = useRef(true);
 
     const refreshAccessToken = useCallback(async () => {
         try {
@@ -21,11 +22,29 @@ export const AuthProvider = ({ children }) => {
         }
     }, []);
 
+    // Register the session-expired handler so the axios interceptor can
+    // trigger a full React-level logout when the refresh token is dead.
     useEffect(() => {
+        setSessionExpiredHandler(() => {
+            setAccessTokenGetter(() => null);
+            setAuth({});
+        });
+        return () => setSessionExpiredHandler(null);
+    }, []);
+
+    useEffect(() => {
+        mountedRef.current = true;
+
         // On mount, try to refresh the token from httpOnly cookie
+        const controller = new AbortController();
+
         const initAuth = async () => {
             try {
-                const response = await api.post('/auth/refresh', {}, { withCredentials: true });
+                const response = await api.post('/auth/refresh', {}, {
+                    withCredentials: true,
+                    signal: controller.signal
+                });
+                if (!mountedRef.current) return;
                 const { accessToken, user } = response.data;
                 // Update getter synchronously BEFORE setLoading(false) so child
                 // component useEffect fetches (which fire before parent effects)
@@ -33,12 +52,18 @@ export const AuthProvider = ({ children }) => {
                 setAccessTokenGetter(() => accessToken);
                 setAuth({ accessToken, user });
             } catch {
+                if (!mountedRef.current) return;
                 // Not authenticated
                 setAccessTokenGetter(() => null);
             }
-            setLoading(false);
+            if (mountedRef.current) setLoading(false);
         };
         initAuth();
+
+        return () => {
+            mountedRef.current = false;
+            controller.abort();
+        };
     }, []);
 
     const login = async (email, password) => {
