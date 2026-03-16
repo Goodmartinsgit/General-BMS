@@ -219,8 +219,14 @@ const ProductsPage = () => {
   const roleName = (user?.role_name || user?.role || '').toLowerCase().replace(/\s+/g, '_');
   const canEdit = ['admin', 'super_admin', 'system_admin', 'manager'].includes(roleName);
 
-  // Get first product image
+  // Get first product image — prefer product_images_v2 (images array), then legacy JSONB
   const getImage = (product) => {
+    // product_images_v2 rows (enriched by backend)
+    if (product.images && Array.isArray(product.images) && product.images.length > 0) {
+      const primary = product.images.find(img => img.is_primary) || product.images[0];
+      return primary.image_url;
+    }
+    // Legacy JSONB product_images column
     if (product.product_images && Array.isArray(product.product_images) && product.product_images.length > 0) {
       const firstImage = product.product_images[0];
       return typeof firstImage === 'object' && firstImage !== null ? firstImage.image_url : firstImage;
@@ -462,6 +468,22 @@ const ProductsPage = () => {
                 <p><span className="font-medium">Brand:</span> {product.brand_name || '-'}</p>
                 <p><span className="font-medium">Category:</span> {product.category_name || '-'}</p>
               </div>
+              {/* Color swatches */}
+              {product.colors && product.colors.length > 0 && (
+                <div className="flex items-center gap-1.5 mb-3">
+                  {product.colors.slice(0, 6).map(color => (
+                    <div
+                      key={color.id}
+                      className="w-5 h-5 rounded-full border border-theme flex-shrink-0"
+                      style={{ backgroundColor: color.color_code || '#ccc' }}
+                      title={color.color_name}
+                    />
+                  ))}
+                  {product.colors.length > 6 && (
+                    <span className="text-xs text-theme-muted">+{product.colors.length - 6}</span>
+                  )}
+                </div>
+              )}
               <div className="flex items-center justify-between mb-3 pb-3 border-b border-theme">
                 <div>
                   <p className="text-xs text-theme-muted">Price</p>
@@ -532,6 +554,38 @@ const ProductsPage = () => {
                   <p className="font-semibold text-theme-primary truncate">{product.is_active !== false ? 'Active' : 'Inactive'}</p>
                 </div>
               </div>
+              {/* Colors */}
+              {product.colors && product.colors.length > 0 && (
+                <div className="flex items-center gap-1.5 mb-2">
+                  {product.colors.slice(0, 8).map(color => (
+                    <div
+                      key={color.id}
+                      className="w-4 h-4 rounded-full border border-theme flex-shrink-0"
+                      style={{ backgroundColor: color.color_code || '#ccc' }}
+                      title={color.color_name}
+                    />
+                  ))}
+                  {product.colors.length > 8 && (
+                    <span className="text-[10px] text-theme-muted">+{product.colors.length - 8}</span>
+                  )}
+                </div>
+              )}
+              {/* Category attributes summary */}
+              {product.category_assignments && product.category_assignments.length > 0 && (
+                <div className="flex items-center gap-1 flex-wrap mb-2">
+                  {product.category_assignments
+                    .filter(a => a.is_selection_attribute)
+                    .slice(0, 4)
+                    .map(a => (
+                      <span key={a.category_id} className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 border border-purple-200 dark:border-purple-800">
+                        {a.category_name}{a.stock_allocated ? ` (${a.stock_allocated})` : ''}
+                      </span>
+                    ))}
+                  {product.category_assignments.filter(a => a.is_selection_attribute).length > 4 && (
+                    <span className="text-[10px] text-theme-muted">+{product.category_assignments.filter(a => a.is_selection_attribute).length - 4} more</span>
+                  )}
+                </div>
+              )}
               <div className="grid grid-cols-3 gap-2 sm:gap-3 mb-3 pb-3 border-t border-b border-theme py-2 sm:py-3">
                 <div>
                   <p className="text-[10px] sm:text-xs text-theme-muted">Selling</p>

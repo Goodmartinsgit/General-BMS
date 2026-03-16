@@ -232,6 +232,55 @@ const getAllProducts = async (req, res) => {
     const total = parseInt(countResult.rows[0].total);
     const totalPages = Math.ceil(total / parseInt(limit));
 
+    // Enrich each product with colors, images, and category assignments
+    const productIds = productsResult.rows.map(p => p.id);
+
+    if (productIds.length > 0) {
+      const [colorsRes, imagesRes, assignmentsRes] = await Promise.all([
+        query(
+          `SELECT * FROM product_colors WHERE product_id = ANY($1) ORDER BY product_id, display_order, color_name`,
+          [productIds]
+        ),
+        query(
+          `SELECT pi.*, pc.color_name, pc.color_code
+           FROM product_images_v2 pi
+           LEFT JOIN product_colors pc ON pi.color_id = pc.id
+           WHERE pi.product_id = ANY($1)
+           ORDER BY pi.product_id, pi.display_order, pi.created_at`,
+          [productIds]
+        ),
+        query(
+          `SELECT pca.*, c.category_name, c.parent_category_id, c.level as cat_level,
+                  c.path, c.unit_of_measure, c.is_selection_attribute, c.is_listing_category
+           FROM product_category_assignments pca
+           JOIN categories c ON c.id = pca.category_id
+           WHERE pca.product_id = ANY($1)
+           ORDER BY pca.product_id, c.level, c.display_order, c.category_name`,
+          [productIds]
+        ),
+      ]);
+
+      // Group by product_id
+      const colorsMap = {};
+      const imagesMap = {};
+      const assignmentsMap = {};
+      for (const c of colorsRes.rows) {
+        (colorsMap[c.product_id] ||= []).push(c);
+      }
+      for (const img of imagesRes.rows) {
+        (imagesMap[img.product_id] ||= []).push(img);
+      }
+      for (const a of assignmentsRes.rows) {
+        (assignmentsMap[a.product_id] ||= []).push(a);
+      }
+
+      for (const p of productsResult.rows) {
+        p.colors = colorsMap[p.id] || [];
+        p.images = imagesMap[p.id] || [];
+        p.category_assignments = assignmentsMap[p.id] || [];
+      }
+    }
+
     res.json({
       products: productsResult.rows,
       pagination: {
@@ -255,36 +304,64 @@ const getProductById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const result = await query(`
-      SELECT p.*,
-        b.brand_name,
-        c.category_name,
-        (SELECT COALESCE(SUM(quantity_on_hand), 0) FROM inventory WHERE product_id = p.id) as total_stock,
-        (SELECT json_agg(json_build_object(
-          'branch_id', i.branch_id,
-          'branch_name', br.branch_name,
-          'quantity', i.quantity_on_hand,
-          'quantity_available', i.quantity_available,
-          'branch_price_override', i.branch_price_override
-        ))
-        FROM inventory i
-        JOIN branches br ON i.branch_id = br.id
-        WHERE i.product_id = p.id
-        ) as branch_inventory
-      FROM products p
-      LEFT JOIN brands b ON p.brand_id = b.id
-      LEFT JOIN categories c ON p.category_id = c.id
-      WHERE p.id = $1 AND p.deleted_at IS NULL
-    `, [id]);
+    const [result, colorsResult, imagesResult, assignmentsResult] = await Promise.all([
+      query(`
+        SELECT p.*,
+          b.brand_name,
+          c.category_name,
+          (SELECT COALESCE(SUM(quantity_on_hand), 0) FROM inventory WHERE product_id = p.id) as total_stock,
+          (SELECT json_agg(json_build_object(
+            'branch_id', i.branch_id,
+            'branch_name', br.branch_name,
+            'quantity', i.quantity_on_hand,
+            'quantity_available', i.quantity_available,
+            'branch_price_override', i.branch_price_override
+          ))
+          FROM inventory i
+          JOIN branches br ON i.branch_id = br.id
+          WHERE i.product_id = p.id
+          ) as branch_inventory
+        FROM products p
+        LEFT JOIN brands b ON p.brand_id = b.id
+        LEFT JOIN categories c ON p.category_id = c.id
+        WHERE p.id = $1 AND p.deleted_at IS NULL
+      `, [id]),
+      query(
+        `SELECT * FROM product_colors WHERE product_id = $1 ORDER BY display_order, color_name`,
+        [id]
+      ),
+      query(
+        `SELECT pi.*, pc.color_name, pc.color_code
+         FROM product_images_v2 pi
+         LEFT JOIN product_colors pc ON pi.color_id = pc.id
+         WHERE pi.product_id = $1
+         ORDER BY pi.display_order, pi.created_at`,
+        [id]
+      ),
+      query(
+        `SELECT pca.*, c.category_name, c.parent_category_id, c.level as cat_level,
+                c.path, c.unit_of_measure, c.is_selection_attribute, c.is_listing_category
+         FROM product_category_assignments pca
+         JOIN categories c ON c.id = pca.category_id
+         WHERE pca.product_id = $1
+         ORDER BY c.level, c.display_order, c.category_name`,
+        [id]
+      ),
+    ]);
 
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Product not found' });
     }
 
+    const product = result.rows[0];
+    product.colors = colorsResult.rows;
+    product.images = imagesResult.rows;
+    product.category_assignments = assignmentsResult.rows;
+
     // Increment view count
     await query('UPDATE products SET view_count = view_count + 1 WHERE id = $1', [id]);
 
-    res.json(result.rows[0]);
+    res.json(product);
   } catch (err) {
     console.error('Error fetching product:', err);
     res.status(500).json({ message: 'Server error' });

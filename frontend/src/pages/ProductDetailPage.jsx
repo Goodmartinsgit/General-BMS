@@ -4,7 +4,7 @@ import {
   ArrowLeft, Package, Edit, Trash2, Star, AlertTriangle,
   CheckCircle, XCircle, BarChart3, TrendingUp, Eye,
   PlusCircle, SlidersHorizontal, Activity, ChevronLeft, ChevronRight,
-  Calendar, Globe, Loader2,
+  Calendar, Globe, Loader2, Palette, Image as ImageIcon, Layers, Tag,
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import api from '../api/axios';
@@ -444,10 +444,18 @@ const ProductDetailPage = () => {
     }
   };
 
+  // Use product_images_v2 (images array) first, then fall back to legacy product_images JSONB
+  const allImages = product?.images?.length > 0
+    ? product.images
+    : (product?.product_images && Array.isArray(product.product_images) && product.product_images.length > 0)
+      ? product.product_images.map(img => typeof img === 'string' ? { image_url: img } : img)
+      : [];
+
+  const [selectedImageIdx, setSelectedImageIdx] = useState(0);
+
   const getImage = () => {
-    if (product?.product_images && Array.isArray(product.product_images) && product.product_images.length > 0) {
-      const firstImage = product.product_images[0];
-      return typeof firstImage === 'object' && firstImage !== null ? firstImage.image_url : firstImage;
+    if (allImages.length > 0) {
+      return allImages[selectedImageIdx]?.image_url || allImages[0]?.image_url;
     }
     if (product?.image_url) return product.image_url;
     return null;
@@ -610,8 +618,8 @@ const ProductDetailPage = () => {
         {/* ── Main 3-col grid ── */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
 
-          {/* Left – image */}
-          <div className="lg:col-span-1">
+          {/* Left – image gallery */}
+          <div className="lg:col-span-1 space-y-4">
             <div className="bg-theme-secondary rounded-xl shadow-theme-sm border border-theme overflow-hidden">
               <div className="aspect-square bg-theme-tertiary flex items-center justify-center">
                 {getImage() ? (
@@ -623,6 +631,36 @@ const ProductDetailPage = () => {
                   </div>
                 )}
               </div>
+
+              {/* Image thumbnails */}
+              {allImages.length > 1 && (
+                <div className="p-3 border-t border-theme">
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {allImages.map((img, idx) => (
+                      <button
+                        key={img.id || idx}
+                        onClick={() => setSelectedImageIdx(idx)}
+                        className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all ${
+                          idx === selectedImageIdx
+                            ? 'border-accent-gold ring-1 ring-accent-gold/30'
+                            : 'border-theme hover:border-accent-gold/40'
+                        }`}
+                      >
+                        <img src={img.image_url} alt={img.alt_text || `Image ${idx + 1}`} className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                  {allImages[selectedImageIdx]?.color_name && (
+                    <div className="flex items-center gap-1.5 mt-2">
+                      <div
+                        className="w-3 h-3 rounded-full border border-theme"
+                        style={{ backgroundColor: allImages[selectedImageIdx].color_code || '#ccc' }}
+                      />
+                      <span className="text-xs text-theme-muted">{allImages[selectedImageIdx].color_name}</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Quick stats */}
               <div className="p-4 grid grid-cols-2 gap-3 border-t border-theme">
@@ -640,6 +678,33 @@ const ProductDetailPage = () => {
                 </div>
               </div>
             </div>
+
+            {/* Colors */}
+            {product.colors && product.colors.length > 0 && (
+              <div className="bg-theme-secondary rounded-xl shadow-theme-sm border border-theme overflow-hidden">
+                <div className="px-4 py-3 bg-theme-tertiary border-b border-theme">
+                  <h2 className="text-sm font-bold text-theme-primary flex items-center gap-2">
+                    <Palette className="w-4 h-4 text-accent-gold" />
+                    Colors ({product.colors.length})
+                  </h2>
+                </div>
+                <div className="p-3 space-y-2">
+                  {product.colors.map(color => (
+                    <div key={color.id} className="flex items-center gap-2.5 p-2 rounded-lg bg-theme-tertiary">
+                      <div
+                        className="w-6 h-6 rounded-full border-2 border-theme flex-shrink-0"
+                        style={{ backgroundColor: color.color_code || '#ccc' }}
+                        title={color.color_code}
+                      />
+                      <span className="text-sm font-medium text-theme-primary">{color.color_name}</span>
+                      {color.is_active === false && (
+                        <span className="text-xs px-1.5 py-0.5 rounded bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">Inactive</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Right – detail cards */}
@@ -866,6 +931,70 @@ const ProductDetailPage = () => {
                 </div>
               </div>
             </div>
+
+            {/* Category Assignments — Selection Attributes with Stock & Prices */}
+            {product.category_assignments && product.category_assignments.length > 0 && (
+              <div className="rounded-xl shadow-theme-sm border border-theme overflow-hidden bg-theme-secondary">
+                <div className="px-4 sm:px-6 py-3 sm:py-4 bg-theme-tertiary border-b border-theme">
+                  <h2 className="text-base sm:text-lg font-bold text-theme-primary flex items-center gap-2">
+                    <Layers className="w-4 h-4 sm:w-5 sm:h-5 text-accent-gold" />
+                    Selection Attributes &amp; Stock Allocation
+                  </h2>
+                </div>
+                <div className="p-4 sm:p-6">
+                  <div className="border border-theme rounded-lg overflow-hidden">
+                    <div className="bg-theme-tertiary px-4 py-2.5 grid grid-cols-12 gap-2 text-xs font-semibold text-theme-muted uppercase">
+                      <div className="col-span-4">Attribute</div>
+                      <div className="col-span-2 text-right">Stock</div>
+                      <div className="col-span-2 text-right">Sell Price</div>
+                      <div className="col-span-2 text-right">Cost Price</div>
+                      <div className="col-span-2 text-center">Image</div>
+                    </div>
+                    <div className="divide-y divide-theme max-h-96 overflow-y-auto">
+                      {product.category_assignments.map((a) => {
+                        const indent = Math.max(0, (a.cat_level || 1) - (product.category_assignments[0]?.cat_level || 1));
+                        return (
+                          <div key={a.id || a.category_id} className="px-4 py-2.5 grid grid-cols-12 gap-2 text-sm hover:bg-theme-tertiary transition-colors items-center">
+                            <div className="col-span-4 flex items-center gap-2" style={{ paddingLeft: `${indent * 16}px` }}>
+                              {indent > 0 && <span className="text-theme-muted text-xs">└</span>}
+                              <Tag className="w-3 h-3 text-theme-muted flex-shrink-0" />
+                              <span className={`font-medium text-theme-primary truncate ${a.is_leaf ? '' : 'font-semibold'}`}>
+                                {a.category_name}
+                              </span>
+                              {a.is_listing_category && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 flex-shrink-0">Listing</span>
+                              )}
+                              {a.is_selection_attribute && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 flex-shrink-0">Selection</span>
+                              )}
+                            </div>
+                            <div className="col-span-2 text-right">
+                              <span className={`font-bold ${(a.stock_allocated || 0) > 0 ? 'text-green-600 dark:text-green-400' : 'text-theme-muted'}`}>
+                                {a.stock_allocated || 0}
+                              </span>
+                              {a.unit_of_measure && <span className="text-xs text-theme-muted ml-1">{a.unit_of_measure}</span>}
+                            </div>
+                            <div className="col-span-2 text-right font-medium text-accent-gold">
+                              {a.price_override ? formatCurrency(a.price_override) : '—'}
+                            </div>
+                            <div className="col-span-2 text-right font-medium text-theme-secondary">
+                              {a.cost_price_override ? formatCurrency(a.cost_price_override) : '—'}
+                            </div>
+                            <div className="col-span-2 flex justify-center">
+                              {a.image_url ? (
+                                <img src={a.image_url} alt={a.category_name} className="w-8 h-8 rounded border border-theme object-cover" />
+                              ) : (
+                                <span className="text-theme-muted text-xs">—</span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
