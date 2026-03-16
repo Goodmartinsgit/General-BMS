@@ -1780,7 +1780,7 @@ const getCategoryGroupInsights = async (req, res) => {
             (SELECT SUM(pca2.stock_allocated) FROM product_category_assignments pca2 WHERE pca2.product_id = p.id),
             0
           ) AS stock,
-          COALESCE(p.retail_price, p.selling_price, 0) AS selling_price,
+          COALESCE(p.retail_price, 0) AS selling_price,
           COALESCE(p.cost_price, 0) AS cost_price,
           p.is_active,
           p.is_featured
@@ -1791,7 +1791,7 @@ const getCategoryGroupInsights = async (req, res) => {
           WHERE pca.product_id = p.id AND pca.category_id = c.id
         ))
         WHERE p.deleted_at IS NULL
-        GROUP BY rc.id, p.id, p.retail_price, p.selling_price, p.cost_price, p.is_active, p.is_featured
+        GROUP BY rc.id, p.id, p.retail_price, p.cost_price, p.is_active, p.is_featured
       )
       SELECT
         rc.id,
