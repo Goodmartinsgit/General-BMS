@@ -72,12 +72,14 @@ const ProductDetailView = ({
     ? ((profitPerUnit / price) * 100).toFixed(1)
     : null;
 
-  // Collect all images
-  const allImages = [
+  // Collect all images — fallback to category assignment images
+  const productImgs = [
     ...(Array.isArray(product_images) ? product_images.map(img => typeof img === 'object' && img !== null ? img.image_url : img) : []),
     image_url,
     ...(Array.isArray(model_images) ? model_images.map(img => typeof img === 'object' && img !== null ? img.image_url : img) : []),
   ].filter(Boolean);
+  const allImages = productImgs.length > 0 ? productImgs
+    : (product.category_assignments || []).map(a => a.image_url).filter(Boolean);
   const [selectedImage, setSelectedImage] = useState(0);
   const [activeTab, setActiveTab] = useState('overview');
 

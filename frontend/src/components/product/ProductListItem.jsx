@@ -31,7 +31,13 @@ const ProductListItem = ({ product, onEdit, onDelete, onView, showActions = true
       const firstImage = product_images[0];
       return typeof firstImage === 'object' && firstImage !== null ? firstImage.image_url : firstImage;
     }
-    return image_url || null;
+    if (image_url) return image_url;
+    // Fallback to category assignment images
+    if (product.category_assignments && product.category_assignments.length > 0) {
+      const withImage = product.category_assignments.find(a => a.image_url);
+      if (withImage) return withImage.image_url;
+    }
+    return null;
   })();
 
   return (

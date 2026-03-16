@@ -219,7 +219,7 @@ const ProductsPage = () => {
   const roleName = (user?.role_name || user?.role || '').toLowerCase().replace(/\s+/g, '_');
   const canEdit = ['admin', 'super_admin', 'system_admin', 'manager'].includes(roleName);
 
-  // Get first product image — prefer product_images_v2 (images array), then legacy JSONB
+  // Get first product image — prefer product_images_v2 (images array), then legacy JSONB, then category assignments
   const getImage = (product) => {
     // product_images_v2 rows (enriched by backend)
     if (product.images && Array.isArray(product.images) && product.images.length > 0) {
@@ -232,6 +232,11 @@ const ProductsPage = () => {
       return typeof firstImage === 'object' && firstImage !== null ? firstImage.image_url : firstImage;
     }
     if (product.image_url) return product.image_url;
+    // Fallback to category assignment images
+    if (product.category_assignments && product.category_assignments.length > 0) {
+      const withImage = product.category_assignments.find(a => a.image_url);
+      if (withImage) return withImage.image_url;
+    }
     return null;
   };
 

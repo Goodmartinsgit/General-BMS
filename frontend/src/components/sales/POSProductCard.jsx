@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Package, Star } from 'lucide-react';
 import { Card, Badge, Button } from '../ui';
 import { useCart } from '../../context/CartContext';
@@ -13,22 +13,51 @@ const POSProductCard = ({ product }) => {
         image_url,
         product_images,
         is_featured,
-        quantity_on_hand,
         has_variants,
         price_min,
         price_max,
-        effective_price
+        effective_price,
+        category_assignments
     } = product;
     const hasPriceRange = price_min && price_max && price_min !== price_max;
     const displayPrice = effective_price || selling_price || 0;
 
-    const displayImage = (() => {
-        if (product_images && Array.isArray(product_images) && product_images.length > 0) {
-            const firstImage = product_images[0];
-            return typeof firstImage === 'object' && firstImage !== null ? firstImage.image_url : firstImage;
+    // Stock: prefer total_stock (enriched with category assignment fallback)
+    const stockQty = product.total_stock ?? product.quantity_on_hand ?? 0;
+
+    // Collect all display images: product images first, then category assignment images
+    const allImages = (() => {
+        const imgs = [];
+        if (product_images && Array.isArray(product_images)) {
+            product_images.forEach(img => {
+                const url = typeof img === 'object' && img !== null ? img.image_url : img;
+                if (url) imgs.push(url);
+            });
         }
-        return image_url || null;
+        if (image_url && !imgs.includes(image_url)) imgs.push(image_url);
+        // Fallback to category assignment images
+        if (imgs.length === 0 && category_assignments && category_assignments.length > 0) {
+            category_assignments.forEach(a => {
+                if (a.image_url) imgs.push(a.image_url);
+            });
+        }
+        return imgs;
     })();
+
+    // Auto-cycle through images
+    const [currentImageIndex, setCurrentImageIndex] = useState(0);
+    const intervalRef = useRef(null);
+
+    useEffect(() => {
+        if (allImages.length > 1) {
+            intervalRef.current = setInterval(() => {
+                setCurrentImageIndex(prev => (prev + 1) % allImages.length);
+            }, 3000);
+            return () => clearInterval(intervalRef.current);
+        }
+    }, [allImages.length]);
+
+    const displayImage = allImages[currentImageIndex] || null;
 
     const handleAdd = (e) => {
         e.stopPropagation();
@@ -62,8 +91,8 @@ const POSProductCard = ({ product }) => {
                 )}
 
                 <div className="absolute bottom-1 sm:bottom-2 left-1 sm:left-2 right-1 sm:right-2">
-                    <div className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md text-[9px] sm:text-xs font-medium text-center ${quantity_on_hand > 0 ? 'bg-emerald-500/90 text-white' : 'bg-rose-500/90 text-white'}`}>
-                        {quantity_on_hand > 0 ? `${quantity_on_hand} In Stock` : 'Out of Stock'}
+                    <div className={`px-1.5 sm:px-2 py-0.5 sm:py-1 rounded-md text-[9px] sm:text-xs font-medium text-center ${stockQty > 0 ? 'bg-emerald-500/90 text-white' : 'bg-rose-500/90 text-white'}`}>
+                        {stockQty > 0 ? `${stockQty} In Stock` : 'Out of Stock'}
                     </div>
                 </div>
             </div>

@@ -444,12 +444,22 @@ const ProductDetailPage = () => {
     }
   };
 
-  // Use product_images_v2 (images array) first, then fall back to legacy product_images JSONB
-  const allImages = product?.images?.length > 0
-    ? product.images
-    : (product?.product_images && Array.isArray(product.product_images) && product.product_images.length > 0)
-      ? product.product_images.map(img => typeof img === 'string' ? { image_url: img } : img)
-      : [];
+  // Use product_images_v2 (images array) first, then fall back to legacy product_images JSONB, then category assignment images
+  const allImages = (() => {
+    if (product?.images?.length > 0) return product.images;
+    if (product?.product_images && Array.isArray(product.product_images) && product.product_images.length > 0) {
+      return product.product_images.map(img => typeof img === 'string' ? { image_url: img } : img);
+    }
+    if (product?.image_url) return [{ image_url: product.image_url }];
+    // Fallback: use category assignment images
+    if (product?.category_assignments && product.category_assignments.length > 0) {
+      const catImages = product.category_assignments
+        .filter(a => a.image_url)
+        .map(a => ({ image_url: a.image_url, alt_text: a.category_name }));
+      if (catImages.length > 0) return catImages;
+    }
+    return [];
+  })();
 
   const [selectedImageIdx, setSelectedImageIdx] = useState(0);
 
@@ -457,7 +467,6 @@ const ProductDetailPage = () => {
     if (allImages.length > 0) {
       return allImages[selectedImageIdx]?.image_url || allImages[0]?.image_url;
     }
-    if (product?.image_url) return product.image_url;
     return null;
   };
 

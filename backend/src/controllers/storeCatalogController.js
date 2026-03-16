@@ -16,7 +16,12 @@ const getProducts = async (req, res) => {
     }
     if (category) {
       params.push(category);
-      whereClause += ` AND (c.slug = $${params.length} OR c.id::text = $${params.length})`;
+      whereClause += ` AND (c.slug = $${params.length} OR c.id::text = $${params.length} OR EXISTS (
+        SELECT 1 FROM product_category_assignments pca_f
+        JOIN categories cf ON cf.id = pca_f.category_id
+        WHERE pca_f.product_id = p.id AND (cf.slug = $${params.length} OR cf.id::text = $${params.length}
+          OR cf.parent_category_id IN (SELECT cff.id FROM categories cff WHERE cff.slug = $${params.length} OR cff.id::text = $${params.length}))
+      ))`;
     }
     if (minPrice) {
       params.push(parseFloat(minPrice));
@@ -27,7 +32,7 @@ const getProducts = async (req, res) => {
       whereClause += ` AND p.retail_price <= $${params.length}`;
     }
     if (inStock === 'true') {
-      whereClause += ` AND COALESCE(inv.total_qty, 0) > 0`;
+      whereClause += ` AND COALESCE(inv.total_qty, COALESCE(pca_agg.cat_stock, 0)) > 0`;
     }
 
     const sortMap = {
@@ -47,6 +52,16 @@ const getProducts = async (req, res) => {
         SELECT product_id, SUM(quantity_available) as total_qty
         FROM inventory GROUP BY product_id
       ) inv ON inv.product_id = p.id
+      LEFT JOIN (
+        SELECT pca2.product_id,
+               SUM(pca2.stock_allocated) as cat_stock,
+               MIN(pca2.price_override) FILTER (WHERE pca2.price_override IS NOT NULL) as price_min,
+               MAX(pca2.price_override) FILTER (WHERE pca2.price_override IS NOT NULL) as price_max,
+               array_remove(array_agg(pca2.image_url), NULL) as cat_images
+        FROM product_category_assignments pca2
+        JOIN categories c2 ON c2.id = pca2.category_id AND c2.is_selection_attribute = true
+        GROUP BY pca2.product_id
+      ) pca_agg ON pca_agg.product_id = p.id
       ${whereClause}
     `;
 
@@ -61,8 +76,10 @@ const getProducts = async (req, res) => {
               p.product_images as images, p.is_featured,
               p.has_variants, p.product_code as sku, p.barcode,
               c.id as category_id, c.category_name as category_name, c.slug as category_slug,
-              COALESCE(inv.total_qty, 0) as stock_quantity,
-              COALESCE(inv.total_qty, 0) > 0 as in_stock,
+              COALESCE(inv.total_qty, COALESCE(pca_agg.cat_stock, 0)) as stock_quantity,
+              COALESCE(inv.total_qty, COALESCE(pca_agg.cat_stock, 0)) > 0 as in_stock,
+              pca_agg.price_min as cat_price_min, pca_agg.price_max as cat_price_max,
+              pca_agg.cat_images,
               p.sale_count, p.view_count, p.created_at
        ${baseQuery}
        ORDER BY ${orderBy}
@@ -95,11 +112,23 @@ const getFeaturedProducts = async (req, res) => {
               p.retail_price as price, p.product_images as images,
               p.has_variants, p.product_code as sku,
               c.category_name as category_name, c.slug as category_slug,
-              COALESCE(inv.total_qty, 0) > 0 as in_stock,
-              COALESCE(inv.total_qty, 0) as stock_quantity
+              COALESCE(inv.total_qty, COALESCE(pca_agg.cat_stock, 0)) > 0 as in_stock,
+              COALESCE(inv.total_qty, COALESCE(pca_agg.cat_stock, 0)) as stock_quantity,
+              pca_agg.price_min as cat_price_min, pca_agg.price_max as cat_price_max,
+              pca_agg.cat_images
        FROM products p
        LEFT JOIN categories c ON p.category_id = c.id
        LEFT JOIN (SELECT product_id, SUM(quantity_available) as total_qty FROM inventory GROUP BY product_id) inv ON inv.product_id = p.id
+       LEFT JOIN (
+         SELECT pca2.product_id,
+                SUM(pca2.stock_allocated) as cat_stock,
+                MIN(pca2.price_override) FILTER (WHERE pca2.price_override IS NOT NULL) as price_min,
+                MAX(pca2.price_override) FILTER (WHERE pca2.price_override IS NOT NULL) as price_max,
+                array_remove(array_agg(pca2.image_url), NULL) as cat_images
+         FROM product_category_assignments pca2
+         JOIN categories c2 ON c2.id = pca2.category_id AND c2.is_selection_attribute = true
+         GROUP BY pca2.product_id
+       ) pca_agg ON pca_agg.product_id = p.id
        WHERE p.is_online_available = true AND p.is_featured = true AND p.deleted_at IS NULL
        ORDER BY p.created_at DESC
        LIMIT $1`,
@@ -240,6 +269,17 @@ const getProductBySlug = async (req, res) => {
       detail.thumbnail = structuredImages[0]?.url || detail.image;
     }
 
+    // Fallback: use category assignment images when no product images exist
+    if ((!detail.images || detail.images.length === 0) && categoryAssignments.length > 0) {
+      const catImages = categoryAssignments
+        .filter(a => a.imageUrl)
+        .map((a, i) => ({ id: `cat-${i}`, url: a.imageUrl, alt: a.categoryName || '', position: i }));
+      if (catImages.length > 0) {
+        detail.images = catImages;
+        detail.thumbnail = catImages[0].url;
+      }
+    }
+
     // Compute price range from selection category assignments
     const selectionWithPrice = categoryAssignments.filter(a => a.priceOverride);
     if (selectionWithPrice.length > 1) {
@@ -343,7 +383,14 @@ const getProductsByCategory = async (req, res) => {
     const orderBy = sortMap[sort] || 'p.created_at DESC';
 
     const countRes = await query(
-      `SELECT COUNT(*) FROM products p WHERE p.category_id = $1 AND p.is_online_available = true AND p.deleted_at IS NULL`,
+      `SELECT COUNT(*) FROM products p
+       LEFT JOIN (
+         SELECT pca2.product_id FROM product_category_assignments pca2
+         JOIN categories c2 ON c2.id = pca2.category_id
+         WHERE c2.id = $1 OR c2.parent_category_id = $1
+       ) pca_match ON pca_match.product_id = p.id
+       WHERE (p.category_id = $1 OR pca_match.product_id IS NOT NULL)
+         AND p.is_online_available = true AND p.deleted_at IS NULL`,
       [cat.id]
     );
 
@@ -351,11 +398,29 @@ const getProductsByCategory = async (req, res) => {
       `SELECT p.id, p.slug, p.product_name as name, p.short_description,
               p.retail_price as price, p.product_images as images,
               p.has_variants, p.is_featured,
-              COALESCE(inv.total_qty, 0) > 0 as in_stock,
-              COALESCE(inv.total_qty, 0) as stock_quantity
+              COALESCE(inv.total_qty, COALESCE(pca_agg.cat_stock, 0)) > 0 as in_stock,
+              COALESCE(inv.total_qty, COALESCE(pca_agg.cat_stock, 0)) as stock_quantity,
+              pca_agg.price_min as cat_price_min, pca_agg.price_max as cat_price_max,
+              pca_agg.cat_images
        FROM products p
        LEFT JOIN (SELECT product_id, SUM(quantity_available) as total_qty FROM inventory GROUP BY product_id) inv ON inv.product_id = p.id
-       WHERE p.category_id = $1 AND p.is_online_available = true AND p.deleted_at IS NULL
+       LEFT JOIN (
+         SELECT pca2.product_id,
+                SUM(pca2.stock_allocated) as cat_stock,
+                MIN(pca2.price_override) FILTER (WHERE pca2.price_override IS NOT NULL) as price_min,
+                MAX(pca2.price_override) FILTER (WHERE pca2.price_override IS NOT NULL) as price_max,
+                array_remove(array_agg(pca2.image_url), NULL) as cat_images
+         FROM product_category_assignments pca2
+         JOIN categories c2 ON c2.id = pca2.category_id AND c2.is_selection_attribute = true
+         GROUP BY pca2.product_id
+       ) pca_agg ON pca_agg.product_id = p.id
+       LEFT JOIN (
+         SELECT pca3.product_id FROM product_category_assignments pca3
+         JOIN categories c3 ON c3.id = pca3.category_id
+         WHERE c3.id = $1 OR c3.parent_category_id = $1
+       ) pca_match ON pca_match.product_id = p.id
+       WHERE (p.category_id = $1 OR pca_match.product_id IS NOT NULL)
+         AND p.is_online_available = true AND p.deleted_at IS NULL
        ORDER BY ${orderBy} LIMIT $2 OFFSET $3`,
       [cat.id, parseInt(limit), offset]
     );
@@ -416,20 +481,35 @@ const trackOrder = async (req, res) => {
 function formatProduct(row) {
   const rawImages = Array.isArray(row.images) ? row.images : (row.images || []);
   // Normalize images to { id, url, alt, position } objects
-  const images = rawImages.map((img, i) => {
+  let images = rawImages.map((img, i) => {
     if (typeof img === 'string') return { id: String(i), url: img, alt: '', position: i };
     if (img && typeof img === 'object') return { id: String(img.id || i), url: img.url || img.image_url || '', alt: img.alt || img.alt_text || '', position: img.position ?? img.display_order ?? i };
     return null;
   }).filter(Boolean);
+
+  // Fallback to category assignment images when product has no images
+  if (images.length === 0 && row.cat_images && Array.isArray(row.cat_images) && row.cat_images.length > 0) {
+    images = row.cat_images.map((url, i) => ({ id: `cat-${i}`, url, alt: '', position: i }));
+  }
   const thumbnail = images[0]?.url || null;
+
+  // Compute price — use category price range if available
+  const basePrice = parseFloat(row.price || row.retail_price || 0);
+  const catPriceMin = row.cat_price_min ? parseFloat(row.cat_price_min) : null;
+  const catPriceMax = row.cat_price_max ? parseFloat(row.cat_price_max) : null;
+  const hasPriceRange = catPriceMin && catPriceMax && catPriceMin !== catPriceMax;
+
   return {
     id: row.id,
     slug: row.slug || String(row.id),
     name: row.name || row.product_name,
     shortDescription: row.short_description,
     description: row.description,
-    price: parseFloat(row.price || row.retail_price || 0),
+    price: catPriceMin || basePrice,
     compareAtPrice: row.compare_at_price ? parseFloat(row.compare_at_price) : null,
+    priceMin: catPriceMin,
+    priceMax: catPriceMax,
+    hasPriceRange: hasPriceRange,
     images: images,
     thumbnail: thumbnail,
     inStock: Boolean(row.in_stock),
