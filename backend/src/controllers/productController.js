@@ -46,7 +46,20 @@ const buildProductFilters = (filters) => {
   }
 
   if (filters.category_id) {
-    conditions.push(`p.category_id = $${paramCounter}`);
+    conditions.push(`(
+      p.category_id = $${paramCounter}
+      OR EXISTS (
+        SELECT 1 FROM product_category_assignments pca_f
+        JOIN categories cf ON cf.id = pca_f.category_id
+        WHERE pca_f.product_id = p.id
+          AND (cf.id = $${paramCounter} OR cf.path LIKE $${paramCounter} || '.%'
+               OR cf.parent_category_id = $${paramCounter})
+      )
+      OR p.category_id IN (
+        SELECT csub.id FROM categories csub
+        WHERE csub.path LIKE $${paramCounter} || '.%' OR csub.parent_category_id = $${paramCounter}
+      )
+    )`);
     params.push(filters.category_id);
     paramCounter++;
   }
@@ -1745,6 +1758,70 @@ const updateColorInventory = async (req, res) => {
   }
 };
 
+/**
+ * Get aggregated insights grouped by root categories
+ * @route GET /api/products/category-groups
+ */
+const getCategoryGroupInsights = async (req, res) => {
+  try {
+    const result = await query(`
+      WITH root_cats AS (
+        SELECT id, category_name, image_url, slug
+        FROM categories
+        WHERE parent_category_id IS NULL
+          AND is_active = true
+      ),
+      product_data AS (
+        SELECT
+          rc.id AS root_id,
+          p.id AS product_id,
+          COALESCE(
+            (SELECT SUM(i.quantity_on_hand) FROM inventory i WHERE i.product_id = p.id),
+            (SELECT SUM(pca2.stock_allocated) FROM product_category_assignments pca2 WHERE pca2.product_id = p.id),
+            0
+          ) AS stock,
+          COALESCE(p.retail_price, p.selling_price, 0) AS selling_price,
+          COALESCE(p.cost_price, 0) AS cost_price,
+          p.is_active,
+          p.is_featured
+        FROM root_cats rc
+        JOIN categories c ON c.path LIKE rc.id || '.%' OR c.id = rc.id
+        JOIN products p ON (p.category_id = c.id OR EXISTS (
+          SELECT 1 FROM product_category_assignments pca
+          WHERE pca.product_id = p.id AND pca.category_id = c.id
+        ))
+        WHERE p.deleted_at IS NULL
+        GROUP BY rc.id, p.id, p.retail_price, p.selling_price, p.cost_price, p.is_active, p.is_featured
+      )
+      SELECT
+        rc.id,
+        rc.category_name,
+        rc.image_url,
+        rc.slug,
+        COUNT(DISTINCT pd.product_id)::int AS total_products,
+        COUNT(DISTINCT pd.product_id) FILTER (WHERE pd.is_active = true)::int AS active_products,
+        COUNT(DISTINCT pd.product_id) FILTER (WHERE pd.is_featured = true)::int AS featured_products,
+        COALESCE(SUM(pd.stock), 0)::int AS total_stock,
+        COALESCE(SUM(pd.selling_price), 0)::numeric AS total_selling_value,
+        COALESCE(SUM(pd.cost_price), 0)::numeric AS total_cost_value,
+        COALESCE(SUM(pd.stock * pd.selling_price), 0)::numeric AS total_stock_value,
+        COALESCE(SUM(pd.stock * pd.cost_price), 0)::numeric AS total_stock_cost,
+        COALESCE(MIN(pd.selling_price) FILTER (WHERE pd.selling_price > 0), 0)::numeric AS min_price,
+        COALESCE(MAX(pd.selling_price), 0)::numeric AS max_price,
+        COALESCE(AVG(pd.selling_price) FILTER (WHERE pd.selling_price > 0), 0)::numeric AS avg_price
+      FROM root_cats rc
+      LEFT JOIN product_data pd ON pd.root_id = rc.id
+      GROUP BY rc.id, rc.category_name, rc.image_url, rc.slug
+      ORDER BY rc.category_name
+    `);
+
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Error fetching category group insights:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
   getAllProducts,
   getProductById,
@@ -1756,6 +1833,7 @@ module.exports = {
   getFeaturedProducts,
   getLowStockProducts,
   getProductStatistics,
+  getCategoryGroupInsights,
   getProductsWithVariants,
   getBrands,
   createBrand,
