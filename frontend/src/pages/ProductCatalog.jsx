@@ -131,10 +131,11 @@ const ProductCatalog = () => {
 
   const handleExport = () => {
     try {
-      const headers = ['Name', 'Code', 'Type', 'Price', 'Cost', 'Stock', 'Brand', 'Category', 'Active'];
+      const headers = ['Name', 'Code', 'Type', 'Price', 'Price Min', 'Price Max', 'Cost', 'Stock', 'Brand', 'Category', 'Active'];
       const rows = products.map(p => [
         p.product_name, p.product_code, p.product_type,
-        p.selling_price, p.cost_price, p.quantity_on_hand,
+        p.effective_price || p.selling_price || '', p.price_min || '', p.price_max || '',
+        p.effective_cost_price || p.cost_price || '', p.total_stock ?? p.quantity_on_hand ?? 0,
         p.brand_name || '', p.category_name || '',
         p.is_active ? 'Yes' : 'No',
       ]);

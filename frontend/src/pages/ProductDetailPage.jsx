@@ -474,7 +474,9 @@ const ProductDetailPage = () => {
 
   const effectivePrice = product?.effective_price || product?.retail_price || product?.selling_price || 0;
   const effectiveCost  = product?.effective_cost_price || product?.cost_price || 0;
-  const profitPerUnit = effectivePrice && effectiveCost
+  const hasPriceRange = product?.price_min && product?.price_max && product?.price_min !== product?.price_max;
+  const selectionPrices = product?.selection_prices || [];
+  const profitPerUnit = !hasPriceRange && effectivePrice && effectiveCost
     ? effectivePrice - effectiveCost : null;
   const profitMargin  = profitPerUnit !== null && effectivePrice
     ? ((profitPerUnit / effectivePrice) * 100).toFixed(1) : null;
@@ -798,32 +800,68 @@ const ProductDetailPage = () => {
                 </h2>
               </div>
               <div className="p-4 sm:p-6">
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-theme-tertiary rounded-lg p-3 text-center">
-                    <p className="text-xs text-theme-muted mb-1">Cost Price</p>
-                    <p className="text-lg font-bold text-theme-primary">{formatCurrency(effectiveCost)}</p>
-                  </div>
-                  <div className="bg-theme-tertiary rounded-lg p-3 text-center">
-                    <p className="text-xs text-theme-muted mb-1">Selling Price</p>
-                    <p className="text-lg font-bold text-accent-gold">{formatCurrency(effectivePrice)}</p>
-                  </div>
-                  {profitPerUnit !== null && (
-                    <div className="bg-theme-tertiary rounded-lg p-3 text-center">
-                      <p className="text-xs text-theme-muted mb-1">Profit / Unit</p>
-                      <p className={`text-lg font-bold ${profitPerUnit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                        {formatCurrency(profitPerUnit)}
-                      </p>
+                {hasPriceRange ? (
+                  <>
+                    <div className="grid grid-cols-2 gap-4 mb-4">
+                      <div className="bg-theme-tertiary rounded-lg p-3 text-center">
+                        <p className="text-xs text-theme-muted mb-1">Price Range</p>
+                        <p className="text-lg font-bold text-accent-gold">
+                          {formatCurrency(product.price_min)} – {formatCurrency(product.price_max)}
+                        </p>
+                      </div>
+                      <div className="bg-theme-tertiary rounded-lg p-3 text-center">
+                        <p className="text-xs text-theme-muted mb-1">Variants</p>
+                        <p className="text-lg font-bold text-theme-primary">{selectionPrices.length}</p>
+                      </div>
                     </div>
-                  )}
-                  {profitMargin !== null && (
-                    <div className="bg-theme-tertiary rounded-lg p-3 text-center">
-                      <p className="text-xs text-theme-muted mb-1">Margin</p>
-                      <p className={`text-lg font-bold ${parseFloat(profitMargin) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                        {profitMargin}%
-                      </p>
+                    <div className="bg-theme-tertiary rounded-lg overflow-hidden">
+                      <div className="grid grid-cols-4 gap-2 px-3 py-2 text-xs font-semibold text-theme-muted border-b border-theme">
+                        <span>Category</span>
+                        <span className="text-right">Price</span>
+                        <span className="text-right">Cost</span>
+                        <span className="text-right">Stock</span>
+                      </div>
+                      {selectionPrices.map((sp, idx) => {
+                        const profit = sp.cost_price ? sp.price - sp.cost_price : null;
+                        return (
+                          <div key={idx} className="grid grid-cols-4 gap-2 px-3 py-2 text-sm border-b border-theme last:border-0">
+                            <span className="text-theme-primary font-medium truncate">{sp.category_name}{sp.unit ? ` (${sp.unit})` : ''}</span>
+                            <span className="text-right text-accent-gold font-bold">{formatCurrency(sp.price)}</span>
+                            <span className="text-right text-theme-muted">{sp.cost_price ? formatCurrency(sp.cost_price) : '–'}</span>
+                            <span className="text-right text-theme-primary">{sp.stock}</span>
+                          </div>
+                        );
+                      })}
                     </div>
-                  )}
-                </div>
+                  </>
+                ) : (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="bg-theme-tertiary rounded-lg p-3 text-center">
+                      <p className="text-xs text-theme-muted mb-1">Cost Price</p>
+                      <p className="text-lg font-bold text-theme-primary">{formatCurrency(effectiveCost)}</p>
+                    </div>
+                    <div className="bg-theme-tertiary rounded-lg p-3 text-center">
+                      <p className="text-xs text-theme-muted mb-1">Selling Price</p>
+                      <p className="text-lg font-bold text-accent-gold">{formatCurrency(effectivePrice)}</p>
+                    </div>
+                    {profitPerUnit !== null && (
+                      <div className="bg-theme-tertiary rounded-lg p-3 text-center">
+                        <p className="text-xs text-theme-muted mb-1">Profit / Unit</p>
+                        <p className={`text-lg font-bold ${profitPerUnit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                          {formatCurrency(profitPerUnit)}
+                        </p>
+                      </div>
+                    )}
+                    {profitMargin !== null && (
+                      <div className="bg-theme-tertiary rounded-lg p-3 text-center">
+                        <p className="text-xs text-theme-muted mb-1">Margin</p>
+                        <p className={`text-lg font-bold ${parseFloat(profitMargin) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                          {profitMargin}%
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
 

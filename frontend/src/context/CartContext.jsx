@@ -40,7 +40,7 @@ export const CartProvider = ({ children }) => {
                 );
             }
 
-            return [...prev, { product, variant, quantity: 1, price: variant ? variant.selling_price : product.selling_price }];
+            return [...prev, { product, variant, quantity: 1, price: variant ? variant.selling_price : (product.effective_price || product.selling_price) }];
         });
     };
 

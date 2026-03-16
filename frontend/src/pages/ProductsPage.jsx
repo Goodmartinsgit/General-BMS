@@ -251,6 +251,13 @@ const ProductsPage = () => {
   // Price helper – prefer effective_price (from category assignment override)
   const getPrice = (p) => p.effective_price || p.retail_price || p.selling_price;
   const getCostPrice = (p) => p.effective_cost_price || p.cost_price;
+  const hasPriceRange = (p) => p.price_min && p.price_max && p.price_min !== p.price_max;
+  const formatPriceDisplay = (p) => {
+    if (hasPriceRange(p)) {
+      return `${formatCurrency(p.price_min)} - ${formatCurrency(p.price_max)}`;
+    }
+    return formatCurrency(getPrice(p));
+  };
 
   // Product type badge
   const renderTypeBadge = (type) => {
@@ -310,7 +317,7 @@ const ProductsPage = () => {
               </div>
               <div>
                 <p className="text-xs text-theme-muted mb-0.5">Price</p>
-                <p className="text-sm font-bold text-accent-gold">{formatCurrency(getPrice(product))}</p>
+                <p className="text-sm font-bold text-accent-gold">{formatPriceDisplay(product)}</p>
               </div>
               <div>
                 <p className="text-xs text-theme-muted mb-0.5">Stock</p>
@@ -373,7 +380,7 @@ const ProductsPage = () => {
                     <div className="text-xs text-theme-muted">{product.category_name || '-'}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-accent-gold">
-                    {formatCurrency(getPrice(product))}
+                    {formatPriceDisplay(product)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`text-sm font-semibold ${
@@ -431,7 +438,7 @@ const ProductsPage = () => {
           </div>
           <h3 className="text-xs font-semibold text-theme-primary line-clamp-2 mb-1 flex-grow">{product.product_name}</h3>
           <div className="space-y-0.5">
-            <p className="text-xs sm:text-sm font-bold text-accent-gold truncate">{formatCurrency(getPrice(product))}</p>
+            <p className="text-xs sm:text-sm font-bold text-accent-gold truncate">{formatPriceDisplay(product)}</p>
             <p className={`text-[10px] sm:text-xs font-semibold ${
               getStock(product) > getReorder(product) ? 'text-green-600 dark:text-green-400'
               : getStock(product) > 0 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'
@@ -516,7 +523,7 @@ const ProductsPage = () => {
                 <div>
                   <p className="text-xs text-theme-muted">Price</p>
                   <p className="text-lg font-bold text-accent-gold">
-                    {formatCurrency(getPrice(product))}
+                    {formatPriceDisplay(product)}
                   </p>
                 </div>
                 <div className="text-right">
@@ -618,7 +625,7 @@ const ProductsPage = () => {
                 <div>
                   <p className="text-[10px] sm:text-xs text-theme-muted">Selling</p>
                   <p className="text-sm sm:text-base md:text-lg font-bold text-accent-gold truncate">
-                    {formatCurrency(getPrice(product))}
+                    {formatPriceDisplay(product)}
                   </p>
                 </div>
                 <div>

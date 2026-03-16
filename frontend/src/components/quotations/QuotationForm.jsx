@@ -55,8 +55,8 @@ const QuotationForm = ({ isOpen, onClose, onSuccess }) => {
                 product_id: product.id,
                 product_name: product.product_name,
                 quantity: 1,
-                unit_price: product.retail_price,
-                subtotal: product.retail_price
+                unit_price: product.effective_price || product.retail_price,
+                subtotal: product.effective_price || product.retail_price
             }]);
         }
     };
@@ -140,7 +140,7 @@ const QuotationForm = ({ isOpen, onClose, onSuccess }) => {
                                 <div key={p.id} className="p-3 bg-theme-primary border border-theme rounded-lg flex justify-between items-center hover:border-accent-gold/40 transition-colors">
                                     <div className="min-w-0 mr-3">
                                         <p className="text-sm font-medium text-theme-primary truncate">{p.product_name}</p>
-                                        <p className="text-xs text-theme-muted mt-0.5">{p.product_code} · ₦{parseFloat(p.retail_price).toLocaleString()}</p>
+                                        <p className="text-xs text-theme-muted mt-0.5">{p.product_code} · ₦{parseFloat(p.effective_price || p.retail_price).toLocaleString()}</p>
                                     </div>
                                     <button
                                         type="button"

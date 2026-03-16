@@ -17,9 +17,10 @@ const ProductCard = ({ product, onEdit, onDelete, onView, showActions = true }) 
   } = product;
 
   const stockQty     = product.total_stock ?? product.quantity_on_hand ?? 0;
-  const displayPrice = product.retail_price ?? product.selling_price ?? 0;
+  const displayPrice = product.effective_price || product.retail_price || product.selling_price || 0;
   const isLowStock   = stockQty <= (reorder_level ?? 0);
-  const profitMargin = displayPrice && cost_price
+  const hasPriceRange = product.price_min && product.price_max && product.price_min !== product.price_max;
+  const profitMargin = !hasPriceRange && displayPrice && cost_price
     ? (((displayPrice - cost_price) / displayPrice) * 100).toFixed(1)
     : null;
 
@@ -86,7 +87,9 @@ const ProductCard = ({ product, onEdit, onDelete, onView, showActions = true }) 
 
         <div className="flex items-center justify-between mt-auto pt-2 border-t border-theme">
           <div>
-            <p className="text-lg font-bold text-accent-gold">{formatCurrency(displayPrice)}</p>
+            <p className="text-lg font-bold text-accent-gold">
+              {hasPriceRange ? `${formatCurrency(product.price_min)} – ${formatCurrency(product.price_max)}` : formatCurrency(displayPrice)}
+            </p>
             {profitMargin && <p className="text-[10px] text-green-500">{profitMargin}% margin</p>}
           </div>
           <div className="text-right">

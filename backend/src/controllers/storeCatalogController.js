@@ -240,6 +240,23 @@ const getProductBySlug = async (req, res) => {
       detail.thumbnail = structuredImages[0]?.url || detail.image;
     }
 
+    // Compute price range from selection category assignments
+    const selectionWithPrice = categoryAssignments.filter(a => a.priceOverride);
+    if (selectionWithPrice.length > 1) {
+      const prices = selectionWithPrice.map(a => a.priceOverride);
+      detail.priceMin = Math.min(...prices);
+      detail.priceMax = Math.max(...prices);
+      if (detail.priceMin !== detail.priceMax) {
+        detail.hasPriceRange = true;
+      }
+    }
+
+    // Compute effective stock from category assignments when inventory is 0
+    if (detail.stockQuantity === 0 && categoryAssignments.length > 0) {
+      detail.stockQuantity = categoryAssignments.reduce((sum, a) => sum + (a.stockAllocated || 0), 0);
+      detail.inStock = detail.stockQuantity > 0;
+    }
+
     res.json({ ...detail, variants, options, categoryAssignments, colors });
   } catch (err) {
     console.error(err);

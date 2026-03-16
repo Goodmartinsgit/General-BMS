@@ -115,7 +115,7 @@ const PurchaseOrderFormModal = ({
             variant_id:      null,
             variant_name:    null,
             quantity_ordered: 1,
-            unit_price:      parseFloat(product.cost_price || product.purchase_price || 0),
+            unit_price:      parseFloat(product.effective_cost_price || product.cost_price || product.purchase_price || 0),
           },
         ],
       }));
@@ -269,8 +269,8 @@ const PurchaseOrderFormModal = ({
                       <span className="text-[10px] font-mono font-semibold px-1.5 py-0.5 rounded bg-accent-gold/10 text-accent-gold border border-accent-gold/20">
                         {product.product_code}
                       </span>
-                      {product.cost_price && (
-                        <span className="text-xs text-theme-muted">Cost: ${parseFloat(product.cost_price).toFixed(2)}</span>
+                      {(product.effective_cost_price || product.cost_price) && (
+                        <span className="text-xs text-theme-muted">Cost: ${parseFloat(product.effective_cost_price || product.cost_price).toFixed(2)}</span>
                       )}
                     </div>
                   </div>

@@ -121,7 +121,7 @@ const InvoiceFormModal = ({ isOpen, onClose, onSubmit, invoice }) => {
             if (field === 'product_id' && value) {
                 const product = products.find(p => String(p.id) === String(value));
                 if (product) {
-                    updated[index].unit_price = product.selling_price || product.price || 0;
+                    updated[index].unit_price = product.effective_price || product.selling_price || product.price || 0;
                     if (!updated[index].description) {
                         updated[index].description = product.product_name || product.name || '';
                     }

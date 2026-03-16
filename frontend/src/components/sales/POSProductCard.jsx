@@ -14,8 +14,13 @@ const POSProductCard = ({ product }) => {
         product_images,
         is_featured,
         quantity_on_hand,
-        has_variants
+        has_variants,
+        price_min,
+        price_max,
+        effective_price
     } = product;
+    const hasPriceRange = price_min && price_max && price_min !== price_max;
+    const displayPrice = effective_price || selling_price || 0;
 
     const displayImage = (() => {
         if (product_images && Array.isArray(product_images) && product_images.length > 0) {
@@ -69,7 +74,9 @@ const POSProductCard = ({ product }) => {
                 </h4>
                 <div className="flex items-center justify-between pt-1 sm:pt-2">
                     <div className="text-xs sm:text-sm font-semibold text-accent-gold">
-                        {formatCurrency(selling_price || 0)}
+                        {hasPriceRange
+                          ? `${formatCurrency(price_min)} – ${formatCurrency(price_max)}`
+                          : formatCurrency(displayPrice)}
                     </div>
                     <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg bg-theme-primary text-accent-gold border border-theme flex items-center justify-center group-hover:bg-accent-gold group-hover:text-white group-hover:border-accent-gold transition-all">
                         <Plus size={14} className="sm:w-[18px] sm:h-[18px]" />

@@ -61,10 +61,13 @@ const ProductDetailView = ({
     short_description,
   } = product;
 
-  const price = retail_price || selling_price || 0;
+  const price = product.effective_price || retail_price || selling_price || 0;
   const stock = total_stock ?? quantity_on_hand ?? 0;
   const isLowStock = stock <= (reorder_level || 10);
-  const profitPerUnit = price && cost_price ? price - cost_price : null;
+  const effectiveCost = product.effective_cost_price || cost_price || 0;
+  const hasPriceRange = product.price_min && product.price_max && product.price_min !== product.price_max;
+  const selectionPrices = product.selection_prices || [];
+  const profitPerUnit = !hasPriceRange && price && effectiveCost ? price - effectiveCost : null;
   const profitMargin = profitPerUnit !== null && price
     ? ((profitPerUnit / price) * 100).toFixed(1)
     : null;
@@ -188,19 +191,90 @@ const ProductDetailView = ({
   // ─── Pricing Tab ───────────────────────────────────────────────────
   const renderPricing = () => (
     <div className="space-y-6">
-      {/* Pricing Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <PriceCard label="Selling Price" value={formatCurrency(price)} accent="text-accent-gold" bg="bg-accent-gold/10 border-accent-gold/20" />
-        <PriceCard label="Cost Price" value={cost_price ? formatCurrency(cost_price) : '—'} accent="text-theme-primary" bg="bg-theme-tertiary border-theme" />
-        <PriceCard label="Profit / Unit"
-          value={profitPerUnit !== null ? formatCurrency(profitPerUnit) : '—'}
-          sub={profitMargin ? `${profitMargin}% margin` : null}
-          accent={profitPerUnit !== null && profitPerUnit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}
-          bg={profitPerUnit !== null && profitPerUnit >= 0
-            ? 'bg-green-500/10 border-green-500/20'
-            : 'bg-red-500/10 border-red-500/20'}
-        />
-      </div>
+      {hasPriceRange ? (
+        <>
+          {/* Price Range Summary */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <PriceCard label="Price Range" value={`${formatCurrency(product.price_min)} – ${formatCurrency(product.price_max)}`} accent="text-accent-gold" bg="bg-accent-gold/10 border-accent-gold/20" />
+            <PriceCard label="Selection Categories" value={`${selectionPrices.length} variants`} accent="text-theme-primary" bg="bg-theme-tertiary border-theme" />
+          </div>
+
+          {/* Category Price Breakdown */}
+          <div className="rounded-xl border border-theme bg-theme-secondary overflow-hidden">
+            <div className="px-5 py-3 bg-theme-tertiary border-b border-theme">
+              <h4 className="text-sm font-semibold text-theme-secondary">Category Pricing</h4>
+            </div>
+            <div className="divide-y divide-theme">
+              <div className="grid grid-cols-4 gap-2 px-5 py-2 text-xs font-semibold text-theme-muted">
+                <span>Category</span>
+                <span className="text-right">Price</span>
+                <span className="text-right">Cost</span>
+                <span className="text-right">Stock</span>
+              </div>
+              {selectionPrices.map((sp, idx) => {
+                const spProfit = sp.cost_price ? sp.price - sp.cost_price : null;
+                const spMargin = spProfit !== null && sp.price ? ((spProfit / sp.price) * 100).toFixed(1) : null;
+                return (
+                  <div key={idx} className="grid grid-cols-4 gap-2 px-5 py-3 text-sm items-center">
+                    <span className="text-theme-primary font-medium truncate">{sp.category_name}{sp.unit ? ` (${sp.unit})` : ''}</span>
+                    <span className="text-right text-accent-gold font-bold">{formatCurrency(sp.price)}</span>
+                    <span className="text-right text-theme-muted">{sp.cost_price ? formatCurrency(sp.cost_price) : '–'}</span>
+                    <div className="text-right">
+                      <span className="text-theme-primary">{sp.stock}</span>
+                      {spMargin && <span className="block text-[10px] text-green-500">{spMargin}%</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          {/* Single Price Cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <PriceCard label="Selling Price" value={formatCurrency(price)} accent="text-accent-gold" bg="bg-accent-gold/10 border-accent-gold/20" />
+            <PriceCard label="Cost Price" value={effectiveCost ? formatCurrency(effectiveCost) : '—'} accent="text-theme-primary" bg="bg-theme-tertiary border-theme" />
+            <PriceCard label="Profit / Unit"
+              value={profitPerUnit !== null ? formatCurrency(profitPerUnit) : '—'}
+              sub={profitMargin ? `${profitMargin}% margin` : null}
+              accent={profitPerUnit !== null && profitPerUnit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}
+              bg={profitPerUnit !== null && profitPerUnit >= 0
+                ? 'bg-green-500/10 border-green-500/20'
+                : 'bg-red-500/10 border-red-500/20'}
+            />
+          </div>
+
+          {/* Profit Breakdown */}
+          {profitMargin && (
+            <div className="rounded-xl border border-theme bg-theme-secondary p-5">
+              <h4 className="text-sm font-semibold text-theme-secondary mb-4">Profit Analysis</h4>
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-theme-muted">Selling Price</span>
+                  <span className="font-medium text-theme-primary">{formatCurrency(price)}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-theme-muted">Cost Price</span>
+                  <span className="font-medium text-theme-primary">-{formatCurrency(effectiveCost)}</span>
+                </div>
+                <div className="border-t border-theme pt-3 flex justify-between items-center">
+                  <span className="text-sm font-semibold text-theme-primary">Profit</span>
+                  <span className={`font-bold text-lg ${profitPerUnit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {formatCurrency(profitPerUnit)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-theme-muted">Margin</span>
+                  <span className={`font-semibold ${parseFloat(profitMargin) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                    {profitMargin}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+        </>
+      )}
 
       {/* Additional pricing info */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -214,35 +288,6 @@ const ProductDetailView = ({
           <PriceCard label="Commission" value={formatCurrency(commission_amount)} accent="text-theme-primary" bg="bg-theme-tertiary border-theme" />
         )}
       </div>
-
-      {/* Profit Breakdown */}
-      {profitMargin && (
-        <div className="rounded-xl border border-theme bg-theme-secondary p-5">
-          <h4 className="text-sm font-semibold text-theme-secondary mb-4">Profit Analysis</h4>
-          <div className="space-y-3">
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-theme-muted">Selling Price</span>
-              <span className="font-medium text-theme-primary">{formatCurrency(price)}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-theme-muted">Cost Price</span>
-              <span className="font-medium text-theme-primary">-{formatCurrency(cost_price)}</span>
-            </div>
-            <div className="border-t border-theme pt-3 flex justify-between items-center">
-              <span className="text-sm font-semibold text-theme-primary">Profit</span>
-              <span className={`font-bold text-lg ${profitPerUnit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                {formatCurrency(profitPerUnit)}
-              </span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-sm text-theme-muted">Margin</span>
-              <span className={`font-semibold ${parseFloat(profitMargin) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                {profitMargin}%
-              </span>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 
@@ -283,7 +328,7 @@ const ProductDetailView = ({
       </div>
 
       {/* Inventory Value */}
-      {cost_price && (
+      {effectiveCost > 0 && !hasPriceRange && (
         <div className="rounded-xl border border-theme bg-theme-secondary p-5">
           <h4 className="text-sm font-semibold text-theme-secondary mb-4">Inventory Value</h4>
           <div className="space-y-3">
@@ -293,12 +338,12 @@ const ProductDetailView = ({
             </div>
             <div className="flex justify-between items-center">
               <span className="text-sm text-theme-muted">Cost Per Unit</span>
-              <span className="font-medium text-theme-primary">{formatCurrency(cost_price)}</span>
+              <span className="font-medium text-theme-primary">{formatCurrency(effectiveCost)}</span>
             </div>
             <div className="border-t border-theme pt-3 flex justify-between items-center">
               <span className="text-sm font-semibold text-theme-primary">Total Value</span>
               <span className="font-bold text-accent-gold text-lg">
-                {formatCurrency(stock * parseFloat(cost_price))}
+                {formatCurrency(stock * effectiveCost)}
               </span>
             </div>
           </div>
