@@ -278,6 +278,27 @@ const getAllProducts = async (req, res) => {
         p.colors = colorsMap[p.id] || [];
         p.images = imagesMap[p.id] || [];
         p.category_assignments = assignmentsMap[p.id] || [];
+
+        // Compute effective stock from category assignments when inventory is 0
+        const invStock = parseInt(p.total_stock) || 0;
+        if (invStock === 0 && p.category_assignments.length > 0) {
+          p.total_stock = p.category_assignments.reduce(
+            (sum, a) => sum + (parseInt(a.stock_allocated) || 0), 0
+          );
+        }
+
+        // Compute effective price from listing-category assignment override
+        if (p.category_assignments.length > 0) {
+          const listingAssignment = p.category_assignments.find(a => a.is_listing_category);
+          const firstWithPrice = p.category_assignments.find(a => a.price_override);
+          const override = listingAssignment || firstWithPrice;
+          if (override && override.price_override) {
+            p.effective_price = parseFloat(override.price_override);
+          }
+          if (override && override.cost_price_override) {
+            p.effective_cost_price = parseFloat(override.cost_price_override);
+          }
+        }
       }
     }
 
@@ -357,6 +378,27 @@ const getProductById = async (req, res) => {
     product.colors = colorsResult.rows;
     product.images = imagesResult.rows;
     product.category_assignments = assignmentsResult.rows;
+
+    // Compute effective stock from category assignments when inventory is 0
+    const invStock = parseInt(product.total_stock) || 0;
+    if (invStock === 0 && product.category_assignments.length > 0) {
+      product.total_stock = product.category_assignments.reduce(
+        (sum, a) => sum + (parseInt(a.stock_allocated) || 0), 0
+      );
+    }
+
+    // Compute effective price from listing-category assignment override
+    if (product.category_assignments.length > 0) {
+      const listingAssignment = product.category_assignments.find(a => a.is_listing_category);
+      const firstWithPrice = product.category_assignments.find(a => a.price_override);
+      const override = listingAssignment || firstWithPrice;
+      if (override && override.price_override) {
+        product.effective_price = parseFloat(override.price_override);
+      }
+      if (override && override.cost_price_override) {
+        product.effective_cost_price = parseFloat(override.cost_price_override);
+      }
+    }
 
     // Increment view count
     await query('UPDATE products SET view_count = view_count + 1 WHERE id = $1', [id]);

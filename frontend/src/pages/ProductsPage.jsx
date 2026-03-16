@@ -236,9 +236,21 @@ const ProductsPage = () => {
   };
 
   // Stock helpers
-  const getStock = (p) => p.total_stock ?? p.stock ?? p.quantity_on_hand ?? 0;
+  const getStock = (p) => {
+    const inv = p.total_stock ?? p.stock ?? p.quantity_on_hand ?? 0;
+    if (inv > 0) return inv;
+    // Fallback: sum stock_allocated from category assignments
+    if (p.category_assignments && p.category_assignments.length > 0) {
+      return p.category_assignments.reduce((sum, a) => sum + (parseInt(a.stock_allocated) || 0), 0);
+    }
+    return inv;
+  };
   const getReorder = (p) => p.reorder_level ?? 10;
   const isLowStock = (p) => getStock(p) <= getReorder(p);
+
+  // Price helper – prefer effective_price (from category assignment override)
+  const getPrice = (p) => p.effective_price || p.retail_price || p.selling_price;
+  const getCostPrice = (p) => p.effective_cost_price || p.cost_price;
 
   // Product type badge
   const renderTypeBadge = (type) => {
@@ -298,7 +310,7 @@ const ProductsPage = () => {
               </div>
               <div>
                 <p className="text-xs text-theme-muted mb-0.5">Price</p>
-                <p className="text-sm font-bold text-accent-gold">{formatCurrency(product.retail_price || product.selling_price)}</p>
+                <p className="text-sm font-bold text-accent-gold">{formatCurrency(getPrice(product))}</p>
               </div>
               <div>
                 <p className="text-xs text-theme-muted mb-0.5">Stock</p>
@@ -361,7 +373,7 @@ const ProductsPage = () => {
                     <div className="text-xs text-theme-muted">{product.category_name || '-'}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-accent-gold">
-                    {formatCurrency(product.retail_price || product.selling_price)}
+                    {formatCurrency(getPrice(product))}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`text-sm font-semibold ${
@@ -419,7 +431,7 @@ const ProductsPage = () => {
           </div>
           <h3 className="text-xs font-semibold text-theme-primary line-clamp-2 mb-1 flex-grow">{product.product_name}</h3>
           <div className="space-y-0.5">
-            <p className="text-xs sm:text-sm font-bold text-accent-gold truncate">{formatCurrency(product.retail_price || product.selling_price)}</p>
+            <p className="text-xs sm:text-sm font-bold text-accent-gold truncate">{formatCurrency(getPrice(product))}</p>
             <p className={`text-[10px] sm:text-xs font-semibold ${
               getStock(product) > getReorder(product) ? 'text-green-600 dark:text-green-400'
               : getStock(product) > 0 ? 'text-yellow-600 dark:text-yellow-400' : 'text-red-600 dark:text-red-400'
@@ -484,11 +496,27 @@ const ProductsPage = () => {
                   )}
                 </div>
               )}
+              {/* Selection category badges with stock */}
+              {product.category_assignments && product.category_assignments.filter(a => a.is_selection_attribute).length > 0 && (
+                <div className="flex items-center gap-1 flex-wrap mb-3">
+                  {product.category_assignments
+                    .filter(a => a.is_selection_attribute)
+                    .slice(0, 4)
+                    .map(a => (
+                      <span key={a.category_id} className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 border border-purple-200 dark:border-purple-800">
+                        {a.category_name}{a.stock_allocated ? ` · ${a.stock_allocated}` : ''}{a.price_override ? ` · ${formatCurrency(a.price_override)}` : ''}
+                      </span>
+                    ))}
+                  {product.category_assignments.filter(a => a.is_selection_attribute).length > 4 && (
+                    <span className="text-[10px] text-theme-muted">+{product.category_assignments.filter(a => a.is_selection_attribute).length - 4} more</span>
+                  )}
+                </div>
+              )}
               <div className="flex items-center justify-between mb-3 pb-3 border-b border-theme">
                 <div>
                   <p className="text-xs text-theme-muted">Price</p>
                   <p className="text-lg font-bold text-accent-gold">
-                    {formatCurrency(product.retail_price || product.selling_price)}
+                    {formatCurrency(getPrice(product))}
                   </p>
                 </div>
                 <div className="text-right">
@@ -590,13 +618,13 @@ const ProductsPage = () => {
                 <div>
                   <p className="text-[10px] sm:text-xs text-theme-muted">Selling</p>
                   <p className="text-sm sm:text-base md:text-lg font-bold text-accent-gold truncate">
-                    {formatCurrency(product.retail_price || product.selling_price)}
+                    {formatCurrency(getPrice(product))}
                   </p>
                 </div>
                 <div>
                   <p className="text-[10px] sm:text-xs text-theme-muted">Cost</p>
                   <p className="text-sm sm:text-base font-semibold text-theme-secondary truncate">
-                    {formatCurrency(product.cost_price)}
+                    {formatCurrency(getCostPrice(product))}
                   </p>
                 </div>
                 <div className="text-right">

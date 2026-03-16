@@ -461,14 +461,23 @@ const ProductDetailPage = () => {
     return null;
   };
 
-  const getStock       = () => product?.total_stock ?? product?.stock ?? product?.quantity_on_hand ?? 0;
+  const getStock = () => {
+    const inv = product?.total_stock ?? product?.stock ?? product?.quantity_on_hand ?? 0;
+    if (inv > 0) return inv;
+    if (product?.category_assignments?.length > 0) {
+      return product.category_assignments.reduce((sum, a) => sum + (parseInt(a.stock_allocated) || 0), 0);
+    }
+    return inv;
+  };
   const getReorderLevel = () => product?.reorder_level ?? 10;
   const isLowStock     = () => getStock() <= getReorderLevel();
 
-  const profitPerUnit = product?.retail_price && product?.cost_price
-    ? product.retail_price - product.cost_price : null;
-  const profitMargin  = profitPerUnit !== null && product.retail_price
-    ? ((profitPerUnit / product.retail_price) * 100).toFixed(1) : null;
+  const effectivePrice = product?.effective_price || product?.retail_price || product?.selling_price || 0;
+  const effectiveCost  = product?.effective_cost_price || product?.cost_price || 0;
+  const profitPerUnit = effectivePrice && effectiveCost
+    ? effectivePrice - effectiveCost : null;
+  const profitMargin  = profitPerUnit !== null && effectivePrice
+    ? ((profitPerUnit / effectivePrice) * 100).toFixed(1) : null;
 
   if (loading) {
     return (
@@ -792,11 +801,11 @@ const ProductDetailPage = () => {
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="bg-theme-tertiary rounded-lg p-3 text-center">
                     <p className="text-xs text-theme-muted mb-1">Cost Price</p>
-                    <p className="text-lg font-bold text-theme-primary">{formatCurrency(product.cost_price || 0)}</p>
+                    <p className="text-lg font-bold text-theme-primary">{formatCurrency(effectiveCost)}</p>
                   </div>
                   <div className="bg-theme-tertiary rounded-lg p-3 text-center">
                     <p className="text-xs text-theme-muted mb-1">Selling Price</p>
-                    <p className="text-lg font-bold text-accent-gold">{formatCurrency(product.retail_price || product.selling_price || 0)}</p>
+                    <p className="text-lg font-bold text-accent-gold">{formatCurrency(effectivePrice)}</p>
                   </div>
                   {profitPerUnit !== null && (
                     <div className="bg-theme-tertiary rounded-lg p-3 text-center">
