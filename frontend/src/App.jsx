@@ -15,6 +15,7 @@ import DraftNotificationToast from './components/common/DraftNotificationToast';
 
 // Product & Catalog Pages
 import ProductsPage from './pages/ProductsPage';
+import CategoryInsightsPage from './pages/CategoryInsightsPage';
 import ProductDetailPage from './pages/ProductDetailPage';
 import ProductCatalog from './pages/ProductCatalog';
 import CategoryManagement from './pages/CategoryManagement';
@@ -190,6 +191,7 @@ function App() {
 
                         {/* Products & Catalog */}
                         <Route path="products" element={<ProductsPage />} />
+                        <Route path="products/category-insights" element={<CategoryInsightsPage />} />
                         <Route path="products/:id" element={<ProductDetailPage />} />
                         <Route path="product-catalog" element={<ProductCatalog />} />
                         <Route path="categories" element={<CategoryManagement />} />
