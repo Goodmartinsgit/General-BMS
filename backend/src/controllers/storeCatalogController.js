@@ -59,9 +59,15 @@ const getProducts = async (req, res) => {
                MAX(pca2.price_override) FILTER (WHERE pca2.price_override IS NOT NULL) as price_max,
                array_remove(array_agg(pca2.image_url), NULL) as cat_images
         FROM product_category_assignments pca2
-        JOIN categories c2 ON c2.id = pca2.category_id AND c2.is_selection_attribute = true
+        JOIN categories c2 ON c2.id = pca2.category_id
         GROUP BY pca2.product_id
       ) pca_agg ON pca_agg.product_id = p.id
+      LEFT JOIN (
+        SELECT product_id,
+               array_agg(json_build_object('id', id::text, 'url', image_url, 'alt', COALESCE(alt_text,''), 'position', COALESCE(display_order,0)) ORDER BY is_primary DESC, display_order, id) as v2_images
+        FROM product_images_v2
+        GROUP BY product_id
+      ) piv ON piv.product_id = p.id
       ${whereClause}
     `;
 
@@ -80,6 +86,7 @@ const getProducts = async (req, res) => {
               COALESCE(inv.total_qty, COALESCE(pca_agg.cat_stock, 0)) > 0 as in_stock,
               pca_agg.price_min as cat_price_min, pca_agg.price_max as cat_price_max,
               pca_agg.cat_images,
+              piv.v2_images,
               p.sale_count, p.view_count, p.created_at
        ${baseQuery}
        ORDER BY ${orderBy}
@@ -115,7 +122,8 @@ const getFeaturedProducts = async (req, res) => {
               COALESCE(inv.total_qty, COALESCE(pca_agg.cat_stock, 0)) > 0 as in_stock,
               COALESCE(inv.total_qty, COALESCE(pca_agg.cat_stock, 0)) as stock_quantity,
               pca_agg.price_min as cat_price_min, pca_agg.price_max as cat_price_max,
-              pca_agg.cat_images
+              pca_agg.cat_images,
+              piv.v2_images
        FROM products p
        LEFT JOIN categories c ON p.category_id = c.id
        LEFT JOIN (SELECT product_id, SUM(quantity_available) as total_qty FROM inventory GROUP BY product_id) inv ON inv.product_id = p.id
@@ -126,9 +134,15 @@ const getFeaturedProducts = async (req, res) => {
                 MAX(pca2.price_override) FILTER (WHERE pca2.price_override IS NOT NULL) as price_max,
                 array_remove(array_agg(pca2.image_url), NULL) as cat_images
          FROM product_category_assignments pca2
-         JOIN categories c2 ON c2.id = pca2.category_id AND c2.is_selection_attribute = true
+         JOIN categories c2 ON c2.id = pca2.category_id
          GROUP BY pca2.product_id
        ) pca_agg ON pca_agg.product_id = p.id
+       LEFT JOIN (
+         SELECT product_id,
+                array_agg(json_build_object('id', id::text, 'url', image_url, 'alt', COALESCE(alt_text,''), 'position', COALESCE(display_order,0)) ORDER BY is_primary DESC, display_order, id) as v2_images
+         FROM product_images_v2
+         GROUP BY product_id
+       ) piv ON piv.product_id = p.id
        WHERE p.is_online_available = true AND p.is_featured = true AND p.deleted_at IS NULL
        ORDER BY p.created_at DESC
        LIMIT $1`,
@@ -401,7 +415,8 @@ const getProductsByCategory = async (req, res) => {
               COALESCE(inv.total_qty, COALESCE(pca_agg.cat_stock, 0)) > 0 as in_stock,
               COALESCE(inv.total_qty, COALESCE(pca_agg.cat_stock, 0)) as stock_quantity,
               pca_agg.price_min as cat_price_min, pca_agg.price_max as cat_price_max,
-              pca_agg.cat_images
+              pca_agg.cat_images,
+              piv.v2_images
        FROM products p
        LEFT JOIN (SELECT product_id, SUM(quantity_available) as total_qty FROM inventory GROUP BY product_id) inv ON inv.product_id = p.id
        LEFT JOIN (
@@ -411,9 +426,15 @@ const getProductsByCategory = async (req, res) => {
                 MAX(pca2.price_override) FILTER (WHERE pca2.price_override IS NOT NULL) as price_max,
                 array_remove(array_agg(pca2.image_url), NULL) as cat_images
          FROM product_category_assignments pca2
-         JOIN categories c2 ON c2.id = pca2.category_id AND c2.is_selection_attribute = true
+         JOIN categories c2 ON c2.id = pca2.category_id
          GROUP BY pca2.product_id
        ) pca_agg ON pca_agg.product_id = p.id
+       LEFT JOIN (
+         SELECT product_id,
+                array_agg(json_build_object('id', id::text, 'url', image_url, 'alt', COALESCE(alt_text,''), 'position', COALESCE(display_order,0)) ORDER BY is_primary DESC, display_order, id) as v2_images
+         FROM product_images_v2
+         GROUP BY product_id
+       ) piv ON piv.product_id = p.id
        LEFT JOIN (
          SELECT pca3.product_id FROM product_category_assignments pca3
          JOIN categories c3 ON c3.id = pca3.category_id
@@ -487,7 +508,15 @@ function formatProduct(row) {
     return null;
   }).filter(Boolean);
 
-  // Fallback to category assignment images when product has no images
+  // Fallback 1: use product_images_v2 structured images
+  if (images.length === 0 && row.v2_images && Array.isArray(row.v2_images) && row.v2_images.length > 0) {
+    images = row.v2_images.map(img => {
+      if (typeof img === 'string') { try { img = JSON.parse(img); } catch(e) { return null; } }
+      return img && img.url ? { id: String(img.id || '0'), url: img.url, alt: img.alt || '', position: img.position || 0 } : null;
+    }).filter(Boolean);
+  }
+
+  // Fallback 2: use category assignment images
   if (images.length === 0 && row.cat_images && Array.isArray(row.cat_images) && row.cat_images.length > 0) {
     images = row.cat_images.map((url, i) => ({ id: `cat-${i}`, url, alt: '', position: i }));
   }
