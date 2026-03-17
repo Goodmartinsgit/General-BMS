@@ -1,4 +1,5 @@
 const { query } = require('../config/db');
+const crypto = require('crypto');
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -186,9 +187,9 @@ const getAllProducts = async (req, res) => {
     // Select fields based on view mode
     let selectFields = 'p.*';
     if (view_mode === 'compact') {
-      selectFields = 'p.id, p.product_code, p.product_name, p.retail_price, p.product_images, p.is_active';
+      selectFields = 'p.id, p.product_code, p.product_name, p.base_product_name, p.product_group_id, p.retail_price, p.product_images, p.is_active';
     } else if (view_mode === 'list') {
-      selectFields = 'p.id, p.product_code, p.product_name, p.product_type, p.retail_price, p.cost_price, p.reorder_level, p.is_active, p.is_featured, p.product_images';
+      selectFields = 'p.id, p.product_code, p.product_name, p.base_product_name, p.product_group_id, p.product_type, p.retail_price, p.cost_price, p.reorder_level, p.is_active, p.is_featured, p.product_images';
     }
 
     // Add related data for detailed view
@@ -548,6 +549,13 @@ const createProduct = async (req, res) => {
     // Begin transaction
     await query('BEGIN');
 
+    // For multi-product creation, strip any existing parenthetical suffix to get the base name
+    const baseName = product_name.replace(/\s*\(.*\)\s*$/, '').trim();
+    // Generate a group ID for linking sibling products created together
+    const productGroupId = hasListingLevel
+      ? crypto.createHash('md5').update(baseName + ':' + (category_id || '')).digest('hex')
+      : null;
+
     try {
       let productsToCreate = [];
 
@@ -555,7 +563,7 @@ const createProduct = async (req, res) => {
         // Create one product per listing-level category
         if (listingLevelCategories.length === 0) {
           productsToCreate.push({
-            name: product_name, catId: parseInt(category_id), slug: baseSlug, code: product_code
+            name: product_name, baseName, catId: parseInt(category_id), slug: baseSlug, code: product_code
           });
         } else {
           // Check for existing products with the same base name under these listing categories
@@ -592,7 +600,8 @@ const createProduct = async (req, res) => {
               + '-' + listingCat.category_name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')
               + '-' + slugTs;
             productsToCreate.push({
-              name: `${product_name} (${listingCat.category_name})`,
+              name: `${baseName} (${listingCat.category_name})`,
+              baseName,
               catId: listingCat.id,
               slug: childSlug,
               code: childCode
@@ -608,7 +617,7 @@ const createProduct = async (req, res) => {
         }
       } else {
         productsToCreate.push({
-          name: product_name, catId: category_id ? parseInt(category_id) : null, slug: baseSlug, code: product_code
+          name: product_name, baseName: product_name, catId: category_id ? parseInt(category_id) : null, slug: baseSlug, code: product_code
         });
       }
 
@@ -624,9 +633,11 @@ const createProduct = async (req, res) => {
             model_images, specifications, commission_amount, has_variants,
             track_serial_numbers, track_batches, is_featured,
             is_retail_available, is_wholesale_available, barcode, weight_per_unit,
-            is_online_available, short_description, slug, has_colors
+            is_online_available, short_description, slug, has_colors,
+            base_product_name, product_group_id
           ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29,
+            $30, $31
           ) RETURNING *
         `, [
           p.code, p.name, description || null, product_type,
@@ -636,7 +647,8 @@ const createProduct = async (req, res) => {
           JSON.stringify(specifications), commission_amount || 0, has_variants,
           track_serial_numbers, track_batches, is_featured,
           is_retail_available, is_wholesale_available, barcode || null, weight_per_unit || null,
-          is_online_available, short_description || null, p.slug, has_colors
+          is_online_available, short_description || null, p.slug, has_colors,
+          p.baseName, productGroupId
         ]);
 
         const product = productResult.rows[0];
@@ -780,10 +792,12 @@ const updateProduct = async (req, res) => {
     if (shouldExpand) {
       // Expand: update the original product to become the first listing-level product,
       // and create new products for the remaining listing-level categories
-      const productName = updates.product_name || existingProduct.product_name;
+      const productName = updates.base_product_name || updates.product_name || existingProduct.product_name;
       // Strip any existing parenthetical suffix from the product name for the base name
-      const baseName = productName.replace(/\s*\(.*\)\s*$/, '');
+      const baseName = productName.replace(/\s*\(.*\)\s*$/, '').trim();
       const slugTs = Date.now();
+      const expandGroupId = existingProduct.product_group_id ||
+        crypto.createHash('md5').update(baseName + ':' + effectiveCatId).digest('hex');
 
       // Check for existing products that already cover some listing-level categories
       const listingCatIds = listingLevelCategories.map(lc => lc.id);
@@ -848,6 +862,8 @@ const updateProduct = async (req, res) => {
                 track_serial_numbers = COALESCE($15, track_serial_numbers),
                 track_batches = COALESCE($16, track_batches),
                 is_featured = COALESCE($17, is_featured),
+                base_product_name = $19,
+                product_group_id = $20,
                 updated_at = CURRENT_TIMESTAMP
               WHERE id = $18 RETURNING *
             `, [
@@ -866,7 +882,9 @@ const updateProduct = async (req, res) => {
               updates.track_serial_numbers !== undefined ? updates.track_serial_numbers : null,
               updates.track_batches !== undefined ? updates.track_batches : null,
               updates.is_featured !== undefined ? updates.is_featured : null,
-              id
+              id,
+              baseName,
+              expandGroupId
             ]);
             createdProducts.push(updateResult.rows[0]);
           } else {
@@ -880,9 +898,11 @@ const updateProduct = async (req, res) => {
                 model_images, specifications, commission_amount, has_variants,
                 track_serial_numbers, track_batches, is_featured,
                 is_retail_available, is_wholesale_available, barcode, weight_per_unit,
-                is_online_available, short_description, slug, has_colors
+                is_online_available, short_description, slug, has_colors,
+                base_product_name, product_group_id
               ) VALUES (
-                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29
+                $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29,
+                $30, $31
               ) RETURNING *
             `, [
               childCode, childName,
@@ -912,7 +932,9 @@ const updateProduct = async (req, res) => {
               updates.is_online_available !== undefined ? updates.is_online_available : existingProduct.is_online_available,
               updates.short_description !== undefined ? updates.short_description : existingProduct.short_description,
               childSlug,
-              updates.has_colors !== undefined ? updates.has_colors : existingProduct.has_colors
+              updates.has_colors !== undefined ? updates.has_colors : existingProduct.has_colors,
+              baseName,
+              expandGroupId
             ]);
             createdProducts.push(newProduct.rows[0]);
           }
@@ -1007,6 +1029,27 @@ const updateProduct = async (req, res) => {
     }
 
     // Standard update (no expansion needed)
+    // Handle base_product_name: if the product has a product_group_id,
+    // the frontend sends base_product_name (editable part only).
+    // We reconstruct product_name from base_product_name + category name.
+    let newBaseName = updates.base_product_name;
+    const hasGroupedName = existingProduct.product_group_id && existingProduct.base_product_name;
+
+    if (newBaseName !== undefined && hasGroupedName) {
+      // Reconstruct the full product_name using the new base + existing category suffix
+      const catRes = await query('SELECT category_name FROM categories WHERE id = $1', [existingProduct.category_id]);
+      const catName = catRes.rows[0]?.category_name;
+      if (catName) {
+        updates.product_name = `${newBaseName.trim()} (${catName})`;
+      } else {
+        updates.product_name = newBaseName.trim();
+      }
+      updates.base_product_name = newBaseName.trim();
+    } else if (updates.product_name !== undefined && !hasGroupedName) {
+      // Non-grouped product: base_product_name = product_name
+      updates.base_product_name = updates.product_name;
+    }
+
     const updateFields = [];
     const values = [];
     let paramCounter = 1;
@@ -1018,7 +1061,8 @@ const updateProduct = async (req, res) => {
       'specifications', 'commission_amount', 'has_variants', 'track_serial_numbers',
       'track_batches', 'is_featured', 'is_retail_available', 'is_wholesale_available',
       'barcode', 'weight_per_unit',
-      'is_online_available', 'short_description', 'slug', 'has_colors'
+      'is_online_available', 'short_description', 'slug', 'has_colors',
+      'base_product_name'
     ];
 
     // Integer/numeric columns that must not receive empty strings
@@ -1063,6 +1107,25 @@ const updateProduct = async (req, res) => {
 
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'Product not found' });
+    }
+
+    // Propagate base name change to all sibling products in the same group
+    if (newBaseName !== undefined && hasGroupedName && newBaseName.trim() !== existingProduct.base_product_name) {
+      const siblings = await query(
+        `SELECT p.id, p.category_id, c.category_name
+         FROM products p
+         JOIN categories c ON c.id = p.category_id
+         WHERE p.product_group_id = $1 AND p.id != $2 AND p.deleted_at IS NULL`,
+        [existingProduct.product_group_id, id]
+      );
+      for (const sib of siblings.rows) {
+        const sibFullName = `${newBaseName.trim()} (${sib.category_name})`;
+        const sibSlug = sibFullName.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-') + '-' + Date.now();
+        await query(
+          `UPDATE products SET product_name = $1, base_product_name = $2, slug = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $4`,
+          [sibFullName, newBaseName.trim(), sibSlug, sib.id]
+        );
+      }
     }
 
     res.json(result.rows[0]);

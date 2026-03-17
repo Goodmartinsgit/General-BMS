@@ -390,20 +390,24 @@ const updateCategory = async (req, res) => {
     await recalcSelectionAttributes();
 
     // If category name changed, propagate to linked product names
-    // Products whose category_id matches this category and whose name ends with
-    // "(oldCategoryName)" get updated to use "(newCategoryName)" instead
+    // Use base_product_name to reconstruct the full name reliably
     const newCatName = category_name?.trim();
     if (newCatName && oldCategoryName && newCatName !== oldCategoryName) {
       const linkedProducts = await query(
-        `SELECT id, product_name FROM products
-         WHERE category_id = $1 AND deleted_at IS NULL
-           AND product_name LIKE $2`,
-        [id, `% (${oldCategoryName})`]
+        `SELECT id, product_name, base_product_name FROM products
+         WHERE category_id = $1 AND deleted_at IS NULL`,
+        [id]
       );
       for (const prod of linkedProducts.rows) {
-        const updatedName = prod.product_name.replace(
-          ` (${oldCategoryName})`, ` (${newCatName})`
-        );
+        // If product has base_product_name, reconstruct using it; otherwise fall back to string replace
+        let updatedName;
+        if (prod.base_product_name) {
+          updatedName = `${prod.base_product_name} (${newCatName})`;
+        } else {
+          updatedName = prod.product_name.replace(
+            ` (${oldCategoryName})`, ` (${newCatName})`
+          );
+        }
         if (updatedName !== prod.product_name) {
           const updatedSlug = updatedName.toLowerCase()
             .replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')

@@ -153,10 +153,17 @@ const ProductFormModal = ({
     fetchProductData();
   }, [product?.id, isOpen]);
 
+  // Whether this product is part of a multi-product group (name linked to category)
+  const isGroupedProduct = isEditMode && product?.product_group_id && product?.base_product_name;
+  // Extract the category suffix for display (e.g. "1 Inche hemming Gum" from "Hemming Gum (1 Inche hemming Gum)")
+  const categorySuffix = isGroupedProduct
+    ? (product.product_name || '').replace(product.base_product_name, '').trim()
+    : '';
+
   useEffect(() => {
     if (product) {
       setFormData({
-        product_name: product.product_name || '',
+        product_name: product.product_group_id ? (product.base_product_name || product.product_name || '') : (product.product_name || ''),
         product_code: product.product_code || '',
         product_type: product.product_type || 'physical',
         description: product.description || '',
@@ -305,6 +312,13 @@ const ProductFormModal = ({
         has_colors: formData.colors && formData.colors.length > 0,
         product_images: formData.images,
       };
+
+      // For grouped products, send base_product_name instead of product_name
+      // so the backend can propagate the change to siblings
+      if (isGroupedProduct) {
+        payload.base_product_name = formData.product_name;
+        delete payload.product_name;
+      }
 
       // Set primary image URL for backward compatibility
       if (formData.images && formData.images.length > 0) {
@@ -476,13 +490,33 @@ const ProductFormModal = ({
               <label className={labelClass}>
                 Product Name <span className="text-red-500">*</span>
               </label>
-              <input
-                type="text"
-                value={formData.product_name}
-                onChange={(e) => handleChange('product_name', e.target.value)}
-                placeholder="e.g. Premium Hardware X1"
-                className={`${inputClass} ${errors.product_name ? 'border-red-500/60 focus:border-red-500' : ''}`}
-              />
+              {isGroupedProduct ? (
+                <div className="flex items-stretch">
+                  <input
+                    type="text"
+                    value={formData.product_name}
+                    onChange={(e) => handleChange('product_name', e.target.value)}
+                    placeholder="Base product name"
+                    className={`${inputClass} rounded-r-none border-r-0 ${errors.product_name ? 'border-red-500/60 focus:border-red-500' : ''}`}
+                  />
+                  <span className="inline-flex items-center px-3 py-2.5 bg-theme-tertiary border border-theme border-l-0 rounded-r-lg text-sm text-theme-muted whitespace-nowrap" title="Linked to category — changes when the category is renamed">
+                    {categorySuffix}
+                  </span>
+                </div>
+              ) : (
+                <input
+                  type="text"
+                  value={formData.product_name}
+                  onChange={(e) => handleChange('product_name', e.target.value)}
+                  placeholder="e.g. Premium Hardware X1"
+                  className={`${inputClass} ${errors.product_name ? 'border-red-500/60 focus:border-red-500' : ''}`}
+                />
+              )}
+              {isGroupedProduct && (
+                <p className="mt-1 text-xs text-theme-muted">
+                  The category suffix is linked to the category and updates automatically. Changing the base name will update all sibling products.
+                </p>
+              )}
               {errors.product_name && (
                 <p className="mt-1 text-xs text-red-500">{errors.product_name}</p>
               )}
@@ -550,7 +584,8 @@ const ProductFormModal = ({
               <select
                 value={formData.category_id}
                 onChange={(e) => handleChange('category_id', e.target.value)}
-                className={`${inputClass} ${errors.category_id ? 'border-red-500/60 focus:border-red-500' : ''}`}
+                disabled={isGroupedProduct}
+                className={`${inputClass} ${errors.category_id ? 'border-red-500/60 focus:border-red-500' : ''} ${isGroupedProduct ? 'opacity-60 cursor-not-allowed' : ''}`}
               >
                 <option value="">Select Category</option>
                 {rootCategories.map((c) => (
@@ -559,6 +594,9 @@ const ProductFormModal = ({
                   </option>
                 ))}
               </select>
+              {isGroupedProduct && (
+                <p className="mt-1 text-xs text-theme-muted">Category is locked for grouped products.</p>
+              )}
               {errors.category_id && (
                 <p className="mt-1 text-xs text-red-500">{errors.category_id}</p>
               )}
