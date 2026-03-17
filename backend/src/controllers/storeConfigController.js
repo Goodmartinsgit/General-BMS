@@ -334,6 +334,18 @@ function formatConfig(row) {
     headerConfig: row.header_config || {},
     footerConfig: row.footer_config || {},
     deliveryConfig: row.delivery_config || {},
+    // Display settings from store_settings JSONB
+    displaySettings: (() => {
+      let ss = row.store_settings;
+      if (typeof ss === 'string') { try { ss = JSON.parse(ss); } catch { ss = {}; } }
+      const d = (ss && ss.display) || {};
+      return {
+        itemsPerPage: parseInt(d.items_per_page) || 20,
+        defaultViewMode: d.default_view_mode || 'grid',
+        showProductImages: d.show_product_images !== false,
+        compactMode: d.compact_mode === true,
+      };
+    })(),
   };
 }
 
@@ -426,6 +438,25 @@ async function resolveCompanyOverrides(formatted, row) {
           if (ps.bank_transfer_enabled)  methods.push('bank_transfer');
           if (ps.mobile_money_enabled)   methods.push('mobile_money');
           if (methods.length > 0) result.paymentMethods = methods;
+        }
+      } catch {}
+    }
+
+    // ── Display ─────────────────────────────────────────────────────────
+    if (ucs.display) {
+      try {
+        const dr = await pool.query(
+          "SELECT settings FROM settings WHERE category = 'display' AND organization_id = $1",
+          [orgId]
+        );
+        if (dr.rows.length > 0) {
+          const ds = dr.rows[0].settings || {};
+          result.displaySettings = {
+            itemsPerPage: parseInt(ds.items_per_page) || 20,
+            defaultViewMode: ds.default_view_mode || 'grid',
+            showProductImages: ds.show_product_images !== false,
+            compactMode: ds.compact_mode === true,
+          };
         }
       } catch {}
     }
