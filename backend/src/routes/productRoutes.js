@@ -3,7 +3,7 @@ const router = express.Router();
 const {
   getAllProducts, getProductById, createProduct, updateProduct, deleteProduct,
   getProductStatistics, getFeaturedProducts, getLowStockProducts,
-  getCategoryGroupInsights,
+  getCategoryGroupInsights, getCategoryGroupBreakdown,
   getBrands, createBrand, updateBrand, deleteBrand,
   getProductColors, addProductColor, updateProductColor, deleteProductColor,
   getProductImages, addProductImage, updateProductImage, deleteProductImage,
@@ -21,6 +21,7 @@ router.get('/statistics', authenticateToken, authorize('view_products'), getProd
 router.get('/featured', authenticateToken, authorize('view_products'), getFeaturedProducts);
 router.get('/low-stock', authenticateToken, authorize('view_products'), getLowStockProducts);
 router.get('/category-groups', authenticateToken, authorize('view_products'), getCategoryGroupInsights);
+router.get('/category-groups/:id/breakdown', authenticateToken, authorize('view_products'), getCategoryGroupBreakdown);
 
 // Brands
 router.get('/brands', authenticateToken, authorize('view_products'), getBrands);

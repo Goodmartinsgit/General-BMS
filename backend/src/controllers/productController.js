@@ -1822,6 +1822,114 @@ const getCategoryGroupInsights = async (req, res) => {
   }
 };
 
+// GET /api/products/category-groups/:id/breakdown
+const getCategoryGroupBreakdown = async (req, res) => {
+  try {
+    const rootId = parseInt(req.params.id);
+
+    // 1. Get root category info
+    const rootRes = await query(
+      `SELECT id, category_name, image_url, slug FROM categories WHERE id = $1`,
+      [rootId]
+    );
+    if (rootRes.rows.length === 0) return res.status(404).json({ message: 'Category not found' });
+    const rootCat = rootRes.rows[0];
+
+    // 2. Get all descendant categories (including root itself)
+    const catsRes = await query(
+      `SELECT id, category_name, image_url, slug, level, parent_category_id, path
+       FROM categories
+       WHERE (path LIKE $1 || '/%' OR id = $2) AND is_active = true
+       ORDER BY level, category_name`,
+      [String(rootId), rootId]
+    );
+
+    // 3. For each category, compute product stats
+    const catIds = catsRes.rows.map(c => c.id);
+    const statsRes = await query(
+      `SELECT
+         c.id AS category_id,
+         c.category_name,
+         c.image_url,
+         c.level,
+         c.parent_category_id,
+         COUNT(DISTINCT p.id)::int AS total_products,
+         COUNT(DISTINCT p.id) FILTER (WHERE p.is_active = true)::int AS active_products,
+         COUNT(DISTINCT p.id) FILTER (WHERE p.is_featured = true)::int AS featured_products,
+         COALESCE(SUM(
+           COALESCE(
+             (SELECT SUM(i.quantity_on_hand) FROM inventory i WHERE i.product_id = p.id),
+             (SELECT SUM(pca2.stock_allocated) FROM product_category_assignments pca2 WHERE pca2.product_id = p.id AND pca2.category_id = c.id),
+             0
+           )
+         ), 0)::int AS total_stock,
+         COALESCE(SUM(
+           COALESCE(
+             (SELECT SUM(i.quantity_on_hand) FROM inventory i WHERE i.product_id = p.id),
+             (SELECT SUM(pca2.stock_allocated) FROM product_category_assignments pca2 WHERE pca2.product_id = p.id AND pca2.category_id = c.id),
+             0
+           ) * COALESCE(p.retail_price, 0)
+         ), 0)::numeric AS total_stock_value,
+         COALESCE(SUM(
+           COALESCE(
+             (SELECT SUM(i.quantity_on_hand) FROM inventory i WHERE i.product_id = p.id),
+             (SELECT SUM(pca2.stock_allocated) FROM product_category_assignments pca2 WHERE pca2.product_id = p.id AND pca2.category_id = c.id),
+             0
+           ) * COALESCE(p.cost_price, 0)
+         ), 0)::numeric AS total_stock_cost,
+         COALESCE(MIN(p.retail_price) FILTER (WHERE p.retail_price > 0), 0)::numeric AS min_price,
+         COALESCE(MAX(p.retail_price), 0)::numeric AS max_price,
+         COALESCE(AVG(p.retail_price) FILTER (WHERE p.retail_price > 0), 0)::numeric AS avg_price
+       FROM categories c
+       LEFT JOIN products p ON (p.category_id = c.id OR EXISTS (
+         SELECT 1 FROM product_category_assignments pca
+         WHERE pca.product_id = p.id AND pca.category_id = c.id
+       )) AND p.deleted_at IS NULL
+       WHERE c.id = ANY($1)
+       GROUP BY c.id, c.category_name, c.image_url, c.level, c.parent_category_id
+       ORDER BY c.level, c.category_name`,
+      [catIds]
+    );
+
+    // 4. Get top products for this root category (by stock value)
+    const topProductsRes = await query(
+      `SELECT
+         p.id, p.product_name, p.product_code, p.retail_price, p.cost_price,
+         p.is_active, p.is_featured,
+         c.category_name AS direct_category,
+         COALESCE(
+           (SELECT SUM(i.quantity_on_hand) FROM inventory i WHERE i.product_id = p.id),
+           (SELECT SUM(pca2.stock_allocated) FROM product_category_assignments pca2 WHERE pca2.product_id = p.id),
+           0
+         )::int AS stock,
+         COALESCE(
+           (SELECT SUM(i.quantity_on_hand) FROM inventory i WHERE i.product_id = p.id),
+           (SELECT SUM(pca2.stock_allocated) FROM product_category_assignments pca2 WHERE pca2.product_id = p.id),
+           0
+         ) * COALESCE(p.retail_price, 0) AS stock_value
+       FROM products p
+       LEFT JOIN categories c ON p.category_id = c.id
+       WHERE p.deleted_at IS NULL
+         AND (p.category_id = ANY($1) OR EXISTS (
+           SELECT 1 FROM product_category_assignments pca
+           WHERE pca.product_id = p.id AND pca.category_id = ANY($1)
+         ))
+       ORDER BY stock_value DESC
+       LIMIT 20`,
+      [catIds]
+    );
+
+    res.json({
+      root: rootCat,
+      subcategories: statsRes.rows,
+      topProducts: topProductsRes.rows,
+    });
+  } catch (err) {
+    console.error('Error fetching category group breakdown:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
   getAllProducts,
   getProductById,
@@ -1834,6 +1942,7 @@ module.exports = {
   getLowStockProducts,
   getProductStatistics,
   getCategoryGroupInsights,
+  getCategoryGroupBreakdown,
   getProductsWithVariants,
   getBrands,
   createBrand,
