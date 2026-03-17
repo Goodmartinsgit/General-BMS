@@ -514,7 +514,7 @@ const ProductsPage = () => {
               {product.category_assignments && product.category_assignments.filter(a => a.is_selection_attribute || a.is_leaf).length > 0 && (
                 <div className="flex items-center gap-1 flex-wrap mb-3">
                   {product.category_assignments
-                    .filter(a => a.is_selection_attribute)
+                    .filter(a => a.is_selection_attribute || a.is_leaf)
                     .slice(0, 4)
                     .map(a => (
                       <span key={a.category_id} className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 border border-purple-200 dark:border-purple-800">
@@ -613,10 +613,10 @@ const ProductsPage = () => {
                 </div>
               )}
               {/* Category attributes summary */}
-              {product.category_assignments && product.category_assignments.length > 0 && (
+              {product.category_assignments && product.category_assignments.filter(a => a.is_selection_attribute || a.is_leaf).length > 0 && (
                 <div className="flex items-center gap-1 flex-wrap mb-2">
                   {product.category_assignments
-                    .filter(a => a.is_selection_attribute)
+                    .filter(a => a.is_selection_attribute || a.is_leaf)
                     .slice(0, 4)
                     .map(a => (
                       <span key={a.category_id} className="text-[10px] px-1.5 py-0.5 rounded bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400 border border-purple-200 dark:border-purple-800">
