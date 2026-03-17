@@ -1007,16 +1007,42 @@ const ProductDetailPage = () => {
                       <div className="col-span-2 text-center">Image</div>
                     </div>
                     <div className="divide-y divide-theme max-h-96 overflow-y-auto">
-                      {product.category_assignments.map((a) => {
-                        const indent = Math.max(0, (a.cat_level || 1) - (product.category_assignments[0]?.cat_level || 1));
-                        return (
-                          <div key={a.id || a.category_id} className="px-4 py-2.5 grid grid-cols-12 gap-2 text-sm hover:bg-theme-tertiary transition-colors items-center">
-                            <div className="col-span-4 flex items-center gap-2" style={{ paddingLeft: `${indent * 16}px` }}>
-                              {indent > 0 && <span className="text-theme-muted text-xs">└</span>}
+                      {(() => {
+                        // Build tree from category assignments using parent_category_id
+                        const assignments = product.category_assignments;
+                        const catIdSet = new Set(assignments.map(a => a.category_id));
+                        const childrenMap = {};
+                        const roots = [];
+                        for (const a of assignments) {
+                          if (a.parent_category_id && catIdSet.has(a.parent_category_id)) {
+                            (childrenMap[a.parent_category_id] ||= []).push(a);
+                          } else {
+                            roots.push(a);
+                          }
+                        }
+                        // DFS walk to produce ordered flat list with depth
+                        const ordered = [];
+                        const walk = (nodes, depth) => {
+                          for (const n of nodes) {
+                            ordered.push({ ...n, _depth: depth });
+                            if (childrenMap[n.category_id]) {
+                              walk(childrenMap[n.category_id], depth + 1);
+                            }
+                          }
+                        };
+                        walk(roots, 0);
+
+                        return ordered.map((a) => (
+                          <div key={a.id || a.category_id} className={`px-4 py-2.5 grid grid-cols-12 gap-2 text-sm hover:bg-theme-tertiary transition-colors items-center ${a._depth === 0 ? 'bg-theme-tertiary/50' : ''}`}>
+                            <div className="col-span-4 flex items-center gap-2" style={{ paddingLeft: `${a._depth * 20}px` }}>
+                              {a._depth > 0 && <span className="text-theme-muted text-xs">└</span>}
                               <Tag className="w-3 h-3 text-theme-muted flex-shrink-0" />
-                              <span className={`font-medium text-theme-primary truncate ${a.is_leaf ? '' : 'font-semibold'}`}>
+                              <span className={`font-medium text-theme-primary truncate ${a._depth === 0 ? 'font-bold' : a.is_leaf ? '' : 'font-semibold'}`}>
                                 {a.category_name}
                               </span>
+                              {a._depth === 0 && (
+                                <span className="text-[10px] px-1.5 py-0.5 rounded bg-gray-200 text-gray-600 dark:bg-gray-700 dark:text-gray-300 flex-shrink-0">Root</span>
+                              )}
                               {a.is_listing_category && (
                                 <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400 flex-shrink-0">Listing</span>
                               )}
@@ -1025,10 +1051,16 @@ const ProductDetailPage = () => {
                               )}
                             </div>
                             <div className="col-span-2 text-right">
-                              <span className={`font-bold ${(a.stock_allocated || 0) > 0 ? 'text-green-600 dark:text-green-400' : 'text-theme-muted'}`}>
-                                {a.stock_allocated || 0}
-                              </span>
-                              {a.unit_of_measure && <span className="text-xs text-theme-muted ml-1">{a.unit_of_measure}</span>}
+                              {a.is_leaf ? (
+                                <>
+                                  <span className={`font-bold ${(a.stock_allocated || 0) > 0 ? 'text-green-600 dark:text-green-400' : 'text-theme-muted'}`}>
+                                    {a.stock_allocated || 0}
+                                  </span>
+                                  {a.unit_of_measure && <span className="text-xs text-theme-muted ml-1">{a.unit_of_measure}</span>}
+                                </>
+                              ) : (
+                                <span className="text-theme-muted text-xs">—</span>
+                              )}
                             </div>
                             <div className="col-span-2 text-right font-medium text-accent-gold">
                               {a.price_override ? formatCurrency(a.price_override) : '—'}
@@ -1044,8 +1076,8 @@ const ProductDetailPage = () => {
                               )}
                             </div>
                           </div>
-                        );
-                      })}
+                        ));
+                      })()}
                     </div>
                   </div>
                 </div>

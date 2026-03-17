@@ -248,7 +248,7 @@ const ProductsPage = () => {
     if (inv > 0) return inv;
     // Fallback: sum stock_allocated from category assignments
     if (p.category_assignments && p.category_assignments.length > 0) {
-      return p.category_assignments.reduce((sum, a) => sum + (parseInt(a.stock_allocated) || 0), 0);
+      return p.category_assignments.filter(a => a.is_leaf).reduce((sum, a) => sum + (parseInt(a.stock_allocated) || 0), 0);
     }
     return inv;
   };
