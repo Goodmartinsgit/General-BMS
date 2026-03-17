@@ -312,9 +312,9 @@ const getAllProducts = async (req, res) => {
             p.effective_cost_price = parseFloat(override.cost_price_override);
           }
 
-          // Compute price range from selection category assignments
+          // Compute price range from leaf-level category assignments with price overrides
           const selectionPrices = p.category_assignments
-            .filter(a => a.is_selection_attribute && a.price_override)
+            .filter(a => (a.is_selection_attribute || a.is_leaf) && a.price_override)
             .map(a => ({
               category_name: a.category_name,
               price: parseFloat(a.price_override),
@@ -322,11 +322,13 @@ const getAllProducts = async (req, res) => {
               stock: parseInt(a.stock_allocated) || 0,
               unit: a.unit_of_measure || null
             }));
-          if (selectionPrices.length > 1) {
-            const prices = selectionPrices.map(s => s.price);
-            p.price_min = Math.min(...prices);
-            p.price_max = Math.max(...prices);
+          if (selectionPrices.length > 0) {
             p.selection_prices = selectionPrices;
+            if (selectionPrices.length > 1) {
+              const prices = selectionPrices.map(s => s.price);
+              p.price_min = Math.min(...prices);
+              p.price_max = Math.max(...prices);
+            }
           }
         }
       }
@@ -429,9 +431,9 @@ const getProductById = async (req, res) => {
         product.effective_cost_price = parseFloat(override.cost_price_override);
       }
 
-      // Compute price range from selection category assignments
+      // Compute price range from leaf-level category assignments with price overrides
       const selectionPrices = product.category_assignments
-        .filter(a => a.is_selection_attribute && a.price_override)
+        .filter(a => (a.is_selection_attribute || a.is_leaf) && a.price_override)
         .map(a => ({
           category_name: a.category_name,
           price: parseFloat(a.price_override),
@@ -439,11 +441,13 @@ const getProductById = async (req, res) => {
           stock: parseInt(a.stock_allocated) || 0,
           unit: a.unit_of_measure || null
         }));
-      if (selectionPrices.length > 1) {
-        const prices = selectionPrices.map(s => s.price);
-        product.price_min = Math.min(...prices);
-        product.price_max = Math.max(...prices);
+      if (selectionPrices.length > 0) {
         product.selection_prices = selectionPrices;
+        if (selectionPrices.length > 1) {
+          const prices = selectionPrices.map(s => s.price);
+          product.price_min = Math.min(...prices);
+          product.price_max = Math.max(...prices);
+        }
       }
     }
 

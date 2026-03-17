@@ -576,6 +576,7 @@ const saveProductAssignments = async (req, res) => {
       );
 
       // Insert new assignments
+      const insertedCatIds = new Set();
       for (const a of assignments) {
         // Get the category level
         const catResult = await query('SELECT level FROM categories WHERE id = $1', [a.category_id]);
@@ -597,6 +598,28 @@ const saveProductAssignments = async (req, res) => {
             a.display_order || 0,
           ]
         );
+        insertedCatIds.add(parseInt(a.category_id));
+      }
+
+      // Auto-ensure the product's own category_id has a root assignment
+      // (the subtree API excludes the root, so it may be missing from the submitted list)
+      const productRes = await query('SELECT category_id FROM products WHERE id = $1', [productId]);
+      if (productRes.rows.length > 0) {
+        const productCatId = productRes.rows[0].category_id;
+        if (productCatId && !insertedCatIds.has(productCatId)) {
+          const rootCatRes = await query('SELECT level FROM categories WHERE id = $1', [productCatId]);
+          const rootLevel = rootCatRes.rows.length ? rootCatRes.rows[0].level : 1;
+          // Compute stock as sum of direct leaf children
+          const leafStock = assignments
+            .filter(a => a.is_leaf)
+            .reduce((sum, a) => sum + (parseInt(a.stock_allocated) || 0), 0);
+          await query(
+            `INSERT INTO product_category_assignments
+              (product_id, category_id, category_level, stock_allocated, is_leaf, display_order)
+             VALUES ($1, $2, $3, $4, false, 0)`,
+            [productId, productCatId, rootLevel, leafStock]
+          );
+        }
       }
 
       await query('COMMIT');

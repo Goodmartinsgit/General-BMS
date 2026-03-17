@@ -511,7 +511,7 @@ const ProductsPage = () => {
                 </div>
               )}
               {/* Selection category badges with stock */}
-              {product.category_assignments && product.category_assignments.filter(a => a.is_selection_attribute).length > 0 && (
+              {product.category_assignments && product.category_assignments.filter(a => a.is_selection_attribute || a.is_leaf).length > 0 && (
                 <div className="flex items-center gap-1 flex-wrap mb-3">
                   {product.category_assignments
                     .filter(a => a.is_selection_attribute)
@@ -521,8 +521,8 @@ const ProductsPage = () => {
                         {a.category_name}{a.stock_allocated ? ` · ${a.stock_allocated}` : ''}{a.price_override ? ` · ${formatCurrency(a.price_override)}` : ''}
                       </span>
                     ))}
-                  {product.category_assignments.filter(a => a.is_selection_attribute).length > 4 && (
-                    <span className="text-[10px] text-theme-muted">+{product.category_assignments.filter(a => a.is_selection_attribute).length - 4} more</span>
+                  {product.category_assignments.filter(a => a.is_selection_attribute || a.is_leaf).length > 4 && (
+                    <span className="text-[10px] text-theme-muted">+{product.category_assignments.filter(a => a.is_selection_attribute || a.is_leaf).length - 4} more</span>
                   )}
                 </div>
               )}
@@ -623,8 +623,8 @@ const ProductsPage = () => {
                         {a.category_name}{a.stock_allocated ? ` (${a.stock_allocated})` : ''}
                       </span>
                     ))}
-                  {product.category_assignments.filter(a => a.is_selection_attribute).length > 4 && (
-                    <span className="text-[10px] text-theme-muted">+{product.category_assignments.filter(a => a.is_selection_attribute).length - 4} more</span>
+                  {product.category_assignments.filter(a => a.is_selection_attribute || a.is_leaf).length > 4 && (
+                    <span className="text-[10px] text-theme-muted">+{product.category_assignments.filter(a => a.is_selection_attribute || a.is_leaf).length - 4} more</span>
                   )}
                 </div>
               )}

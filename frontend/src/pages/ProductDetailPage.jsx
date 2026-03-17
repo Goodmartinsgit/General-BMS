@@ -485,7 +485,8 @@ const ProductDetailPage = () => {
   const effectiveCost  = product?.effective_cost_price || product?.cost_price || 0;
   const hasPriceRange = product?.price_min && product?.price_max && product?.price_min !== product?.price_max;
   const selectionPrices = product?.selection_prices || [];
-  const profitPerUnit = !hasPriceRange && effectivePrice && effectiveCost
+  const hasVariantPricing = selectionPrices.length > 0 || hasPriceRange;
+  const profitPerUnit = !hasVariantPricing && effectivePrice && effectiveCost
     ? effectivePrice - effectiveCost : null;
   const profitMargin  = profitPerUnit !== null && effectivePrice
     ? ((profitPerUnit / effectivePrice) * 100).toFixed(1) : null;
@@ -809,13 +810,15 @@ const ProductDetailPage = () => {
                 </h2>
               </div>
               <div className="p-4 sm:p-6">
-                {hasPriceRange ? (
+                {hasVariantPricing ? (
                   <>
                     <div className="grid grid-cols-2 gap-4 mb-4">
                       <div className="bg-theme-tertiary rounded-lg p-3 text-center">
-                        <p className="text-xs text-theme-muted mb-1">Price Range</p>
+                        <p className="text-xs text-theme-muted mb-1">{hasPriceRange ? 'Price Range' : 'Price'}</p>
                         <p className="text-lg font-bold text-accent-gold">
-                          {formatCurrency(product.price_min)} – {formatCurrency(product.price_max)}
+                          {hasPriceRange
+                            ? `${formatCurrency(product.price_min)} – ${formatCurrency(product.price_max)}`
+                            : formatCurrency(selectionPrices[0]?.price || effectivePrice)}
                         </p>
                       </div>
                       <div className="bg-theme-tertiary rounded-lg p-3 text-center">

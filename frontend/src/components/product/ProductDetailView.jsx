@@ -67,7 +67,8 @@ const ProductDetailView = ({
   const effectiveCost = product.effective_cost_price || cost_price || 0;
   const hasPriceRange = product.price_min && product.price_max && product.price_min !== product.price_max;
   const selectionPrices = product.selection_prices || [];
-  const profitPerUnit = !hasPriceRange && price && effectiveCost ? price - effectiveCost : null;
+  const hasVariantPricing = selectionPrices.length > 0 || hasPriceRange;
+  const profitPerUnit = !hasVariantPricing && price && effectiveCost ? price - effectiveCost : null;
   const profitMargin = profitPerUnit !== null && price
     ? ((profitPerUnit / price) * 100).toFixed(1)
     : null;
@@ -193,11 +194,11 @@ const ProductDetailView = ({
   // ─── Pricing Tab ───────────────────────────────────────────────────
   const renderPricing = () => (
     <div className="space-y-6">
-      {hasPriceRange ? (
+      {hasVariantPricing ? (
         <>
           {/* Price Range Summary */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <PriceCard label="Price Range" value={`${formatCurrency(product.price_min)} – ${formatCurrency(product.price_max)}`} accent="text-accent-gold" bg="bg-accent-gold/10 border-accent-gold/20" />
+            <PriceCard label={hasPriceRange ? "Price Range" : "Price"} value={hasPriceRange ? `${formatCurrency(product.price_min)} – ${formatCurrency(product.price_max)}` : formatCurrency(selectionPrices[0]?.price || price)} accent="text-accent-gold" bg="bg-accent-gold/10 border-accent-gold/20" />
             <PriceCard label="Selection Categories" value={`${selectionPrices.length} variants`} accent="text-theme-primary" bg="bg-theme-tertiary border-theme" />
           </div>
 
