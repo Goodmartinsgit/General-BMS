@@ -247,42 +247,78 @@ const CategoryInsightsPage = () => {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-theme">
-                          {(breakdownData.subcategories || []).map((sub) => {
-                            const isRoot = sub.category_id === breakdownData.root.id;
-                            const indent = Math.max(0, (sub.level || 1) - 1);
-                            return (
-                              <tr key={sub.category_id} className={`hover:bg-theme-secondary transition-colors ${isRoot ? 'bg-theme-secondary/50 font-semibold' : ''}`}>
-                                <td className="px-4 py-3">
-                                  <div className="flex items-center gap-2" style={{ paddingLeft: `${indent * 20}px` }}>
-                                    {sub.image_url ? (
-                                      <img src={sub.image_url} alt="" className="w-7 h-7 rounded object-cover flex-shrink-0" />
-                                    ) : (
-                                      <div className="w-7 h-7 rounded bg-theme-tertiary flex items-center justify-center flex-shrink-0">
-                                        <Boxes className="w-3.5 h-3.5 text-theme-muted opacity-40" />
+                          {(() => {
+                            // Build tree-ordered flat list (DFS) so children appear under parents
+                            const subs = breakdownData.subcategories || [];
+                            const rootId = breakdownData.root.id;
+                            const childrenMap = {};
+                            subs.forEach(s => {
+                              // For root-level items, parent is rootId; for others use parent_category_id
+                              const parentKey = s.category_id === rootId ? '__root__' : (s.parent_category_id || rootId);
+                              if (!childrenMap[parentKey]) childrenMap[parentKey] = [];
+                              childrenMap[parentKey].push(s);
+                            });
+                            // Sort children alphabetically within each group
+                            Object.values(childrenMap).forEach(arr => arr.sort((a, b) => (a.category_name || '').localeCompare(b.category_name || '')));
+
+                            const ordered = [];
+                            const walk = (nodeId, depth) => {
+                              const children = childrenMap[nodeId] || [];
+                              children.forEach(child => {
+                                ordered.push({ ...child, _depth: depth });
+                                walk(child.category_id, depth + 1);
+                              });
+                            };
+                            // Start with root node itself
+                            const rootNode = subs.find(s => s.category_id === rootId);
+                            if (rootNode) {
+                              ordered.push({ ...rootNode, _depth: 0 });
+                              walk(rootId, 1);
+                            } else {
+                              walk('__root__', 0);
+                            }
+                            // If any items weren't placed (orphans), append them
+                            const placedIds = new Set(ordered.map(o => o.category_id));
+                            subs.forEach(s => { if (!placedIds.has(s.category_id)) ordered.push({ ...s, _depth: 1 }); });
+
+                            return ordered.map((sub) => {
+                              const isRoot = sub.category_id === rootId;
+                              const indent = sub._depth;
+                              const hasChildren = (childrenMap[sub.category_id] || []).length > 0;
+                              return (
+                                <tr key={sub.category_id} className={`hover:bg-theme-secondary transition-colors ${isRoot ? 'bg-theme-secondary/50' : ''}`}>
+                                  <td className="px-4 py-3">
+                                    <div className="flex items-center gap-2" style={{ paddingLeft: `${indent * 24}px` }}>
+                                      {sub.image_url ? (
+                                        <img src={sub.image_url} alt="" className="w-7 h-7 rounded object-cover flex-shrink-0" />
+                                      ) : (
+                                        <div className="w-7 h-7 rounded bg-theme-tertiary flex items-center justify-center flex-shrink-0">
+                                          <Boxes className="w-3.5 h-3.5 text-theme-muted opacity-40" />
+                                        </div>
+                                      )}
+                                      <div className="min-w-0">
+                                        <p className={`truncate text-theme-primary ${isRoot || hasChildren ? 'font-bold' : ''}`}>
+                                          {sub.category_name}
+                                          {isRoot && <span className="ml-1.5 text-[10px] px-1.5 py-0.5 bg-accent-gold/10 text-accent-gold border border-accent-gold/20 rounded uppercase font-bold">Root</span>}
+                                        </p>
+                                        <p className="text-[10px] text-theme-muted">
+                                          {sub.active_products} active
+                                          {sub.featured_products > 0 && <> &middot; <Star className="w-2.5 h-2.5 inline text-yellow-500" /> {sub.featured_products}</>}
+                                        </p>
                                       </div>
-                                    )}
-                                    <div className="min-w-0">
-                                      <p className={`truncate text-theme-primary ${isRoot ? 'font-bold' : ''}`}>
-                                        {sub.category_name}
-                                        {isRoot && <span className="ml-1.5 text-[10px] px-1.5 py-0.5 bg-accent-gold/10 text-accent-gold border border-accent-gold/20 rounded uppercase font-bold">Root</span>}
-                                      </p>
-                                      <p className="text-[10px] text-theme-muted">
-                                        {sub.active_products} active
-                                        {sub.featured_products > 0 && <> &middot; <Star className="w-2.5 h-2.5 inline text-yellow-500" /> {sub.featured_products}</>}
-                                      </p>
                                     </div>
-                                  </div>
-                                </td>
-                                <td className="text-right px-3 py-3 text-theme-primary">{sub.total_products}</td>
-                                <td className="text-right px-3 py-3 text-theme-primary">{sub.total_stock} <span className="text-theme-muted text-[10px]">units</span></td>
-                                <td className="text-right px-3 py-3 text-accent-gold text-xs font-medium">{renderPriceRange(sub.min_price, sub.max_price)}</td>
-                                <td className="text-right px-3 py-3 text-theme-primary">{formatCurrency(sub.avg_price || 0)}</td>
-                                <td className="text-right px-3 py-3 text-theme-primary font-medium">{formatCurrency(sub.total_stock_value || 0)}</td>
-                                <td className="text-right px-3 py-3 text-theme-primary">{formatCurrency(sub.total_stock_cost || 0)}</td>
-                                <td className="text-right px-3 py-3 font-medium">{renderMargin(sub.total_stock_value, sub.total_stock_cost)}</td>
-                              </tr>
-                            );
-                          })}
+                                  </td>
+                                  <td className="text-right px-3 py-3 text-theme-primary">{sub.total_products}</td>
+                                  <td className="text-right px-3 py-3 text-theme-primary">{sub.total_stock} <span className="text-theme-muted text-[10px]">units</span></td>
+                                  <td className="text-right px-3 py-3 text-accent-gold text-xs font-medium">{renderPriceRange(sub.min_price, sub.max_price)}</td>
+                                  <td className="text-right px-3 py-3 text-theme-primary">{formatCurrency(sub.avg_price || 0)}</td>
+                                  <td className="text-right px-3 py-3 text-theme-primary font-medium">{formatCurrency(sub.total_stock_value || 0)}</td>
+                                  <td className="text-right px-3 py-3 text-theme-primary">{formatCurrency(sub.total_stock_cost || 0)}</td>
+                                  <td className="text-right px-3 py-3 font-medium">{renderMargin(sub.total_stock_value, sub.total_stock_cost)}</td>
+                                </tr>
+                              );
+                            });
+                          })()}
                           {/* Totals row */}
                           {breakdownData.subcategories?.length > 1 && (() => {
                             const tots = breakdownData.subcategories.reduce((acc, s) => ({
