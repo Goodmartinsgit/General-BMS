@@ -54,7 +54,7 @@ const getProducts = async (req, res) => {
       ) inv ON inv.product_id = p.id
       LEFT JOIN (
         SELECT pca2.product_id,
-               SUM(pca2.stock_allocated) as cat_stock,
+               SUM(pca2.stock_allocated) FILTER (WHERE pca2.is_leaf = true) as cat_stock,
                MIN(pca2.price_override) FILTER (WHERE pca2.price_override IS NOT NULL) as price_min,
                MAX(pca2.price_override) FILTER (WHERE pca2.price_override IS NOT NULL) as price_max,
                array_remove(array_agg(pca2.image_url), NULL) as cat_images
@@ -129,7 +129,7 @@ const getFeaturedProducts = async (req, res) => {
        LEFT JOIN (SELECT product_id, SUM(quantity_available) as total_qty FROM inventory GROUP BY product_id) inv ON inv.product_id = p.id
        LEFT JOIN (
          SELECT pca2.product_id,
-                SUM(pca2.stock_allocated) as cat_stock,
+                SUM(pca2.stock_allocated) FILTER (WHERE pca2.is_leaf = true) as cat_stock,
                 MIN(pca2.price_override) FILTER (WHERE pca2.price_override IS NOT NULL) as price_min,
                 MAX(pca2.price_override) FILTER (WHERE pca2.price_override IS NOT NULL) as price_max,
                 array_remove(array_agg(pca2.image_url), NULL) as cat_images
@@ -307,7 +307,7 @@ const getProductBySlug = async (req, res) => {
 
     // Compute effective stock from category assignments when inventory is 0
     if (detail.stockQuantity === 0 && categoryAssignments.length > 0) {
-      detail.stockQuantity = categoryAssignments.reduce((sum, a) => sum + (a.stockAllocated || 0), 0);
+      detail.stockQuantity = categoryAssignments.filter(a => a.isLeaf).reduce((sum, a) => sum + (a.stockAllocated || 0), 0);
       detail.inStock = detail.stockQuantity > 0;
     }
 
@@ -421,7 +421,7 @@ const getProductsByCategory = async (req, res) => {
        LEFT JOIN (SELECT product_id, SUM(quantity_available) as total_qty FROM inventory GROUP BY product_id) inv ON inv.product_id = p.id
        LEFT JOIN (
          SELECT pca2.product_id,
-                SUM(pca2.stock_allocated) as cat_stock,
+                SUM(pca2.stock_allocated) FILTER (WHERE pca2.is_leaf = true) as cat_stock,
                 MIN(pca2.price_override) FILTER (WHERE pca2.price_override IS NOT NULL) as price_min,
                 MAX(pca2.price_override) FILTER (WHERE pca2.price_override IS NOT NULL) as price_max,
                 array_remove(array_agg(pca2.image_url), NULL) as cat_images

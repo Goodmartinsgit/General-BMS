@@ -292,12 +292,12 @@ const getAllProducts = async (req, res) => {
         p.images = imagesMap[p.id] || [];
         p.category_assignments = assignmentsMap[p.id] || [];
 
-        // Compute effective stock from category assignments when inventory is 0
+        // Compute effective stock from leaf-level category assignments when inventory is 0
         const invStock = parseInt(p.total_stock) || 0;
         if (invStock === 0 && p.category_assignments.length > 0) {
-          p.total_stock = p.category_assignments.reduce(
-            (sum, a) => sum + (parseInt(a.stock_allocated) || 0), 0
-          );
+          p.total_stock = p.category_assignments
+            .filter(a => a.is_leaf)
+            .reduce((sum, a) => sum + (parseInt(a.stock_allocated) || 0), 0);
         }
 
         // Compute effective price from category assignment overrides
@@ -409,12 +409,12 @@ const getProductById = async (req, res) => {
     product.images = imagesResult.rows;
     product.category_assignments = assignmentsResult.rows;
 
-    // Compute effective stock from category assignments when inventory is 0
+    // Compute effective stock from leaf-level category assignments when inventory is 0
     const invStock = parseInt(product.total_stock) || 0;
     if (invStock === 0 && product.category_assignments.length > 0) {
-      product.total_stock = product.category_assignments.reduce(
-        (sum, a) => sum + (parseInt(a.stock_allocated) || 0), 0
-      );
+      product.total_stock = product.category_assignments
+        .filter(a => a.is_leaf)
+        .reduce((sum, a) => sum + (parseInt(a.stock_allocated) || 0), 0);
     }
 
     // Compute effective price from category assignment overrides
@@ -1777,7 +1777,7 @@ const getCategoryGroupInsights = async (req, res) => {
           p.id AS product_id,
           COALESCE(
             (SELECT SUM(i.quantity_on_hand) FROM inventory i WHERE i.product_id = p.id),
-            (SELECT SUM(pca2.stock_allocated) FROM product_category_assignments pca2 WHERE pca2.product_id = p.id),
+            (SELECT SUM(pca2.stock_allocated) FROM product_category_assignments pca2 WHERE pca2.product_id = p.id AND pca2.is_leaf = true),
             0
           ) AS stock,
           COALESCE(p.retail_price, 0) AS selling_price,
@@ -1859,21 +1859,21 @@ const getCategoryGroupBreakdown = async (req, res) => {
          COALESCE(SUM(
            COALESCE(
              (SELECT SUM(i.quantity_on_hand) FROM inventory i WHERE i.product_id = p.id),
-             (SELECT SUM(pca2.stock_allocated) FROM product_category_assignments pca2 WHERE pca2.product_id = p.id AND pca2.category_id = c.id),
+             (SELECT SUM(pca2.stock_allocated) FROM product_category_assignments pca2 WHERE pca2.product_id = p.id AND pca2.category_id = c.id AND pca2.is_leaf = true),
              0
            )
          ), 0)::int AS total_stock,
          COALESCE(SUM(
            COALESCE(
              (SELECT SUM(i.quantity_on_hand) FROM inventory i WHERE i.product_id = p.id),
-             (SELECT SUM(pca2.stock_allocated) FROM product_category_assignments pca2 WHERE pca2.product_id = p.id AND pca2.category_id = c.id),
+             (SELECT SUM(pca2.stock_allocated) FROM product_category_assignments pca2 WHERE pca2.product_id = p.id AND pca2.category_id = c.id AND pca2.is_leaf = true),
              0
            ) * COALESCE(p.retail_price, 0)
          ), 0)::numeric AS total_stock_value,
          COALESCE(SUM(
            COALESCE(
              (SELECT SUM(i.quantity_on_hand) FROM inventory i WHERE i.product_id = p.id),
-             (SELECT SUM(pca2.stock_allocated) FROM product_category_assignments pca2 WHERE pca2.product_id = p.id AND pca2.category_id = c.id),
+             (SELECT SUM(pca2.stock_allocated) FROM product_category_assignments pca2 WHERE pca2.product_id = p.id AND pca2.category_id = c.id AND pca2.is_leaf = true),
              0
            ) * COALESCE(p.cost_price, 0)
          ), 0)::numeric AS total_stock_cost,
@@ -1899,12 +1899,12 @@ const getCategoryGroupBreakdown = async (req, res) => {
          c.category_name AS direct_category,
          COALESCE(
            (SELECT SUM(i.quantity_on_hand) FROM inventory i WHERE i.product_id = p.id),
-           (SELECT SUM(pca2.stock_allocated) FROM product_category_assignments pca2 WHERE pca2.product_id = p.id),
+           (SELECT SUM(pca2.stock_allocated) FROM product_category_assignments pca2 WHERE pca2.product_id = p.id AND pca2.is_leaf = true),
            0
          )::int AS stock,
          COALESCE(
            (SELECT SUM(i.quantity_on_hand) FROM inventory i WHERE i.product_id = p.id),
-           (SELECT SUM(pca2.stock_allocated) FROM product_category_assignments pca2 WHERE pca2.product_id = p.id),
+           (SELECT SUM(pca2.stock_allocated) FROM product_category_assignments pca2 WHERE pca2.product_id = p.id AND pca2.is_leaf = true),
            0
          ) * COALESCE(p.retail_price, 0) AS stock_value
        FROM products p
