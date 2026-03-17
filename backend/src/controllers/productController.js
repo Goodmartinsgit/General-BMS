@@ -52,12 +52,12 @@ const buildProductFilters = (filters) => {
         SELECT 1 FROM product_category_assignments pca_f
         JOIN categories cf ON cf.id = pca_f.category_id
         WHERE pca_f.product_id = p.id
-          AND (cf.id = $${paramCounter} OR cf.path LIKE $${paramCounter} || '.%'
+          AND (cf.id = $${paramCounter} OR cf.path LIKE $${paramCounter} || '/%'
                OR cf.parent_category_id = $${paramCounter})
       )
       OR p.category_id IN (
         SELECT csub.id FROM categories csub
-        WHERE csub.path LIKE $${paramCounter} || '.%' OR csub.parent_category_id = $${paramCounter}
+        WHERE csub.path LIKE $${paramCounter} || '/%' OR csub.parent_category_id = $${paramCounter}
       )
     )`);
     params.push(filters.category_id);
@@ -1785,7 +1785,7 @@ const getCategoryGroupInsights = async (req, res) => {
           p.is_active,
           p.is_featured
         FROM root_cats rc
-        JOIN categories c ON c.path LIKE rc.id || '.%' OR c.id = rc.id
+        JOIN categories c ON c.path LIKE rc.id::text || '/%' OR c.id = rc.id
         JOIN products p ON (p.category_id = c.id OR EXISTS (
           SELECT 1 FROM product_category_assignments pca
           WHERE pca.product_id = p.id AND pca.category_id = c.id
