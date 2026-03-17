@@ -1,4 +1,5 @@
 const { query } = require('../config/db');
+const crypto = require('crypto');
 
 // ============================================================================
 // HELPERS
@@ -85,6 +86,241 @@ const syncListingLevel = async (categoryId, isListing) => {
        WHERE level = $1 AND (path LIKE $2 || '/%' OR id = $2::int)`,
       [level, rootId]
     );
+  }
+};
+
+/**
+ * Generate unique product code based on product type (duplicated from productController
+ * to avoid circular dependency).
+ */
+const generateProductCode = async (productType = 'physical') => {
+  const prefixMap = { physical: 'PRD', service: 'SRV', digital: 'DIG', bundle: 'BDL' };
+  const prefix = prefixMap[productType] || 'PRD';
+  const maxResult = await query(
+    `SELECT MAX(CAST(SUBSTRING(product_code FROM '[0-9]+$') AS INTEGER)) as max_num
+     FROM products WHERE product_code LIKE $1 || '-%'`,
+    [prefix]
+  );
+  const nextNum = (parseInt(maxResult.rows[0].max_num) || 0) + 1;
+  return `${prefix}-${String(nextNum).padStart(4, '0')}`;
+};
+
+/**
+ * When the listing level changes in a category tree, restructure all product groups:
+ * - Products are always created per listing-level category
+ * - Level UP (fewer listing cats): consolidate products, soft-delete extras
+ * - Level DOWN (more listing cats): expand products, create new ones
+ * - Preserve colors, images, stock, and reassign category assignments
+ *
+ * @param {number} rootId - The root category ID of the tree
+ * @param {Array} oldListingCats - Previous listing-level category rows
+ * @param {Array} newListingCats - New listing-level category rows
+ */
+const relistProducts = async (rootId, oldListingCats, newListingCats) => {
+  // No change or nothing to do
+  if (oldListingCats.length === 0 && newListingCats.length === 0) return;
+  // Listing disabled entirely — leave existing products as-is
+  if (newListingCats.length === 0) return;
+  if (JSON.stringify(oldListingCats.map(c => c.id).sort()) === JSON.stringify(newListingCats.map(c => c.id).sort())) return;
+
+  const oldCatIds = oldListingCats.map(c => c.id);
+  const newCatIds = newListingCats.map(c => c.id);
+
+  // Find all product groups that have products assigned to OLD listing-level categories
+  // Include both grouped AND ungrouped products in this root tree
+  const allCatsInTree = [rootId, ...oldCatIds, ...newCatIds];
+  const groupsRes = await query(
+    `SELECT DISTINCT product_group_id, base_product_name
+     FROM products
+     WHERE category_id = ANY($1) AND deleted_at IS NULL AND product_group_id IS NOT NULL`,
+    [allCatsInTree]
+  );
+
+  const allGroups = new Map();
+  groupsRes.rows.forEach(r => {
+    if (r.product_group_id && r.base_product_name) {
+      allGroups.set(r.product_group_id, r.base_product_name);
+    }
+  });
+
+  // Also handle ungrouped products in old listing categories — assign them a group first
+  const ungroupedRes = await query(
+    `SELECT id, product_name, base_product_name, category_id
+     FROM products
+     WHERE category_id = ANY($1) AND deleted_at IS NULL AND product_group_id IS NULL`,
+    [allCatsInTree]
+  );
+  for (const up of ungroupedRes.rows) {
+    const bn = up.base_product_name || up.product_name.replace(/\s*\(.*\)\s*$/, '').trim();
+    const gid = crypto.createHash('md5').update(bn + ':' + rootId).digest('hex');
+    await query(
+      'UPDATE products SET base_product_name = $1, product_group_id = $2 WHERE id = $3',
+      [bn, gid, up.id]
+    );
+    allGroups.set(gid, bn);
+  }
+
+  if (allGroups.size === 0) return;
+
+  const slugTs = Date.now();
+
+  for (const [groupId, baseName] of allGroups) {
+    // Get all existing products in this group
+    const existingProds = await query(
+      `SELECT p.*, c.category_name, c.level as cat_level
+       FROM products p
+       LEFT JOIN categories c ON c.id = p.category_id
+       WHERE p.product_group_id = $1 AND p.deleted_at IS NULL
+       ORDER BY p.id`,
+      [groupId]
+    );
+    if (existingProds.rows.length === 0) continue;
+
+    // Use first product as the template for shared fields
+    const template = existingProds.rows[0];
+    const newGroupId = crypto.createHash('md5').update(baseName + ':' + rootId).digest('hex');
+
+    // Collect all colors and images from existing products (deduplicated)
+    const allColorRows = await query(
+      `SELECT DISTINCT ON (color_name) pc.*
+       FROM product_colors pc
+       WHERE pc.product_id = ANY($1)
+       ORDER BY color_name, pc.id`,
+      [existingProds.rows.map(p => p.id)]
+    );
+    const allImageRows = await query(
+      `SELECT DISTINCT ON (image_url) pi.*
+       FROM product_images_v2 pi
+       WHERE pi.product_id = ANY($1)
+       ORDER BY image_url, pi.id`,
+      [existingProds.rows.map(p => p.id)]
+    );
+
+    // Map which old products cover which new listing cats (by path ancestry)
+    // For each new listing cat, find old products whose category is an ancestor or descendant
+    const newProducts = [];
+
+    for (const newCat of newListingCats) {
+      const childName = `${baseName} (${newCat.category_name})`;
+      const childSlug = baseName.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')
+        + '-' + newCat.category_name.toLowerCase().replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-')
+        + '-' + slugTs;
+
+      // Check if an existing product already covers this new listing category
+      const existingMatch = existingProds.rows.find(p => p.category_id === newCat.id);
+
+      if (existingMatch) {
+        // Product already exists for this listing cat — update its name/group and keep it
+        await query(
+          `UPDATE products SET product_name = $1, base_product_name = $2, product_group_id = $3,
+           slug = $4, updated_at = CURRENT_TIMESTAMP WHERE id = $5`,
+          [childName, baseName, newGroupId, childSlug, existingMatch.id]
+        );
+        newProducts.push({ ...existingMatch, id: existingMatch.id, isExisting: true });
+      } else {
+        // Create a new product for this listing category
+        const childCode = await generateProductCode(template.product_type);
+        const newProd = await query(`
+          INSERT INTO products (
+            product_code, product_name, description, product_type,
+            category_id, brand_id, base_unit, retail_price, wholesale_base_price,
+            cost_price, tax_rate, reorder_level, max_stock_level, product_images,
+            model_images, specifications, commission_amount, has_variants,
+            track_serial_numbers, track_batches, is_featured,
+            is_retail_available, is_wholesale_available, barcode, weight_per_unit,
+            is_online_available, short_description, slug, has_colors,
+            base_product_name, product_group_id
+          ) VALUES (
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29, $30, $31
+          ) RETURNING *
+        `, [
+          childCode, childName, template.description, template.product_type,
+          newCat.id, template.brand_id, template.base_unit, template.retail_price,
+          template.wholesale_base_price, template.cost_price, template.tax_rate,
+          template.reorder_level, template.max_stock_level, template.product_images,
+          template.model_images, template.specifications, template.commission_amount,
+          template.has_variants, template.track_serial_numbers, template.track_batches,
+          template.is_featured, template.is_retail_available, template.is_wholesale_available,
+          template.barcode, template.weight_per_unit, template.is_online_available,
+          template.short_description, childSlug, template.has_colors,
+          baseName, newGroupId
+        ]);
+        newProducts.push({ ...newProd.rows[0], isExisting: false });
+
+        // Copy colors from template
+        const colorIdMap = {};
+        for (const color of allColorRows.rows) {
+          const nc = await query(
+            `INSERT INTO product_colors (product_id, color_name, color_code, display_order, is_active)
+             VALUES ($1, $2, $3, $4, $5)
+             ON CONFLICT (product_id, color_name) DO NOTHING
+             RETURNING *`,
+            [newProd.rows[0].id, color.color_name, color.color_code, color.display_order, color.is_active]
+          );
+          if (nc.rows.length > 0) colorIdMap[color.id] = nc.rows[0].id;
+        }
+        // Copy images from template
+        for (const img of allImageRows.rows) {
+          const newColorId = img.color_id ? (colorIdMap[img.color_id] || null) : null;
+          await query(
+            `INSERT INTO product_images_v2 (product_id, image_url, color_id, is_primary, display_order, alt_text)
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [newProd.rows[0].id, img.image_url, newColorId, img.is_primary, img.display_order, img.alt_text]
+          );
+        }
+      }
+    }
+
+    // Build category assignments for each new product
+    for (const prod of newProducts) {
+      const productId = prod.id;
+      const catId = prod.category_id;
+      if (!catId) continue;
+
+      // Clear old assignments and rebuild
+      await query('DELETE FROM product_category_assignments WHERE product_id = $1', [productId]);
+
+      const catPath = await query('SELECT path, level FROM categories WHERE id = $1', [catId]);
+      if (catPath.rows.length === 0) continue;
+
+      const descendants = await query(
+        `SELECT id, level, parent_category_id
+         FROM categories WHERE path LIKE $1 || '/%' AND is_active = true
+         ORDER BY level, display_order`,
+        [catPath.rows[0].path]
+      );
+
+      // Root assignment for the product's listing-level category
+      await query(
+        `INSERT INTO product_category_assignments
+          (product_id, category_id, category_level, stock_allocated, is_leaf)
+         VALUES ($1, $2, $3, 0, $4)
+         ON CONFLICT (product_id, category_id) DO NOTHING`,
+        [productId, catId, catPath.rows[0].level, descendants.rows.length === 0]
+      );
+
+      // Descendant assignments (selection attributes)
+      for (const desc of descendants.rows) {
+        const isLeaf = !descendants.rows.some(d => d.parent_category_id === desc.id);
+        await query(
+          `INSERT INTO product_category_assignments
+            (product_id, category_id, category_level, stock_allocated, is_leaf)
+           VALUES ($1, $2, $3, 0, $4)
+           ON CONFLICT (product_id, category_id) DO NOTHING`,
+          [productId, desc.id, desc.level, isLeaf]
+        );
+      }
+    }
+
+    // Soft-delete old products that no longer match any new listing category
+    const keepIds = newProducts.map(p => p.id);
+    const toDelete = existingProds.rows.filter(p => !keepIds.includes(p.id));
+    for (const old of toDelete) {
+      await query(
+        `UPDATE products SET deleted_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+        [old.id]
+      );
+    }
   }
 };
 
@@ -382,12 +618,49 @@ const updateCategory = async (req, res) => {
     await updateDescendants(parseInt(id), level, path);
 
     // Sync listing status across siblings at this level in the same branch
+    // First, capture OLD listing-level categories before syncing (for product restructuring)
+    let oldListingCats = [];
+    const catForRoot = await query('SELECT path FROM categories WHERE id = $1', [id]);
+    const treeRootId = catForRoot.rows.length > 0 ? parseInt(catForRoot.rows[0].path.split('/')[0]) : null;
+
+    if (is_listing_category !== undefined && treeRootId) {
+      const oldListingRes = await query(
+        `SELECT id, category_name, level, path, parent_category_id
+         FROM categories
+         WHERE is_listing_category = true AND is_active = true
+           AND (path LIKE $1 || '/%' OR id = $1)
+         ORDER BY level, display_order, category_name`,
+        [treeRootId]
+      );
+      oldListingCats = oldListingRes.rows;
+    }
+
     if (is_listing_category !== undefined) {
       await syncListingLevel(id, is_listing_category);
     }
 
     // Recalculate selection attributes
     await recalcSelectionAttributes();
+
+    // After syncing, capture NEW listing-level categories and restructure products if changed
+    if (is_listing_category !== undefined && treeRootId) {
+      const newListingRes = await query(
+        `SELECT id, category_name, level, path, parent_category_id
+         FROM categories
+         WHERE is_listing_category = true AND is_active = true
+           AND (path LIKE $1 || '/%' OR id = $1)
+         ORDER BY level, display_order, category_name`,
+        [treeRootId]
+      );
+      const newListingCats = newListingRes.rows;
+
+      // Only restructure if the listing categories actually changed
+      const oldIds = oldListingCats.map(c => c.id).sort().join(',');
+      const newIds = newListingCats.map(c => c.id).sort().join(',');
+      if (oldIds !== newIds && (oldListingCats.length > 0 || newListingCats.length > 0)) {
+        await relistProducts(treeRootId, oldListingCats, newListingCats);
+      }
+    }
 
     // If category name changed, propagate to linked product names
     // Use base_product_name to reconstruct the full name reliably
