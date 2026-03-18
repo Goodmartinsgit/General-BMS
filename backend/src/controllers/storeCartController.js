@@ -78,7 +78,11 @@ async function buildCartResponse(cartId, couponCode, couponDiscount) {
   );
 
   const items = itemsRes.rows.map((row) => {
-    const images = Array.isArray(row.product_images) ? row.product_images : [];
+    const rawImages = Array.isArray(row.product_images) ? row.product_images : [];
+    // product_images JSONB may contain objects {url, alt} or plain URL strings
+    const thumbnail = rawImages.length > 0
+      ? (typeof rawImages[0] === 'object' && rawImages[0] !== null ? rawImages[0].url : rawImages[0])
+      : undefined;
     const unitPrice = parseFloat(row.unit_price || 0);
     const stockQty = row.variant_id ? parseInt(row.variant_stock_qty) : parseInt(row.stock_qty);
     const qty = parseInt(row.quantity);
@@ -94,7 +98,7 @@ async function buildCartResponse(cartId, couponCode, couponDiscount) {
       product: {
         name: row.product_name,
         slug: row.product_slug || String(row.product_id),
-        thumbnail: images[0] || undefined,
+        thumbnail,
         sku: row.variant_id ? (row.variant_sku || row.sku) : row.sku,
       },
       variant: row.variant_id ? {

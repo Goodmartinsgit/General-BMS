@@ -256,7 +256,8 @@ const checkout = async (req, res) => {
     // Insert order items (snapshot product details)
     for (const item of itemsRes.rows) {
       const images = Array.isArray(item.product_images) ? item.product_images : [];
-      const productImage = images[0] || null;
+      const firstImg = images[0] || null;
+      const productImage = firstImg && typeof firstImg === 'object' ? firstImg.url : firstImg;
       const unitPrice = parseFloat(item.unit_price || item.retail_price || 0);
       const effectiveSku = item.variant_id ? (item.variant_sku || item.sku) : item.sku;
 
