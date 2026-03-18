@@ -500,7 +500,7 @@ const trackOrder = async (req, res) => {
 };
 
 function formatProduct(row) {
-  const rawImages = Array.isArray(row.images) ? row.images : (row.images || []);
+  const rawImages = Array.isArray(row.images) ? row.images : [];
   // Normalize images to { id, url, alt, position } objects
   let images = rawImages.map((img, i) => {
     if (typeof img === 'string') return { id: String(i), url: img, alt: '', position: i };
