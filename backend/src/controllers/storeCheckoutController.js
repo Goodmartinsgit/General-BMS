@@ -81,6 +81,7 @@ const checkout = async (req, res) => {
       `SELECT ci.*, p.product_name, p.product_images, p.product_code as sku,
               p.is_online_available, p.retail_price,
               pv.sku as variant_sku, pv.selling_price as variant_price,
+              cat.category_name as cat_name,
               COALESCE(
                 (SELECT SUM(COALESCE(quantity_on_hand,0) - COALESCE(quantity_reserved,0)) FROM inventory WHERE product_id = ci.product_id),
                 0
@@ -92,6 +93,7 @@ const checkout = async (req, res) => {
        FROM cart_items ci
        JOIN products p ON p.id = ci.product_id
        LEFT JOIN product_variants pv ON pv.id = ci.variant_id
+       LEFT JOIN categories cat ON cat.id = ci.category_id
        WHERE ci.cart_id = $1`,
       [cart.id]
     );
@@ -252,21 +254,29 @@ const checkout = async (req, res) => {
 
     // Insert order items (snapshot product details)
     for (const item of itemsRes.rows) {
-      const images = Array.isArray(item.product_images) ? item.product_images : (item.product_images || []);
+      const images = Array.isArray(item.product_images) ? item.product_images : [];
       const productImage = images[0] || null;
       const unitPrice = parseFloat(item.unit_price || item.retail_price || 0);
       const effectiveSku = item.variant_id ? (item.variant_sku || item.sku) : item.sku;
 
+      // Append category name to product name when present
+      const displayName = item.cat_name
+        ? `${item.product_name} — ${item.cat_name}`
+        : item.product_name;
+
       await client.query(
         `INSERT INTO online_order_items
-           (order_id, product_id, variant_id, product_name, product_image, sku,
+           (order_id, product_id, variant_id, category_id, category_name,
+            product_name, product_image, sku,
             unit_price, quantity, total_price, created_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())`,
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())`,
         [
           order.id,
           item.product_id,
           item.variant_id || null,
-          item.product_name,
+          item.category_id || null,
+          item.cat_name || null,
+          displayName,
           productImage,
           effectiveSku,
           unitPrice,

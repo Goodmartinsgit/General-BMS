@@ -48,6 +48,7 @@ async function buildCartResponse(cartId, couponCode, couponDiscount) {
        ci.id,
        ci.product_id,
        ci.variant_id,
+       ci.category_id,
        ci.quantity,
        ci.unit_price,
        p.product_name,
@@ -58,6 +59,7 @@ async function buildCartResponse(cartId, couponCode, couponDiscount) {
        pv.sku as variant_sku,
        pv.variant_name,
        pv.variant_values as variant_attributes,
+       cat.category_name as category_name,
        COALESCE(
          (SELECT SUM(quantity_available) FROM inventory WHERE product_id = ci.product_id),
          0
@@ -69,13 +71,14 @@ async function buildCartResponse(cartId, couponCode, couponDiscount) {
      FROM cart_items ci
      JOIN products p ON p.id = ci.product_id
      LEFT JOIN product_variants pv ON pv.id = ci.variant_id
+     LEFT JOIN categories cat ON cat.id = ci.category_id
      WHERE ci.cart_id = $1
      ORDER BY ci.created_at ASC`,
     [cartId]
   );
 
   const items = itemsRes.rows.map((row) => {
-    const images = Array.isArray(row.product_images) ? row.product_images : (row.product_images || []);
+    const images = Array.isArray(row.product_images) ? row.product_images : [];
     const unitPrice = parseFloat(row.unit_price || 0);
     const stockQty = row.variant_id ? parseInt(row.variant_stock_qty) : parseInt(row.stock_qty);
     const qty = parseInt(row.quantity);
@@ -83,6 +86,8 @@ async function buildCartResponse(cartId, couponCode, couponDiscount) {
       id: String(row.id),
       productId: String(row.product_id),
       variantId: row.variant_id ? String(row.variant_id) : undefined,
+      categoryId: row.category_id ? String(row.category_id) : undefined,
+      categoryName: row.category_name || undefined,
       quantity: qty,
       unitPrice,
       totalPrice: parseFloat((unitPrice * qty).toFixed(2)),
@@ -165,7 +170,7 @@ const addItem = async (req, res) => {
     const customerId = req.customer ? req.customer.customerId : null;
     const sessionId = req.sessionId;
 
-    const { productId, variantId, quantity = 1 } = req.body;
+    const { productId, variantId, categoryId, quantity = 1 } = req.body;
 
     if (!productId) return res.status(400).json({ message: 'productId is required' });
     const qty = parseInt(quantity);
@@ -189,9 +194,21 @@ const addItem = async (req, res) => {
     }
     const product = productRes.rows[0];
 
-    // Check variant if provided
+    // Determine unit price and check stock
     let unitPrice = parseFloat(product.retail_price || 0);
-    if (variantId) {
+    if (categoryId) {
+      // Use category assignment price/stock
+      const pcaRes = await query(
+        `SELECT pca.price_override, pca.stock_allocated
+         FROM product_category_assignments pca
+         WHERE pca.product_id = $1 AND pca.category_id = $2`,
+        [productId, categoryId]
+      );
+      if (pcaRes.rows.length > 0) {
+        const pca = pcaRes.rows[0];
+        if (pca.price_override) unitPrice = parseFloat(pca.price_override);
+      }
+    } else if (variantId) {
       const varRes = await query(
         `SELECT pv.*,
                 COALESCE(vi.total_qty, 0) as variant_stock
@@ -205,13 +222,11 @@ const addItem = async (req, res) => {
         return res.status(404).json({ message: 'Variant not found' });
       }
       const variant = varRes.rows[0];
-      // Check stock
       if (parseInt(variant.variant_stock) < qty) {
         return res.status(400).json({ message: 'Insufficient stock for this variant', available: parseInt(variant.variant_stock) });
       }
       if (variant.selling_price) unitPrice = parseFloat(variant.selling_price);
     } else {
-      // Check main product stock
       if (parseInt(product.stock_qty) < qty) {
         return res.status(400).json({ message: 'Insufficient stock', available: parseInt(product.stock_qty) });
       }
@@ -220,14 +235,13 @@ const addItem = async (req, res) => {
     // Get or create cart
     const cart = await getOrCreateCart(customerId, sessionId);
 
-    // Upsert cart item
-    // Using COALESCE(variant_id, 0) in the conflict target requires a functional unique index,
-    // so we handle it manually to be safe.
+    // Upsert cart item (dedup includes category_id)
     const existing = await query(
       `SELECT id, quantity FROM cart_items
        WHERE cart_id = $1 AND product_id = $2
-         AND (($3::int IS NULL AND variant_id IS NULL) OR variant_id = $3)`,
-      [cart.id, productId, variantId || null]
+         AND (($3::int IS NULL AND variant_id IS NULL) OR variant_id = $3)
+         AND (($4::int IS NULL AND category_id IS NULL) OR category_id = $4)`,
+      [cart.id, productId, variantId || null, categoryId || null]
     );
 
     if (existing.rows.length > 0) {
@@ -238,9 +252,9 @@ const addItem = async (req, res) => {
       );
     } else {
       await query(
-        `INSERT INTO cart_items (cart_id, product_id, variant_id, quantity, unit_price, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, $5, NOW(), NOW())`,
-        [cart.id, productId, variantId || null, qty, unitPrice]
+        `INSERT INTO cart_items (cart_id, product_id, variant_id, category_id, quantity, unit_price, created_at, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW())`,
+        [cart.id, productId, variantId || null, categoryId || null, qty, unitPrice]
       );
     }
 
