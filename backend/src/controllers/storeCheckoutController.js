@@ -50,6 +50,7 @@ const checkout = async (req, res) => {
       billingAddress,
       paymentMethod,
       bankChannelId,
+      shippingAmount: clientShippingAmount,
       notes,
     } = value;
 
@@ -154,9 +155,9 @@ const checkout = async (req, res) => {
       }
     }
 
-    // Tax and shipping (future: pull from store_config)
-    const taxRate = 0; // 0% for now
-    const shippingAmount = 0;
+    // Tax and shipping — shipping comes from frontend (computed from deliveryConfig zones)
+    const taxRate = 0; // 0% for now — could pull from store_config.tax_rate
+    const shippingAmount = parseFloat(clientShippingAmount) || 0;
     const taxAmount = parseFloat(((subtotal - couponDiscount) * taxRate).toFixed(2));
     const total = parseFloat((subtotal - couponDiscount + taxAmount + shippingAmount).toFixed(2));
 

@@ -96,5 +96,6 @@ exports.checkoutSchema = Joi.object({
     then: Joi.number().integer().required(),
     otherwise: Joi.any().optional().allow(null),
   }),
+  shippingAmount: Joi.number().min(0).optional().default(0),
   notes: Joi.string().max(500).optional().allow(''),
 });
