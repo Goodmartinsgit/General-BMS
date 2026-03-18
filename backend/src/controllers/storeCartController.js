@@ -60,6 +60,8 @@ async function buildCartResponse(cartId, couponCode, couponDiscount) {
        pv.variant_name,
        pv.variant_values as variant_attributes,
        cat.category_name as category_name,
+       piv.v2_image_url,
+       pca_img.cat_image_url,
        COALESCE(
          (SELECT SUM(quantity_available) FROM inventory WHERE product_id = ci.product_id),
          0
@@ -72,6 +74,19 @@ async function buildCartResponse(cartId, couponCode, couponDiscount) {
      JOIN products p ON p.id = ci.product_id
      LEFT JOIN product_variants pv ON pv.id = ci.variant_id
      LEFT JOIN categories cat ON cat.id = ci.category_id
+     LEFT JOIN LATERAL (
+       SELECT image_url as v2_image_url
+       FROM product_images_v2
+       WHERE product_id = ci.product_id
+       ORDER BY is_primary DESC, display_order, id
+       LIMIT 1
+     ) piv ON true
+     LEFT JOIN LATERAL (
+       SELECT image_url as cat_image_url
+       FROM product_category_assignments
+       WHERE product_id = ci.product_id AND image_url IS NOT NULL
+       LIMIT 1
+     ) pca_img ON true
      WHERE ci.cart_id = $1
      ORDER BY ci.created_at ASC`,
     [cartId]
@@ -80,9 +95,12 @@ async function buildCartResponse(cartId, couponCode, couponDiscount) {
   const items = itemsRes.rows.map((row) => {
     const rawImages = Array.isArray(row.product_images) ? row.product_images : [];
     // product_images JSONB may contain objects {url, alt} or plain URL strings
-    const thumbnail = rawImages.length > 0
+    let thumbnail = rawImages.length > 0
       ? (typeof rawImages[0] === 'object' && rawImages[0] !== null ? rawImages[0].url : rawImages[0])
       : undefined;
+    // Fallback: product_images_v2 table, then category assignment images
+    if (!thumbnail && row.v2_image_url) thumbnail = row.v2_image_url;
+    if (!thumbnail && row.cat_image_url) thumbnail = row.cat_image_url;
     const unitPrice = parseFloat(row.unit_price || 0);
     const stockQty = row.variant_id ? parseInt(row.variant_stock_qty) : parseInt(row.stock_qty);
     const qty = parseInt(row.quantity);

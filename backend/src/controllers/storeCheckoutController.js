@@ -83,6 +83,8 @@ const checkout = async (req, res) => {
               p.is_online_available, p.retail_price,
               pv.sku as variant_sku, pv.selling_price as variant_price,
               cat.category_name as cat_name,
+              piv.v2_image_url,
+              pca_img.cat_image_url,
               COALESCE(
                 (SELECT SUM(COALESCE(quantity_on_hand,0) - COALESCE(quantity_reserved,0)) FROM inventory WHERE product_id = ci.product_id),
                 0
@@ -95,6 +97,19 @@ const checkout = async (req, res) => {
        JOIN products p ON p.id = ci.product_id
        LEFT JOIN product_variants pv ON pv.id = ci.variant_id
        LEFT JOIN categories cat ON cat.id = ci.category_id
+       LEFT JOIN LATERAL (
+         SELECT image_url as v2_image_url
+         FROM product_images_v2
+         WHERE product_id = ci.product_id
+         ORDER BY is_primary DESC, display_order, id
+         LIMIT 1
+       ) piv ON true
+       LEFT JOIN LATERAL (
+         SELECT image_url as cat_image_url
+         FROM product_category_assignments
+         WHERE product_id = ci.product_id AND image_url IS NOT NULL
+         LIMIT 1
+       ) pca_img ON true
        WHERE ci.cart_id = $1`,
       [cart.id]
     );
@@ -257,7 +272,9 @@ const checkout = async (req, res) => {
     for (const item of itemsRes.rows) {
       const images = Array.isArray(item.product_images) ? item.product_images : [];
       const firstImg = images[0] || null;
-      const productImage = firstImg && typeof firstImg === 'object' ? firstImg.url : firstImg;
+      let productImage = firstImg && typeof firstImg === 'object' ? firstImg.url : firstImg;
+      if (!productImage && item.v2_image_url) productImage = item.v2_image_url;
+      if (!productImage && item.cat_image_url) productImage = item.cat_image_url;
       const unitPrice = parseFloat(item.unit_price || item.retail_price || 0);
       const effectiveSku = item.variant_id ? (item.variant_sku || item.sku) : item.sku;
 
