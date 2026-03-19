@@ -134,10 +134,10 @@ const register = async (req, res) => {
     console.log(`[EMAIL] Verify email token: ${verificationToken}`);
 
     // Build token and response
-    const token = signCustomerToken({ id: customer.id, email: auth.email });
+    const accessToken = signCustomerToken({ id: customer.id, email: auth.email });
 
     res.status(201).json({
-      token,
+      accessToken,
       customer: formatCustomer(customer, auth),
     });
   } catch (err) {
@@ -213,10 +213,10 @@ const login = async (req, res) => {
     );
     const updatedAuth = updatedAuthRes.rows[0];
 
-    const token = signCustomerToken({ id: customer.id, email: updatedAuth.email });
+    const accessToken = signCustomerToken({ id: customer.id, email: updatedAuth.email });
 
     res.json({
-      token,
+      accessToken,
       customer: formatCustomer(customer, updatedAuth),
     });
   } catch (err) {
