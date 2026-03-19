@@ -303,7 +303,7 @@ const checkout = async (req, res) => {
         `INSERT INTO online_order_items
            (order_id, product_id, variant_id, category_id, category_name,
             product_name, product_image, sku,
-            unit_price, quantity, total_price, created_at)
+            unit_price, quantity, line_total, created_at)
          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())`,
         [
           order.id,
