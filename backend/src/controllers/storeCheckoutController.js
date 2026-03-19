@@ -36,8 +36,10 @@ const checkout = async (req, res) => {
   const client = await pool.connect();
   try {
     // Validate request body
-    const { error, value } = checkoutSchema.validate(req.body, { abortEarly: false });
+    const { error, value } = checkoutSchema.validate(req.body, { abortEarly: false, allowUnknown: true, stripUnknown: true });
     if (error) {
+      console.error('[storeCheckoutController.checkout] Validation errors:', error.details.map(d => d.message));
+      console.error('[storeCheckoutController.checkout] Body keys:', Object.keys(req.body));
       return res.status(400).json({
         message: 'Validation failed',
         errors: error.details.map((d) => d.message),
@@ -73,6 +75,7 @@ const checkout = async (req, res) => {
     }
 
     if (!cartRes || cartRes.rows.length === 0) {
+      console.error('[storeCheckoutController.checkout] No cart found. customerId:', customerId, 'sessionId:', sessionId);
       return res.status(400).json({ message: 'Your cart is empty' });
     }
     const cart = cartRes.rows[0];
