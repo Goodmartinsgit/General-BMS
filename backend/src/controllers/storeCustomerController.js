@@ -4,6 +4,25 @@ const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { query, pool } = require('../config/db');
 const { signCustomerToken } = require('../middleware/storeAuthMiddleware');
+const { sendText } = require('../services/whatsappService');
+
+// ---------------------------------------------------------------------------
+// Helper: generate 6-digit OTP
+// ---------------------------------------------------------------------------
+function generateOTP() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+// ---------------------------------------------------------------------------
+// Helper: fetch customer_channel from store_config
+// ---------------------------------------------------------------------------
+async function getCustomerChannel() {
+  const res = await query(
+    `SELECT customer_channel, whatsapp_phone_number_id, whatsapp_access_token
+     FROM store_config ORDER BY id LIMIT 1`
+  );
+  return res.rows[0] || { customer_channel: 'email' };
+}
 
 // ---------------------------------------------------------------------------
 // Helper: format customer object for API responses
@@ -14,8 +33,11 @@ function formatCustomer(customer, auth) {
     email: auth.email,
     firstName: customer.customer_name ? customer.customer_name.split(' ')[0] : '',
     lastName: customer.customer_name ? customer.customer_name.split(' ').slice(1).join(' ') : '',
+    fullName: customer.customer_name || '',
     phone: customer.phone_number,
+    whatsappNumber: auth.whatsapp_number || null,
     isEmailVerified: auth.is_email_verified,
+    isVerified: auth.is_verified !== undefined ? auth.is_verified : auth.is_email_verified,
     lastLoginAt: auth.last_login_at,
     createdAt: customer.created_at,
   };
@@ -75,11 +97,24 @@ async function mergeGuestCart(client, customerId, sessionId) {
 const register = async (req, res) => {
   const client = await pool.connect();
   try {
-    const { firstName, lastName, email, phone, password } = req.body;
+    // Accept both old (firstName+lastName) and new (fullName) formats
+    const { firstName, lastName, fullName, email, phone, whatsappNumber, password } = req.body;
 
-    // Basic validation
-    if (!firstName || !lastName || !email || !phone || !password) {
-      return res.status(400).json({ message: 'All fields are required' });
+    const customerName = fullName
+      ? fullName.trim()
+      : (firstName && lastName ? `${firstName.trim()} ${lastName.trim()}` : '');
+
+    if (!customerName || !email || !password) {
+      return res.status(400).json({ message: 'Name, email, and password are required' });
+    }
+
+    // Fetch store communication channel
+    const storeConfig = await getCustomerChannel();
+    const channel = storeConfig.customer_channel || 'email';
+
+    // If WhatsApp mode, whatsappNumber is required
+    if (channel === 'whatsapp' && !whatsappNumber) {
+      return res.status(400).json({ message: 'WhatsApp number is required' });
     }
 
     await client.query('BEGIN');
@@ -94,11 +129,22 @@ const register = async (req, res) => {
       return res.status(409).json({ message: 'An account with this email already exists' });
     }
 
+    // Check WhatsApp number uniqueness if provided
+    if (whatsappNumber) {
+      const waCheck = await client.query(
+        `SELECT id FROM customer_auth WHERE whatsapp_number = $1`,
+        [whatsappNumber]
+      );
+      if (waCheck.rows.length > 0) {
+        await client.query('ROLLBACK');
+        return res.status(409).json({ message: 'An account with this WhatsApp number already exists' });
+      }
+    }
+
     // Generate customer_code: CUS-ONL-XXXXXX
     const countRes = await client.query(`SELECT COUNT(*) FROM customers WHERE source = 'online'`);
     const seq = parseInt(countRes.rows[0].count) + 1;
     const customerCode = `CUS-ONL-${String(seq).padStart(6, '0')}`;
-    const customerName = `${firstName.trim()} ${lastName.trim()}`;
 
     // Insert into customers
     const customerRes = await client.query(
@@ -106,39 +152,56 @@ const register = async (req, res) => {
          (customer_name, customer_code, customer_type, email, phone_number, source, is_active_online, created_at)
        VALUES ($1, $2, 'retail', $3, $4, 'online', true, NOW())
        RETURNING *`,
-      [customerName, customerCode, email.toLowerCase(), phone]
+      [customerName, customerCode, email.toLowerCase(), phone || whatsappNumber || null]
     );
     const customer = customerRes.rows[0];
 
     // Hash password
     const passwordHash = await bcrypt.hash(password, 10);
 
-    // Generate email verification token
+    // Generate OTP for verification
+    const otp = generateOTP();
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    // Generate email verification token (for email channel fallback)
     const verificationToken = crypto.randomBytes(32).toString('hex');
     const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
 
     // Insert into customer_auth
     const authRes = await client.query(
       `INSERT INTO customer_auth
-         (customer_id, email, password_hash, is_email_verified,
-          email_verification_token, email_verification_expires)
-       VALUES ($1, $2, $3, false, $4, $5)
+         (customer_id, email, password_hash, is_email_verified, is_verified,
+          email_verification_token, email_verification_expires,
+          whatsapp_number, otp_code, otp_expires)
+       VALUES ($1, $2, $3, false, false, $4, $5, $6, $7, $8)
        RETURNING *`,
-      [customer.id, email.toLowerCase(), passwordHash, verificationToken, verificationExpires]
+      [customer.id, email.toLowerCase(), passwordHash, verificationToken, verificationExpires,
+       whatsappNumber || null, otp, otpExpires]
     );
     const auth = authRes.rows[0];
 
     await client.query('COMMIT');
 
-    // Log token (email sending is future work)
-    console.log(`[EMAIL] Verify email token: ${verificationToken}`);
-
-    // Build token and response
-    const accessToken = signCustomerToken({ id: customer.id, email: auth.email });
+    // Send OTP via configured channel
+    if (channel === 'whatsapp' && whatsappNumber) {
+      try {
+        await sendText(storeConfig, whatsappNumber, `Your verification code is: ${otp}\n\nThis code expires in 10 minutes.`);
+        console.log(`[WhatsApp OTP] Sent to ${whatsappNumber}`);
+      } catch (otpErr) {
+        console.error('[WhatsApp OTP] Send failed:', otpErr.message);
+      }
+    } else {
+      // Email channel — log OTP (email sending is future work)
+      console.log(`[EMAIL OTP] Verification code for ${email}: ${otp}`);
+    }
 
     res.status(201).json({
-      accessToken,
-      customer: formatCustomer(customer, auth),
+      pendingVerification: true,
+      channel,
+      customerId: customer.id,
+      message: channel === 'whatsapp'
+        ? `Verification code sent to your WhatsApp number`
+        : `Verification code sent to your email`,
     });
   } catch (err) {
     await client.query('ROLLBACK');
@@ -155,28 +218,51 @@ const register = async (req, res) => {
 const login = async (req, res) => {
   const client = await pool.connect();
   try {
-    const { email, password } = req.body;
-    if (!email || !password) {
-      return res.status(400).json({ message: 'Email and password are required' });
+    const { email, whatsappNumber, password } = req.body;
+
+    if (!password || (!email && !whatsappNumber)) {
+      return res.status(400).json({ message: 'Login credentials and password are required' });
     }
 
-    // Look up auth record
-    const authRes = await client.query(
-      `SELECT ca.*, c.id as cust_id
-       FROM customer_auth ca
-       JOIN customers c ON c.id = ca.customer_id
-       WHERE ca.email = LOWER($1) AND c.deleted_at IS NULL`,
-      [email]
-    );
+    // Look up auth record by email or WhatsApp number
+    let authRes;
+    if (whatsappNumber) {
+      authRes = await client.query(
+        `SELECT ca.*, c.id as cust_id
+         FROM customer_auth ca
+         JOIN customers c ON c.id = ca.customer_id
+         WHERE ca.whatsapp_number = $1 AND c.deleted_at IS NULL`,
+        [whatsappNumber]
+      );
+    } else {
+      authRes = await client.query(
+        `SELECT ca.*, c.id as cust_id
+         FROM customer_auth ca
+         JOIN customers c ON c.id = ca.customer_id
+         WHERE ca.email = LOWER($1) AND c.deleted_at IS NULL`,
+        [email]
+      );
+    }
+
+    const loginLabel = whatsappNumber ? 'WhatsApp number' : 'email';
     if (authRes.rows.length === 0) {
-      return res.status(401).json({ message: 'Invalid email or password' });
+      return res.status(401).json({ message: `Invalid ${loginLabel} or password` });
     }
     const authRow = authRes.rows[0];
+
+    // Block login if account is not verified (allow legacy users who have is_email_verified)
+    if (!authRow.is_verified && !authRow.is_email_verified) {
+      return res.status(403).json({
+        message: 'Account not verified. Please complete OTP verification.',
+        pendingVerification: true,
+        customerId: authRow.customer_id,
+      });
+    }
 
     // Verify password
     const valid = await bcrypt.compare(password, authRow.password_hash);
     if (!valid) {
-      return res.status(401).json({ message: 'Invalid email or password' });
+      return res.status(401).json({ message: `Invalid ${loginLabel} or password` });
     }
 
     // Fetch customer row
@@ -352,6 +438,123 @@ const verifyEmail = async (req, res) => {
     res.json({ message: 'Email verified successfully' });
   } catch (err) {
     console.error('[storeCustomerController.verifyEmail]', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ---------------------------------------------------------------------------
+// POST /api/store/:slug/customers/verify-otp  { customerId, otp }
+// ---------------------------------------------------------------------------
+const verifyOtp = async (req, res) => {
+  const client = await pool.connect();
+  try {
+    const { customerId, otp } = req.body;
+    if (!customerId || !otp) {
+      return res.status(400).json({ message: 'Customer ID and OTP are required' });
+    }
+
+    const authRes = await client.query(
+      `SELECT ca.*, c.id as cust_id
+       FROM customer_auth ca
+       JOIN customers c ON c.id = ca.customer_id
+       WHERE ca.customer_id = $1 AND c.deleted_at IS NULL`,
+      [customerId]
+    );
+    if (authRes.rows.length === 0) {
+      return res.status(404).json({ message: 'Account not found' });
+    }
+    const auth = authRes.rows[0];
+
+    // Check OTP
+    if (!auth.otp_code || auth.otp_code !== otp) {
+      return res.status(400).json({ message: 'Invalid verification code' });
+    }
+    if (new Date() > new Date(auth.otp_expires)) {
+      return res.status(400).json({ message: 'Verification code has expired. Please request a new one.' });
+    }
+
+    await client.query('BEGIN');
+
+    // Mark as verified, clear OTP
+    await client.query(
+      `UPDATE customer_auth
+       SET is_verified = true, is_email_verified = true,
+           otp_code = NULL, otp_expires = NULL,
+           email_verification_token = NULL, email_verification_expires = NULL
+       WHERE customer_id = $1`,
+      [customerId]
+    );
+
+    await client.query('COMMIT');
+
+    // Fetch customer for response
+    const customerRes = await client.query(`SELECT * FROM customers WHERE id = $1`, [customerId]);
+    const customer = customerRes.rows[0];
+
+    // Sign JWT and return
+    const accessToken = signCustomerToken({ id: customer.id, email: auth.email });
+
+    res.json({
+      accessToken,
+      customer: formatCustomer(customer, { ...auth, is_email_verified: true }),
+    });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    console.error('[storeCustomerController.verifyOtp]', err);
+    res.status(500).json({ message: 'Server error' });
+  } finally {
+    client.release();
+  }
+};
+
+// ---------------------------------------------------------------------------
+// POST /api/store/:slug/customers/resend-otp  { customerId }
+// ---------------------------------------------------------------------------
+const resendOtp = async (req, res) => {
+  try {
+    const { customerId } = req.body;
+    if (!customerId) {
+      return res.status(400).json({ message: 'Customer ID is required' });
+    }
+
+    const authRes = await query(
+      `SELECT * FROM customer_auth WHERE customer_id = $1`,
+      [customerId]
+    );
+    if (authRes.rows.length === 0) {
+      return res.status(404).json({ message: 'Account not found' });
+    }
+    const auth = authRes.rows[0];
+
+    if (auth.is_verified) {
+      return res.status(400).json({ message: 'Account is already verified' });
+    }
+
+    const otp = generateOTP();
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+
+    await query(
+      `UPDATE customer_auth SET otp_code = $1, otp_expires = $2 WHERE customer_id = $3`,
+      [otp, otpExpires, customerId]
+    );
+
+    // Send via configured channel
+    const storeConfig = await getCustomerChannel();
+    const channel = storeConfig.customer_channel || 'email';
+
+    if (channel === 'whatsapp' && auth.whatsapp_number) {
+      try {
+        await sendText(storeConfig, auth.whatsapp_number, `Your verification code is: ${otp}\n\nThis code expires in 10 minutes.`);
+      } catch (otpErr) {
+        console.error('[WhatsApp OTP] Resend failed:', otpErr.message);
+      }
+    } else {
+      console.log(`[EMAIL OTP] Resend verification code for ${auth.email}: ${otp}`);
+    }
+
+    res.json({ message: 'Verification code resent' });
+  } catch (err) {
+    console.error('[storeCustomerController.resendOtp]', err);
     res.status(500).json({ message: 'Server error' });
   }
 };
@@ -927,6 +1130,8 @@ module.exports = {
   forgotPassword,
   resetPassword,
   verifyEmail,
+  verifyOtp,
+  resendOtp,
   resendVerification,
   getProfile,
   updateProfile,

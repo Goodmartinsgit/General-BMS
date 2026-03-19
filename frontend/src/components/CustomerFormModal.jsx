@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X } from 'lucide-react';
+import { X, Eye, EyeOff, Globe } from 'lucide-react';
 import useFormDraft from '../hooks/useFormDraft';
 import DraftRecoveryBanner from './common/DraftRecoveryBanner';
 
@@ -11,6 +11,7 @@ const defaultCustomerData = {
     email: '',
     phone_number: '',
     alternative_phone: '',
+    whatsapp_number: '',
     address: '',
     city: '',
     state: '',
@@ -20,11 +21,16 @@ const defaultCustomerData = {
     referred_by: '',
     credit_limit: 0,
     payment_terms_days: 0,
-    is_active: true
+    is_active: true,
+    source: 'shop',
+    // Online store account fields
+    create_store_account: false,
+    password: '',
 };
 
 const CustomerFormModal = ({ isOpen, onClose, onSubmit, customer, priceTiers, referrers = [] }) => {
     const [formData, setFormData] = useState(defaultCustomerData);
+    const [showPassword, setShowPassword] = useState(false);
 
     const isEditMode = !!customer;
     const draftKey = isEditMode ? `customer_edit_${customer?.id}` : 'customer_create';
@@ -55,6 +61,7 @@ const CustomerFormModal = ({ isOpen, onClose, onSubmit, customer, priceTiers, re
                 email: customer.email || '',
                 phone_number: customer.phone_number || '',
                 alternative_phone: customer.alternative_phone || '',
+                whatsapp_number: customer.whatsapp_number || '',
                 address: customer.address || '',
                 city: customer.city || '',
                 state: customer.state || '',
@@ -64,7 +71,10 @@ const CustomerFormModal = ({ isOpen, onClose, onSubmit, customer, priceTiers, re
                 referred_by: customer.referred_by || '',
                 credit_limit: customer.credit_limit || 0,
                 payment_terms_days: customer.payment_terms_days || 0,
-                is_active: customer.is_active ?? true
+                is_active: customer.is_active ?? true,
+                source: customer.source || 'shop',
+                create_store_account: false,
+                password: '',
             });
 
         } else {
@@ -76,6 +86,7 @@ const CustomerFormModal = ({ isOpen, onClose, onSubmit, customer, priceTiers, re
                 email: '',
                 phone_number: '',
                 alternative_phone: '',
+                whatsapp_number: '',
                 address: '',
                 city: '',
                 state: '',
@@ -85,7 +96,10 @@ const CustomerFormModal = ({ isOpen, onClose, onSubmit, customer, priceTiers, re
                 referred_by: '',
                 credit_limit: 0,
                 payment_terms_days: 0,
-                is_active: true
+                is_active: true,
+                source: 'shop',
+                create_store_account: false,
+                password: '',
             });
 
         }
@@ -106,6 +120,11 @@ const CustomerFormModal = ({ isOpen, onClose, onSubmit, customer, priceTiers, re
         clearDraft();
         onSubmit(formData);
     };
+
+    const isOnlineSource = formData.source === 'online';
+    const showStoreAccountSection = isOnlineSource && !isEditMode;
+    // In edit mode, if customer is online source, show whether they have a store account
+    const isExistingOnlineCustomer = isEditMode && customer?.source === 'online';
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 overflow-y-auto py-10">
@@ -154,6 +173,19 @@ const CustomerFormModal = ({ isOpen, onClose, onSubmit, customer, priceTiers, re
                             </select>
                         </div>
                         <div>
+                            <label className="block text-sm font-medium text-theme-secondary mb-1">Source</label>
+                            <select
+                                name="source"
+                                value={formData.source}
+                                onChange={handleChange}
+                                className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none"
+                                disabled={isEditMode}
+                            >
+                                <option value="shop">Shop (In-Store)</option>
+                                <option value="online">Online (Store)</option>
+                            </select>
+                        </div>
+                        <div>
                             <label className="block text-sm font-medium text-theme-secondary mb-1">Customer/Company Name</label>
                             <input
                                 type="text"
@@ -179,13 +211,14 @@ const CustomerFormModal = ({ isOpen, onClose, onSubmit, customer, priceTiers, re
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-theme-secondary mb-1">Email Address</label>
+                            <label className="block text-sm font-medium text-theme-secondary mb-1">Email Address {isOnlineSource && <span className="text-red-500">*</span>}</label>
                             <input
                                 type="email"
                                 name="email"
                                 value={formData.email}
                                 onChange={handleChange}
                                 className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none"
+                                required={isOnlineSource}
                             />
                         </div>
                         <div>
@@ -199,7 +232,28 @@ const CustomerFormModal = ({ isOpen, onClose, onSubmit, customer, priceTiers, re
                                 required
                             />
                         </div>
-                        <div className="md:col-span-2">
+                        <div>
+                            <label className="block text-sm font-medium text-theme-secondary mb-1">Alternative Phone</label>
+                            <input
+                                type="text"
+                                name="alternative_phone"
+                                value={formData.alternative_phone}
+                                onChange={handleChange}
+                                className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-theme-secondary mb-1">WhatsApp Number</label>
+                            <input
+                                type="text"
+                                name="whatsapp_number"
+                                value={formData.whatsapp_number}
+                                onChange={handleChange}
+                                placeholder="+234 800 000 0000"
+                                className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none"
+                            />
+                        </div>
+                        <div className="md:col-span-2 lg:col-span-1">
                             <label className="block text-sm font-medium text-theme-secondary mb-1">Address</label>
                             <input
                                 type="text"
@@ -219,6 +273,109 @@ const CustomerFormModal = ({ isOpen, onClose, onSubmit, customer, priceTiers, re
                                 className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none"
                             />
                         </div>
+                        <div>
+                            <label className="block text-sm font-medium text-theme-secondary mb-1">State</label>
+                            <input
+                                type="text"
+                                name="state"
+                                value={formData.state}
+                                onChange={handleChange}
+                                className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-theme-secondary mb-1">Country</label>
+                            <input
+                                type="text"
+                                name="country"
+                                value={formData.country}
+                                onChange={handleChange}
+                                className="w-full px-3 py-2 border border-theme bg-theme-primary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none"
+                            />
+                        </div>
+
+                        {/* Store Account Section — only for new online customers */}
+                        {showStoreAccountSection && (
+                            <>
+                                <div className="col-span-1 lg:col-span-3 pb-2 border-b border-theme mt-4">
+                                    <h3 className="text-sm font-semibold text-accent-gold uppercase flex items-center gap-2">
+                                        <Globe size={14} />
+                                        Online Store Account
+                                    </h3>
+                                </div>
+
+                                <div className="col-span-1 lg:col-span-3">
+                                    <div className="flex items-center gap-2 mb-4">
+                                        <input
+                                            type="checkbox"
+                                            name="create_store_account"
+                                            id="create_store_account"
+                                            checked={formData.create_store_account}
+                                            onChange={handleChange}
+                                            className="w-4 h-4 text-accent-gold border-theme rounded focus:ring-accent-gold"
+                                        />
+                                        <label htmlFor="create_store_account" className="text-sm font-medium text-theme-secondary">
+                                            Create store login account for this customer
+                                        </label>
+                                    </div>
+                                    {formData.create_store_account && (
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-theme-primary rounded-lg border border-theme">
+                                            <div>
+                                                <label className="block text-sm font-medium text-theme-secondary mb-1">
+                                                    Password <span className="text-red-500">*</span>
+                                                </label>
+                                                <div className="relative">
+                                                    <input
+                                                        type={showPassword ? 'text' : 'password'}
+                                                        name="password"
+                                                        value={formData.password}
+                                                        onChange={handleChange}
+                                                        className="w-full px-3 py-2 pr-10 border border-theme bg-theme-secondary text-theme-primary rounded-lg focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold outline-none"
+                                                        placeholder="Min. 8 characters"
+                                                        required={formData.create_store_account}
+                                                        minLength={8}
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowPassword(!showPassword)}
+                                                        className="absolute right-3 top-1/2 -translate-y-1/2 text-theme-muted hover:text-theme-primary transition"
+                                                        tabIndex={-1}
+                                                    >
+                                                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-end">
+                                                <p className="text-xs text-theme-muted leading-relaxed">
+                                                    This account will be immediately active and verified. The customer can log in to the store using their email (or WhatsApp number) and this password.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </>
+                        )}
+
+                        {/* Existing online customer info */}
+                        {isExistingOnlineCustomer && (
+                            <>
+                                <div className="col-span-1 lg:col-span-3 pb-2 border-b border-theme mt-4">
+                                    <h3 className="text-sm font-semibold text-accent-gold uppercase flex items-center gap-2">
+                                        <Globe size={14} />
+                                        Online Store Account
+                                    </h3>
+                                </div>
+                                <div className="col-span-1 lg:col-span-3">
+                                    <div className="p-3 bg-theme-primary rounded-lg border border-theme text-sm text-theme-secondary">
+                                        {customer.is_email_verified ? (
+                                            <span className="text-green-600 dark:text-green-400 font-medium">Store account is active and verified</span>
+                                        ) : (
+                                            <span className="text-amber-600 dark:text-amber-400 font-medium">Store account is pending verification</span>
+                                        )}
+                                    </div>
+                                </div>
+                            </>
+                        )}
 
                         <div className="col-span-1 lg:col-span-3 pb-2 border-b border-theme mt-4">
                             <h3 className="text-sm font-semibold text-accent-gold uppercase">Pricing & Credit</h3>

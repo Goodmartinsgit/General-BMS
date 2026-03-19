@@ -13,6 +13,8 @@ router.post('/logout', ctrl.logout);
 router.post('/forgot-password', ctrl.forgotPassword);
 router.post('/reset-password', ctrl.resetPassword);
 router.post('/verify-email', ctrl.verifyEmail);
+router.post('/verify-otp', ctrl.verifyOtp);
+router.post('/resend-otp', ctrl.resendOtp);
 router.post('/resend-verification', storeAuth, ctrl.resendVerification);
 
 // Profile (authenticated)
