@@ -95,11 +95,18 @@ const checkout = async (req, res) => {
               COALESCE(
                 (SELECT SUM(COALESCE(quantity_on_hand,0) - COALESCE(quantity_reserved,0)) FROM variant_inventory WHERE variant_id = ci.variant_id),
                 0
-              ) as variant_stock_qty
+              ) as variant_stock_qty,
+              pca_stock.cat_stock_allocated
        FROM cart_items ci
        JOIN products p ON p.id = ci.product_id
        LEFT JOIN product_variants pv ON pv.id = ci.variant_id
        LEFT JOIN categories cat ON cat.id = ci.category_id
+       LEFT JOIN LATERAL (
+         SELECT COALESCE(stock_allocated, 0) as cat_stock_allocated
+         FROM product_category_assignments
+         WHERE product_id = ci.product_id AND category_id = ci.category_id
+         LIMIT 1
+       ) pca_stock ON ci.category_id IS NOT NULL
        LEFT JOIN LATERAL (
          SELECT image_url as v2_image_url
          FROM product_images_v2
@@ -126,9 +133,15 @@ const checkout = async (req, res) => {
       if (!item.is_online_available) {
         return res.status(400).json({ message: `Product "${item.product_name}" is no longer available` });
       }
-      const availableStock = item.variant_id
-        ? parseInt(item.variant_stock_qty)
-        : parseInt(item.stock_qty);
+      // Determine available stock: category assignment → variant → inventory
+      let availableStock;
+      if (item.category_id && item.cat_stock_allocated !== null && item.cat_stock_allocated !== undefined) {
+        availableStock = parseInt(item.cat_stock_allocated);
+      } else if (item.variant_id) {
+        availableStock = parseInt(item.variant_stock_qty);
+      } else {
+        availableStock = parseInt(item.stock_qty);
+      }
       if (availableStock < parseInt(item.quantity)) {
         return res.status(400).json({
           message: `Insufficient stock for "${item.product_name}"`,
