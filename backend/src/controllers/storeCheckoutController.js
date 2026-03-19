@@ -420,8 +420,8 @@ const checkout = async (req, res) => {
     }
 
     // Include store communication channel preference in response
-    const storeConfigRes = await query(`SELECT customer_channel FROM store_config ORDER BY id LIMIT 1`);
-    const customerChannel = storeConfigRes.rows[0]?.customer_channel || 'email';
+    const channelRes = await query(`SELECT customer_channel FROM store_config ORDER BY id LIMIT 1`);
+    const customerChannel = channelRes.rows[0]?.customer_channel || 'email';
     responsePayload.customerChannel = customerChannel;
     responsePayload.isManualPayment = isManualPayment;
 
