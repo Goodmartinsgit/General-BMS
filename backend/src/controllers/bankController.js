@@ -39,11 +39,11 @@ const getBankChannels = async (req, res) => {
 
 const createBankChannel = async (req, res) => {
     try {
-        const { channel_name, bank_name, account_number, account_name, initial_balance } = req.body;
+        const { channel_name, bank_name, account_number, account_name, initial_balance, channel_type, usage_scope } = req.body;
         const result = await pool.query(
-            `INSERT INTO bank_channels (channel_name, bank_name, account_number, account_name, initial_balance, current_balance) 
-             VALUES ($1, $2, $3, $4, $5, $5) RETURNING *`,
-            [channel_name, bank_name, account_number, account_name, initial_balance || 0]
+            `INSERT INTO bank_channels (channel_name, bank_name, account_number, account_name, initial_balance, current_balance, channel_type, usage_scope)
+             VALUES ($1, $2, $3, $4, $5, $5, $6, $7) RETURNING *`,
+            [channel_name, bank_name, account_number, account_name, initial_balance || 0, channel_type || 'bank', usage_scope || 'both']
         );
         res.status(201).json(result.rows[0]);
     } catch (err) {
@@ -55,12 +55,13 @@ const createBankChannel = async (req, res) => {
 const updateBankChannel = async (req, res) => {
     try {
         const { id } = req.params;
-        const { channel_name, bank_name, account_number, account_name, is_active } = req.body;
+        const { channel_name, bank_name, account_number, account_name, is_active, channel_type, usage_scope } = req.body;
         const result = await pool.query(
-            `UPDATE bank_channels 
-             SET channel_name = $1, bank_name = $2, account_number = $3, account_name = $4, is_active = $5, updated_at = NOW() 
-             WHERE id = $6 RETURNING *`,
-            [channel_name, bank_name, account_number, account_name, is_active, id]
+            `UPDATE bank_channels
+             SET channel_name = $1, bank_name = $2, account_number = $3, account_name = $4, is_active = $5,
+                 channel_type = $6, usage_scope = $7, updated_at = NOW()
+             WHERE id = $8 RETURNING *`,
+            [channel_name, bank_name, account_number, account_name, is_active, channel_type || 'bank', usage_scope || 'both', id]
         );
         res.json(result.rows[0]);
     } catch (err) {

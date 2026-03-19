@@ -464,8 +464,9 @@ const getBankChannels = async (req, res) => {
     const result = await query(
       `SELECT id, channel_name, channel_type, account_number, account_name, bank_name
        FROM bank_channels
-       WHERE is_active = true AND channel_type IN ('bank', 'mobile_money', 'cash')
-       ORDER BY channel_type, channel_name`
+       WHERE is_active = true
+         AND COALESCE(usage_scope, 'both') IN ('store', 'both')
+       ORDER BY COALESCE(channel_type, 'bank'), channel_name`
     );
     res.json(result.rows);
   } catch (err) {

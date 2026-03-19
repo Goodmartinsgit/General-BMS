@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
-import { Plus, Edit, Landmark, Wallet, List, Search, X, DollarSign } from 'lucide-react';
+import { Plus, Edit, Landmark, Wallet, List, Search, X, DollarSign, Store, Monitor, Globe } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../components/common/PageHeader';
 import { useCurrency } from '../context/CurrencyContext';
@@ -19,6 +19,8 @@ const BankChannelsPage = () => {
         account_number: '',
         account_name: '',
         initial_balance: 0,
+        channel_type: 'bank',
+        usage_scope: 'both',
         is_active: true
     });
 
@@ -44,6 +46,8 @@ const BankChannelsPage = () => {
             bank_name: channel.bank_name || '',
             account_number: channel.account_number || '',
             account_name: channel.account_name || '',
+            channel_type: channel.channel_type || 'bank',
+            usage_scope: channel.usage_scope || 'both',
             is_active: channel.is_active
         });
         setIsModalOpen(true);
@@ -73,6 +77,8 @@ const BankChannelsPage = () => {
             account_number: '',
             account_name: '',
             initial_balance: 0,
+            channel_type: 'bank',
+            usage_scope: 'both',
             is_active: true
         });
     };
@@ -194,13 +200,30 @@ const BankChannelsPage = () => {
                                         <h3 className="text-lg font-bold text-theme-primary">{channel.channel_name}</h3>
                                         <p className="text-xs text-theme-muted mt-0.5">{channel.bank_name || 'Internal'}</p>
                                     </div>
-                                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
-                                        channel.is_active
-                                            ? 'bg-green-200 text-green-900 dark:bg-green-900/30 dark:text-green-300'
-                                            : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
-                                    }`}>
-                                        {channel.is_active ? 'Active' : 'Inactive'}
-                                    </span>
+                                    <div className="flex flex-col items-end gap-1.5">
+                                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${
+                                            channel.is_active
+                                                ? 'bg-green-200 text-green-900 dark:bg-green-900/30 dark:text-green-300'
+                                                : 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300'
+                                        }`}>
+                                            {channel.is_active ? 'Active' : 'Inactive'}
+                                        </span>
+                                        <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                                            (channel.usage_scope || 'both') === 'both'
+                                                ? 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300'
+                                                : (channel.usage_scope === 'store')
+                                                    ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300'
+                                                    : 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                                        }`}>
+                                            {(channel.usage_scope || 'both') === 'both' ? (
+                                                <><Globe className="w-2.5 h-2.5" /> BMS & Store</>
+                                            ) : channel.usage_scope === 'store' ? (
+                                                <><Store className="w-2.5 h-2.5" /> Store Only</>
+                                            ) : (
+                                                <><Monitor className="w-2.5 h-2.5" /> BMS Only</>
+                                            )}
+                                        </span>
+                                    </div>
                                 </div>
 
                                 <div className="mb-5">
@@ -309,6 +332,34 @@ const BankChannelsPage = () => {
                                     className="w-full bg-theme-primary border border-theme rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none transition-all text-theme-primary placeholder-theme-muted text-sm"
                                     placeholder="Business Name"
                                 />
+                            </div>
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-sm font-medium text-theme-primary mb-2">Channel Type</label>
+                                    <select
+                                        value={formData.channel_type}
+                                        onChange={(e) => setFormData({ ...formData, channel_type: e.target.value })}
+                                        className="w-full bg-theme-primary border border-theme rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none transition-all text-theme-primary text-sm"
+                                    >
+                                        <option value="bank">Bank Account</option>
+                                        <option value="mobile_money">Mobile Money</option>
+                                        <option value="cash">Cash</option>
+                                        <option value="card">Card</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-theme-primary mb-2">Available For</label>
+                                    <select
+                                        value={formData.usage_scope}
+                                        onChange={(e) => setFormData({ ...formData, usage_scope: e.target.value })}
+                                        className="w-full bg-theme-primary border border-theme rounded-lg px-3 py-2.5 focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none transition-all text-theme-primary text-sm"
+                                    >
+                                        <option value="both">BMS & Online Store</option>
+                                        <option value="bms">BMS Only</option>
+                                        <option value="store">Online Store Only</option>
+                                    </select>
+                                </div>
                             </div>
 
                             {!selectedChannel && (
