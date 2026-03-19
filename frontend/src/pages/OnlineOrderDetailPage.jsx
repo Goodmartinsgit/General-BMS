@@ -165,8 +165,8 @@ const OnlineOrderDetailPage = () => {
             const data = res.data;
             setOrder(data);
             setNewStatus(data.status || data.order_status || '');
-            setTrackingNumber(data.tracking_number || '');
-            setCarrier(data.carrier || '');
+            setTrackingNumber(data.tracking_number || data.order_number || '');
+            setCarrier(data.shipping_carrier || data.carrier || '');
             setAdminNotes(data.admin_notes || '');
         } catch (err) {
             console.error('Failed to load order', err);
@@ -273,7 +273,8 @@ const OnlineOrderDetailPage = () => {
     const shippingAddr = order.shipping_address || {};
     const billingAddr = order.billing_address || {};
     const isSameAddress = JSON.stringify(shippingAddr) === JSON.stringify(billingAddr);
-    const canManagePayment = paymentStatus === 'AWAITING_CONFIRMATION' && order.payment_method === 'bank_transfer';
+    const canManagePayment = paymentStatus === 'AWAITING_CONFIRMATION' && ['bank_transfer', 'manual'].includes(order.payment_method);
+    const isPaymentPending = paymentStatus === 'AWAITING_CONFIRMATION';
     const items = order.items || order.order_items || [];
     const statusHistory = order.status_history || [];
 
@@ -381,7 +382,7 @@ const OnlineOrderDetailPage = () => {
                             </div>
 
                             {/* Bank transfer details */}
-                            {order.payment_method === 'bank_transfer' && (
+                            {['bank_transfer', 'manual'].includes(order.payment_method) && (
                                 <div className="bg-theme-primary rounded-lg p-3 space-y-2 border border-theme">
                                     <p className="text-xs font-semibold text-theme-muted uppercase">Bank Transfer Details</p>
                                     {order.bank_channel && <InfoRow label="Bank Channel" value={order.bank_channel} />}
@@ -528,6 +529,16 @@ const OnlineOrderDetailPage = () => {
                     {/* Admin Actions */}
                     <Card title="Admin Actions" icon={Package}>
                         <div className="space-y-5">
+                            {/* Payment pending warning */}
+                            {isPaymentPending && (
+                                <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 rounded-lg">
+                                    <Clock size={14} className="text-amber-600 mt-0.5 flex-shrink-0" />
+                                    <p className="text-xs text-amber-700 dark:text-amber-300">
+                                        Payment must be confirmed before this order can be processed. Only cancellation is allowed.
+                                    </p>
+                                </div>
+                            )}
+
                             {/* Status Update */}
                             <div>
                                 <label className="block text-xs font-semibold text-theme-muted mb-1.5">Update Order Status</label>
@@ -538,12 +549,19 @@ const OnlineOrderDetailPage = () => {
                                         onChange={(e) => setNewStatus(e.target.value)}
                                     >
                                         {ORDER_STATUSES.map(s => (
-                                            <option key={s} value={s} className="bg-theme-secondary">{ORDER_STATUS_CONFIG[s]?.label || s}</option>
+                                            <option
+                                                key={s}
+                                                value={s}
+                                                className="bg-theme-secondary"
+                                                disabled={isPaymentPending && !['PENDING', 'CANCELLED'].includes(s)}
+                                            >
+                                                {ORDER_STATUS_CONFIG[s]?.label || s}
+                                            </option>
                                         ))}
                                     </select>
                                     <button
                                         onClick={handleUpdateStatus}
-                                        disabled={actionLoading === 'status' || newStatus === orderStatus}
+                                        disabled={actionLoading === 'status' || newStatus === orderStatus || (isPaymentPending && !['PENDING', 'CANCELLED'].includes(newStatus))}
                                         className="px-3 py-2 text-xs font-medium rounded-lg bg-accent-gold text-white hover:bg-accent-goldDark transition disabled:opacity-50 flex items-center gap-1.5"
                                     >
                                         {actionLoading === 'status' && <Loader2 size={12} className="animate-spin" />}

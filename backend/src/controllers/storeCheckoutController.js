@@ -2,6 +2,7 @@
 
 const { query, pool } = require('../config/db');
 const { checkoutSchema } = require('../validators/storeValidators');
+const { sendOrderReceipt } = require('../services/orderReceiptService');
 
 // ---------------------------------------------------------------------------
 // Helper: deduct quantity_reserved for each order item
@@ -59,6 +60,19 @@ const checkout = async (req, res) => {
     // Identify the customer / session
     const customerId = req.customer ? req.customer.customerId : null;
     const sessionId = req.sessionId;
+
+    // Check registration requirements from store config
+    const storeConfigRes = await client.query(
+      `SELECT require_registration, min_order_amount_for_guest, customer_channel FROM store_config ORDER BY id LIMIT 1`
+    );
+    const storeConf = storeConfigRes.rows[0];
+    if (storeConf) {
+      if (storeConf.require_registration && !customerId) {
+        client.release();
+        return res.status(403).json({ message: 'You must register and log in before placing an order.' });
+      }
+      // min_order_amount_for_guest is checked after total is computed (see below)
+    }
 
     // Find the cart
     let cartRes;
@@ -192,6 +206,17 @@ const checkout = async (req, res) => {
     const taxAmount = parseFloat(((subtotal - couponDiscount) * taxRate).toFixed(2));
     const total = parseFloat((subtotal - couponDiscount + taxAmount + shippingAmount).toFixed(2));
 
+    // Check min order amount for guest checkout
+    if (storeConf && !customerId && storeConf.min_order_amount_for_guest) {
+      const minAmount = parseFloat(storeConf.min_order_amount_for_guest);
+      if (total >= minAmount) {
+        client.release();
+        return res.status(403).json({
+          message: `Orders of ₦${minAmount.toLocaleString()} and above require you to register and log in.`,
+        });
+      }
+    }
+
     // Validate bank channel if bank_transfer or manual
     const isManualPayment = paymentMethod === 'bank_transfer' || paymentMethod === 'manual';
     let bankChannelRow = null;
@@ -255,6 +280,7 @@ const checkout = async (req, res) => {
          payment_method, payment_status,
          bank_channel_id,
          status, status_history,
+         tracking_number,
          customer_notes, created_at, updated_at
        ) VALUES (
          $1, $2, $3, $4, $5,
@@ -264,7 +290,8 @@ const checkout = async (req, res) => {
          $14, $15,
          $16,
          $17, $18::jsonb,
-         $19, NOW(), NOW()
+         $19,
+         $20, NOW(), NOW()
        ) RETURNING *`,
       [
         orderNumber,
@@ -279,6 +306,7 @@ const checkout = async (req, res) => {
         paymentMethod, paymentStatus,
         bankChannelId || null,
         orderStatus, JSON.stringify(statusHistory),
+        orderNumber,
         notes || null,
       ]
     );
@@ -389,6 +417,19 @@ const checkout = async (req, res) => {
         accountNumber: bankChannelRow.account_number,
         channelType: bankChannelRow.channel_type,
       };
+    }
+
+    // Include store communication channel preference in response
+    const storeConfigRes = await query(`SELECT customer_channel FROM store_config ORDER BY id LIMIT 1`);
+    const customerChannel = storeConfigRes.rows[0]?.customer_channel || 'email';
+    responsePayload.customerChannel = customerChannel;
+    responsePayload.isManualPayment = isManualPayment;
+
+    // For non-manual payments, send receipt immediately (async — don't block response)
+    if (!isManualPayment) {
+      sendOrderReceipt(finalOrder, finalOrderItemsRes.rows).catch(err =>
+        console.error('[checkout] receipt send error:', err)
+      );
     }
 
     res.status(201).json(responsePayload);

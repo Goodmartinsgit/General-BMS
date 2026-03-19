@@ -2,6 +2,7 @@
 
 // Admin-facing controller for managing online orders
 const { query, pool } = require('../config/db');
+const { sendOrderReceipt } = require('../services/orderReceiptService');
 
 // ---------------------------------------------------------------------------
 // Internal helper: deduct inventory for fulfilled online orders
@@ -236,6 +237,17 @@ const updateOrderStatus = async (req, res) => {
     if (orderRes.rows.length === 0) return res.status(404).json({ message: 'Order not found' });
     const order = orderRes.rows[0];
 
+    // Block processing if payment is awaiting confirmation (only allow PENDING or CANCELLED)
+    if (
+      order.payment_status === 'AWAITING_CONFIRMATION' &&
+      !['PENDING', 'CANCELLED'].includes(newStatus)
+    ) {
+      client.release();
+      return res.status(400).json({
+        message: 'Payment must be confirmed before the order can be processed. Please confirm or reject the payment first.',
+      });
+    }
+
     const history = Array.isArray(order.status_history) ? order.status_history : [];
     history.push({
       status: newStatus,
@@ -316,7 +328,9 @@ const updateOrderStatus = async (req, res) => {
 const updateTracking = async (req, res) => {
   try {
     const { id } = req.params;
-    const { trackingNumber, shippingCarrier, estimatedDelivery } = req.body;
+    const trackingNumber = req.body.trackingNumber || req.body.tracking_number;
+    const shippingCarrier = req.body.shippingCarrier || req.body.carrier;
+    const estimatedDelivery = req.body.estimatedDelivery || req.body.estimated_delivery;
 
     if (!trackingNumber && !shippingCarrier && !estimatedDelivery) {
       return res.status(400).json({ message: 'At least one tracking field is required' });
@@ -424,8 +438,15 @@ const confirmPayment = async (req, res) => {
 
     await client.query('COMMIT');
 
+    // Send order receipt to customer (async — don't block response)
     const updatedRes = await query(`SELECT * FROM online_orders WHERE id = $1`, [id]);
-    res.json({ ...updatedRes.rows[0], message: 'Payment confirmed and inventory updated' });
+    const updatedOrder = updatedRes.rows[0];
+    const itemsRes = await query(`SELECT * FROM online_order_items WHERE order_id = $1`, [id]);
+    sendOrderReceipt(updatedOrder, itemsRes.rows).catch(err =>
+      console.error('[confirmPayment] receipt send error:', err)
+    );
+
+    res.json({ ...updatedOrder, message: 'Payment confirmed and inventory updated' });
   } catch (err) {
     await client.query('ROLLBACK');
     console.error('[onlineOrderController.confirmPayment]', err);

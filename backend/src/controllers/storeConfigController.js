@@ -145,6 +145,9 @@ const updateConfig = async (req, res) => {
       delivery_config,
       // Company settings integration
       use_company_settings, store_settings,
+      // Communication & registration
+      customer_channel, require_registration, min_order_amount_for_guest,
+      whatsapp_phone_number_id, whatsapp_business_account_id, whatsapp_access_token, whatsapp_verify_token,
     } = req.body;
 
     // Check if config exists
@@ -165,11 +168,13 @@ const updateConfig = async (req, res) => {
           currency, shipping_methods, payment_methods, tax_rate,
           home_sections, header_config, footer_config,
           delivery_config,
-          use_company_settings, store_settings
+          use_company_settings, store_settings,
+          customer_channel, require_registration, min_order_amount_for_guest,
+          whatsapp_phone_number_id, whatsapp_business_account_id, whatsapp_access_token, whatsapp_verify_token
         ) VALUES (
           $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,
           $17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,
-          $39,$40,$41,$42,$43,$44
+          $39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50,$51
         ) RETURNING *`,
         [
           store_slug, store_name, tagline, description,
@@ -193,6 +198,8 @@ const updateConfig = async (req, res) => {
           delivery_config ? JSON.stringify(delivery_config) : '{}',
           use_company_settings ? JSON.stringify(use_company_settings) : '{"general":true,"branding":true,"tax":true,"receipt":true,"payment":true,"notifications":true,"security":true,"display":true}',
           store_settings ? JSON.stringify(store_settings) : '{}',
+          customer_channel || 'email', require_registration ?? false, min_order_amount_for_guest || null,
+          whatsapp_phone_number_id || null, whatsapp_business_account_id || null, whatsapp_access_token || null, whatsapp_verify_token || null,
         ]
       );
       return res.json(result.rows[0]);
@@ -237,8 +244,15 @@ const updateConfig = async (req, res) => {
         delivery_config = COALESCE($42::jsonb, delivery_config),
         use_company_settings = COALESCE($43::jsonb, use_company_settings),
         store_settings = COALESCE($44::jsonb, store_settings),
+        customer_channel = COALESCE($45, customer_channel),
+        require_registration = COALESCE($46, require_registration),
+        min_order_amount_for_guest = $47,
+        whatsapp_phone_number_id = $48,
+        whatsapp_business_account_id = $49,
+        whatsapp_access_token = $50,
+        whatsapp_verify_token = $51,
         updated_at = NOW()
-      WHERE id = $45 RETURNING *`,
+      WHERE id = $52 RETURNING *`,
       [
         store_slug, store_name, tagline, description,
         logo_primary, logo_icon, logo_dark,
@@ -262,6 +276,8 @@ const updateConfig = async (req, res) => {
         delivery_config ? JSON.stringify(delivery_config) : null,
         use_company_settings ? JSON.stringify(use_company_settings) : null,
         store_settings ? JSON.stringify(store_settings) : null,
+        customer_channel || null, require_registration ?? null, min_order_amount_for_guest || null,
+        whatsapp_phone_number_id || null, whatsapp_business_account_id || null, whatsapp_access_token || null, whatsapp_verify_token || null,
         id,
       ]
     );
@@ -334,6 +350,10 @@ function formatConfig(row) {
     headerConfig: row.header_config || {},
     footerConfig: row.footer_config || {},
     deliveryConfig: row.delivery_config || {},
+    // Communication & registration
+    customerChannel: row.customer_channel || 'email',
+    requireRegistration: row.require_registration || false,
+    minOrderAmountForGuest: row.min_order_amount_for_guest ? parseFloat(row.min_order_amount_for_guest) : null,
     // Display settings from store_settings JSONB
     displaySettings: (() => {
       let ss = row.store_settings;

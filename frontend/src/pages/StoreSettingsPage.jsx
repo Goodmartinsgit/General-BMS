@@ -3,7 +3,7 @@ import {
     Store, Palette, Home, Phone, Search, ShoppingCart, Settings,
     Plus, Trash2, Save, Upload, Image as ImageIcon, Loader2,
     CheckSquare, Square, Building2, Calculator, Receipt, CreditCard,
-    Bell, Shield, Monitor, Lock, QrCode, Barcode
+    Bell, Shield, Monitor, Lock, QrCode, Barcode, MessageCircle, UserCheck
 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import PageHeader from '../components/common/PageHeader';
@@ -74,6 +74,8 @@ const STORE_TABS = [
     { key: 'contact', label: 'Contact & Social', icon: Phone },
     { key: 'seo', label: 'SEO', icon: Search },
     { key: 'commerce', label: 'Commerce', icon: ShoppingCart },
+    { key: 'communication', label: 'Communication', icon: MessageCircle },
+    { key: 'registration', label: 'Registration', icon: UserCheck },
     { key: 'advanced', label: 'Advanced', icon: Settings },
 ];
 
@@ -400,6 +402,21 @@ const StoreSettingsPage = () => {
                     payment_methods: parseJson(d.payment_methods, { paystack: true, manual: false }),
                 },
 
+                // Communication
+                communication: {
+                    customer_channel: d.customer_channel || 'email',
+                    whatsapp_phone_number_id: d.whatsapp_phone_number_id || '',
+                    whatsapp_business_account_id: d.whatsapp_business_account_id || '',
+                    whatsapp_access_token: d.whatsapp_access_token || '',
+                    whatsapp_verify_token: d.whatsapp_verify_token || '',
+                },
+
+                // Registration
+                registration: {
+                    require_registration: d.require_registration ?? false,
+                    min_order_amount_for_guest: d.min_order_amount_for_guest || '',
+                },
+
                 // Advanced (mapped from flat columns)
                 advanced: {
                     store_active: d.is_active ?? true,
@@ -515,6 +532,17 @@ const StoreSettingsPage = () => {
                 tax_rate: config.commerce.tax_rate,
                 shipping_methods: config.commerce.shipping_methods,
                 payment_methods: config.commerce.payment_methods,
+
+                // Communication
+                customer_channel: config.communication.customer_channel,
+                whatsapp_phone_number_id: config.communication.whatsapp_phone_number_id,
+                whatsapp_business_account_id: config.communication.whatsapp_business_account_id,
+                whatsapp_access_token: config.communication.whatsapp_access_token,
+                whatsapp_verify_token: config.communication.whatsapp_verify_token,
+
+                // Registration
+                require_registration: config.registration.require_registration,
+                min_order_amount_for_guest: config.registration.min_order_amount_for_guest || null,
 
                 // Advanced
                 is_active: config.advanced.store_active,
@@ -1103,6 +1131,102 @@ const StoreSettingsPage = () => {
                                 <button onClick={addShippingMethod} className="flex items-center gap-2 px-4 py-2 text-sm rounded-lg border border-dashed border-theme text-theme-muted hover:border-accent-gold hover:text-accent-gold transition">
                                     <Plus size={14} /> Add Shipping Method
                                 </button>
+                            </div>
+                        </div>
+                    </div>
+                );
+
+            case 'communication':
+                return (
+                    <div className="space-y-6">
+                        <div>
+                            <SectionLabel>Customer Communication Channel</SectionLabel>
+                            <p className="text-xs text-theme-muted mb-4">Choose how your store communicates with customers — receipts, notifications, and authentication will use this channel.</p>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={() => set('communication.customer_channel', 'email')}
+                                    className={`flex-1 flex items-center gap-3 p-4 rounded-lg border-2 transition ${config.communication.customer_channel === 'email' ? 'border-accent-gold bg-accent-gold/5' : 'border-theme hover:border-accent-gold/30'}`}
+                                >
+                                    <Bell size={20} className={config.communication.customer_channel === 'email' ? 'text-accent-gold' : 'text-theme-muted'} />
+                                    <div className="text-left">
+                                        <p className="text-sm font-semibold text-theme-primary">Email</p>
+                                        <p className="text-xs text-theme-muted">Send receipts, OTPs and notifications via email</p>
+                                    </div>
+                                </button>
+                                <button
+                                    onClick={() => set('communication.customer_channel', 'whatsapp')}
+                                    className={`flex-1 flex items-center gap-3 p-4 rounded-lg border-2 transition ${config.communication.customer_channel === 'whatsapp' ? 'border-green-500 bg-green-50 dark:bg-green-900/10' : 'border-theme hover:border-green-300'}`}
+                                >
+                                    <MessageCircle size={20} className={config.communication.customer_channel === 'whatsapp' ? 'text-green-600' : 'text-theme-muted'} />
+                                    <div className="text-left">
+                                        <p className="text-sm font-semibold text-theme-primary">WhatsApp</p>
+                                        <p className="text-xs text-theme-muted">Send receipts, OTPs and notifications via WhatsApp</p>
+                                    </div>
+                                </button>
+                            </div>
+                        </div>
+
+                        {config.communication.customer_channel === 'whatsapp' && (
+                            <div>
+                                <SectionLabel>WhatsApp Cloud API Configuration</SectionLabel>
+                                <p className="text-xs text-theme-muted mb-4">
+                                    Get these from your{' '}
+                                    <a href="https://developers.facebook.com/apps/" target="_blank" rel="noopener noreferrer" className="text-accent-gold underline">Meta Developer Dashboard</a>.
+                                    You need a Meta Business account with WhatsApp Business API access.
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
+                                    <FormField label="Phone Number ID">
+                                        <TextInput value={config.communication.whatsapp_phone_number_id} onChange={e => set('communication.whatsapp_phone_number_id', e.target.value)} placeholder="e.g. 123456789012345" />
+                                    </FormField>
+                                    <FormField label="Business Account ID">
+                                        <TextInput value={config.communication.whatsapp_business_account_id} onChange={e => set('communication.whatsapp_business_account_id', e.target.value)} placeholder="e.g. 123456789012345" />
+                                    </FormField>
+                                    <div className="md:col-span-2">
+                                        <FormField label="Permanent Access Token">
+                                            <TextInput type="password" value={config.communication.whatsapp_access_token} onChange={e => set('communication.whatsapp_access_token', e.target.value)} placeholder="EAAxxxxxxx..." />
+                                        </FormField>
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <FormField label="Webhook Verify Token">
+                                            <TextInput value={config.communication.whatsapp_verify_token} onChange={e => set('communication.whatsapp_verify_token', e.target.value)} placeholder="A random secret string for webhook verification" />
+                                        </FormField>
+                                        <p className="text-[10px] text-theme-muted mt-1">
+                                            Set your webhook URL in the Meta dashboard to: <code className="bg-theme-primary px-1.5 py-0.5 rounded text-accent-gold">{'https://<your-domain>/api/webhooks/whatsapp'}</code>
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                );
+
+            case 'registration':
+                return (
+                    <div className="space-y-6">
+                        <div>
+                            <SectionLabel>Customer Registration Requirements</SectionLabel>
+                            <p className="text-xs text-theme-muted mb-4">Control whether customers must register before placing orders.</p>
+                            <div className="space-y-4 max-w-lg">
+                                <Toggle
+                                    checked={!!config.registration.require_registration}
+                                    onChange={v => set('registration.require_registration', v)}
+                                    label="Require customers to register and log in before placing an order"
+                                />
+                                {!config.registration.require_registration && (
+                                    <div className="pl-1">
+                                        <FormField label="Minimum Order Amount for Guest Checkout">
+                                            <TextInput
+                                                type="number"
+                                                value={config.registration.min_order_amount_for_guest}
+                                                onChange={e => set('registration.min_order_amount_for_guest', e.target.value)}
+                                                placeholder="Leave empty for no minimum"
+                                            />
+                                        </FormField>
+                                        <p className="text-[10px] text-theme-muted mt-1">
+                                            Orders above this amount will require the customer to be registered and logged in. Leave empty to allow all guest orders.
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

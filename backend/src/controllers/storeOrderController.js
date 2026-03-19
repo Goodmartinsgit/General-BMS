@@ -189,15 +189,20 @@ const uploadProofOfPayment = async (req, res) => {
 
 // ---------------------------------------------------------------------------
 // GET /api/store/:slug/orders/track/:orderNumber  (PUBLIC — no auth)
-// Query: ?email=customer@email.com
+// Query: ?phone=08012345678 (or ?email= for backward compat)
 // ---------------------------------------------------------------------------
 const trackOrder = async (req, res) => {
   try {
     const { orderNumber } = req.params;
-    const { email } = req.query;
+    const { phone, email } = req.query;
 
     if (!orderNumber) return res.status(400).json({ message: 'Order number is required' });
-    if (!email) return res.status(400).json({ message: 'Email address is required to look up your order' });
+    if (!phone && !email) return res.status(400).json({ message: 'Phone number is required to look up your order' });
+
+    // Support both phone and email lookup for backward compatibility
+    const lookupField = phone ? 'o.customer_phone' : 'LOWER(o.customer_email)';
+    const lookupValue = phone || email;
+    const lookupParam = phone ? lookupValue : lookupValue.toLowerCase();
 
     const result = await query(
       `SELECT o.order_number, o.status, o.payment_status, o.payment_method,
@@ -207,12 +212,12 @@ const trackOrder = async (req, res) => {
               o.shipping_address,
               (SELECT COUNT(*) FROM online_order_items WHERE order_id = o.id) AS item_count
        FROM online_orders o
-       WHERE o.order_number = $1 AND LOWER(o.customer_email) = LOWER($2)`,
-      [orderNumber, email]
+       WHERE o.order_number = $1 AND ${lookupField} = $2`,
+      [orderNumber, lookupParam]
     );
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ message: 'Order not found. Please check your order number and email address.' });
+      return res.status(404).json({ message: 'Order not found. Please check your order number and phone number.' });
     }
 
     const r = result.rows[0];

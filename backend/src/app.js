@@ -181,6 +181,9 @@ app.use('/api/online-orders', onlineOrderRoutes);
 // ─── Website Builder — Admin-facing ─────────────────────────────────────────
 app.use('/api/website-builder', websiteBuilderRoutes);
 
+// ─── WhatsApp Cloud API Webhook ─────────────────────────────────────────────
+app.use('/api/webhooks/whatsapp', require('./routes/whatsappWebhookRoutes'));
+
 // Health Check
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date() });
