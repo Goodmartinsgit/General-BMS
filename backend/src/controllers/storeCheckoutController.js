@@ -81,7 +81,7 @@ const checkout = async (req, res) => {
     const itemsRes = await client.query(
       `SELECT ci.*, p.product_name, p.product_images, p.product_code as sku,
               p.is_online_available, p.retail_price,
-              pv.sku as variant_sku, pv.selling_price as variant_price,
+              pv.sku as variant_sku, pv.retail_price as variant_price,
               cat.category_name as cat_name,
               piv.v2_image_url,
               pca_img.cat_image_url,
