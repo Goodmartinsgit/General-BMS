@@ -265,12 +265,12 @@ const createSale = async (req, res) => {
             // Record Stock Movement
             await client.query(
                 `INSERT INTO stock_movements (
-                    product_id, variant_id, branch_id, movement_type, quantity,
+                    product_id, branch_id, movement_type, quantity,
                     quantity_before, quantity_after, notes, performed_by
                 )
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
                 [
-                    item.product_id, item.variant_id || null, branch_id, 'sale', -item.quantity,
+                    item.product_id, branch_id, 'sale', -item.quantity,
                     quantity_before, quantity_after, `Sale #${saleNumber}`, performed_by
                 ]
             );
@@ -530,12 +530,12 @@ const reverseSale = async (req, res) => {
             // Record stock movement for reversal
             await client.query(
                 `INSERT INTO stock_movements (
-                    product_id, variant_id, branch_id, movement_type, quantity,
+                    product_id, branch_id, movement_type, quantity,
                     notes, performed_by
                 )
-                 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                 VALUES ($1, $2, $3, $4, $5, $6)`,
                 [
-                    item.product_id, item.variant_id || null, sale.branch_id, 'sale_reversal', item.quantity,
+                    item.product_id, sale.branch_id, 'sale_reversal', item.quantity,
                     `Reversal of Sale #${sale.sale_number} - ${reversal_reason}`, reversed_by
                 ]
             );
@@ -699,12 +699,12 @@ const unreverseSale = async (req, res) => {
             // Record stock movement for unreversal
             await client.query(
                 `INSERT INTO stock_movements (
-                    product_id, variant_id, branch_id, movement_type, quantity,
+                    product_id, branch_id, movement_type, quantity,
                     notes, performed_by
                 )
-                 VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                 VALUES ($1, $2, $3, $4, $5, $6)`,
                 [
-                    item.product_id, item.variant_id || null, sale.branch_id, 'sale', -item.quantity,
+                    item.product_id, sale.branch_id, 'sale', -item.quantity,
                     `Unreversal of Sale #${sale.sale_number}`, unreversed_by
                 ]
             );
