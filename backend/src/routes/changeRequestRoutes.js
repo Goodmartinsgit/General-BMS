@@ -3,7 +3,7 @@
 const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/changeRequestController');
-const { authenticateToken } = require('../middleware/auth');
+const { authenticateToken } = require('../middleware/authMiddleware');
 
 // Admin routes (requires BMS auth)
 router.get('/', authenticateToken, ctrl.listChangeRequests);
