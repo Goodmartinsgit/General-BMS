@@ -50,6 +50,7 @@ const POSCheckout = ({ onSaleComplete }) => {
                 items: cartItems.map(item => ({
                     product_id: item.product.id,
                     variant_id: item.variant?.id || null,
+                    category_id: item.categoryId || null,
                     quantity: item.quantity,
                     unit_price: item.price,
                     subtotal: item.price * item.quantity
@@ -72,6 +73,7 @@ const POSCheckout = ({ onSaleComplete }) => {
                 items: cartItems.map(item => ({
                     product_name: item.product.product_name,
                     variant_name: item.variant?.variant_name,
+                    category_name: item.categoryName,
                     quantity: item.quantity,
                     unit_price: item.price
                 })),

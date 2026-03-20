@@ -1,6 +1,7 @@
 export { default as POSCart } from './POSCart';
 export { default as POSProductGrid } from './POSProductGrid';
 export { default as POSProductCard } from './POSProductCard';
+export { default as POSProductDetail } from './POSProductDetail';
 export { default as CustomerAutocomplete } from './CustomerAutocomplete';
 export { default as ReferrerAutocomplete } from './ReferrerAutocomplete';
 export { default as PaymentMethodSelector } from './PaymentMethodSelector';

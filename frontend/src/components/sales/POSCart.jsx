@@ -51,7 +51,7 @@ const POSCart = () => {
                     <AnimatePresence initial={false}>
                         {cartItems.map((item) => (
                             <motion.div
-                                key={item.variant ? `${item.product.id}-${item.variant.id}` : item.product.id}
+                                key={item.categoryId ? `${item.product.id}-cat-${item.categoryId}` : item.variant ? `${item.product.id}-${item.variant.id}` : item.product.id}
                                 initial={{ opacity: 0, x: 20 }}
                                 animate={{ opacity: 1, x: 0 }}
                                 exit={{ opacity: 0, x: -20, scale: 0.95 }}
@@ -68,6 +68,11 @@ const POSCart = () => {
                                             {item.variant.variant_name}
                                         </span>
                                     )}
+                                    {item.categoryName && (
+                                        <span className="inline-flex text-[10px] sm:text-xs text-accent-gold mt-0.5">
+                                            {item.categoryName}
+                                        </span>
+                                    )}
                                     <div className="flex items-center gap-1 sm:gap-1.5 mt-0.5 sm:mt-1">
                                         <span className="text-[10px] sm:text-xs text-theme-muted">
                                             {formatCurrency(item.price)} × {item.quantity}
@@ -82,7 +87,7 @@ const POSCart = () => {
                                     </div>
                                     <div className="flex items-center bg-theme-secondary rounded-lg p-0.5 border border-theme">
                                         <button
-                                            onClick={() => updateQuantity(item.product.id, item.variant?.id, item.quantity - 1)}
+                                            onClick={() => updateQuantity(item.product.id, item.variant?.id, item.quantity - 1, item.categoryId)}
                                             className="p-0.5 sm:p-1 hover:bg-theme-primary hover:text-rose-500 rounded transition text-theme-muted"
                                         >
                                             <Minus className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
@@ -91,7 +96,7 @@ const POSCart = () => {
                                             {item.quantity}
                                         </span>
                                         <button
-                                            onClick={() => updateQuantity(item.product.id, item.variant?.id, item.quantity + 1)}
+                                            onClick={() => updateQuantity(item.product.id, item.variant?.id, item.quantity + 1, item.categoryId)}
                                             className="p-0.5 sm:p-1 hover:bg-theme-primary hover:text-accent-gold rounded transition text-theme-muted"
                                         >
                                             <Plus className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
@@ -101,7 +106,7 @@ const POSCart = () => {
 
                                 {/* Remove button */}
                                 <button
-                                    onClick={() => removeFromCart(item.product.id, item.variant?.id)}
+                                    onClick={() => removeFromCart(item.product.id, item.variant?.id, item.categoryId)}
                                     className="absolute -top-1 -right-1 p-0.5 sm:p-1 bg-rose-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all shadow-sm"
                                 >
                                     <Trash2 size={8} className="sm:w-[9px] sm:h-[9px]" />

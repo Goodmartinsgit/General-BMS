@@ -4,7 +4,7 @@ import { Card, Badge, Button } from '../ui';
 import { useCart } from '../../context/CartContext';
 import { useCurrency } from '../../context/CurrencyContext';
 
-const POSProductCard = ({ product }) => {
+const POSProductCard = ({ product, onProductClick }) => {
     const { addToCart } = useCart();
     const { formatCurrency } = useCurrency();
     const {
@@ -59,14 +59,22 @@ const POSProductCard = ({ product }) => {
 
     const displayImage = allImages[currentImageIndex] || null;
 
-    const handleAdd = (e) => {
+    const handleClick = () => {
+        if (onProductClick) {
+            onProductClick(product);
+        } else {
+            addToCart(product);
+        }
+    };
+
+    const handleQuickAdd = (e) => {
         e.stopPropagation();
         addToCart(product);
     };
 
     return (
         <div
-            onClick={handleAdd}
+            onClick={handleClick}
             className="group relative bg-theme-secondary rounded-lg border border-theme p-1.5 sm:p-2 transition-all hover:shadow-md hover:border-accent-gold/30 cursor-pointer overflow-hidden"
         >
             <div className="relative aspect-square rounded-lg overflow-hidden bg-theme-primary mb-1.5 sm:mb-3">

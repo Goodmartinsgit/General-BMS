@@ -1444,6 +1444,7 @@ const getCategories = async (req, res) => {
   try {
     const result = await query(
       `SELECT c.id, c.category_name, c.description, c.is_active, c.created_at,
+              c.parent_category_id, c.level, c.slug,
               COUNT(p.id)::int AS product_count
        FROM categories c
        LEFT JOIN products p ON p.category_id = c.id AND p.deleted_at IS NULL

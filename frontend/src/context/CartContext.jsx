@@ -25,41 +25,66 @@ export const CartProvider = ({ children }) => {
         localStorage.setItem('pos_cart', JSON.stringify(cartItems));
     }, [cartItems]);
 
-    const addToCart = (product, variant = null) => {
+    const addToCart = (product, variant = null, categoryId = null, categoryName = null, qty = 1) => {
         setCartItems(prev => {
-            const itemKey = variant ? `${product.id}-${variant.id}` : product.id;
-            const existingItem = prev.find(item => 
-                variant ? (item.product.id === product.id && item.variant?.id === variant.id) : (item.product.id === product.id && !item.variant)
-            );
+            const matchItem = (item) => {
+                if (categoryId) {
+                    return item.product.id === product.id && item.categoryId === categoryId;
+                }
+                if (variant) {
+                    return item.product.id === product.id && item.variant?.id === variant.id && !item.categoryId;
+                }
+                return item.product.id === product.id && !item.variant && !item.categoryId;
+            };
+
+            const existingItem = prev.find(matchItem);
 
             if (existingItem) {
-                return prev.map(item => 
-                    (variant ? (item.product.id === product.id && item.variant?.id === variant.id) : (item.product.id === product.id && !item.variant))
-                    ? { ...item, quantity: item.quantity + 1 }
-                    : item
+                return prev.map(item =>
+                    matchItem(item) ? { ...item, quantity: item.quantity + qty } : item
                 );
             }
 
-            return [...prev, { product, variant, quantity: 1, price: variant ? variant.selling_price : (product.effective_price || product.selling_price) }];
+            return [...prev, {
+                product,
+                variant,
+                categoryId: categoryId || null,
+                categoryName: categoryName || null,
+                quantity: qty,
+                price: variant ? variant.selling_price : (product.effective_price || product.selling_price),
+            }];
         });
     };
 
-    const removeFromCart = (productId, variantId = null) => {
-        setCartItems(prev => prev.filter(item => 
-            !(item.product.id === productId && (variantId ? item.variant?.id === variantId : !item.variant))
-        ));
+    const removeFromCart = (productId, variantId = null, categoryId = null) => {
+        setCartItems(prev => prev.filter(item => {
+            if (categoryId) {
+                return !(item.product.id === productId && item.categoryId === categoryId);
+            }
+            if (variantId) {
+                return !(item.product.id === productId && item.variant?.id === variantId && !item.categoryId);
+            }
+            return !(item.product.id === productId && !item.variant && !item.categoryId);
+        }));
     };
 
-    const updateQuantity = (productId, variantId = null, quantity) => {
+    const updateQuantity = (productId, variantId = null, quantity, categoryId = null) => {
         if (quantity <= 0) {
-            removeFromCart(productId, variantId);
+            removeFromCart(productId, variantId, categoryId);
             return;
         }
-        setCartItems(prev => prev.map(item => 
-            (item.product.id === productId && (variantId ? item.variant?.id === variantId : !item.variant))
-            ? { ...item, quantity }
-            : item
-        ));
+        setCartItems(prev => prev.map(item => {
+            if (categoryId) {
+                return (item.product.id === productId && item.categoryId === categoryId)
+                    ? { ...item, quantity } : item;
+            }
+            if (variantId) {
+                return (item.product.id === productId && item.variant?.id === variantId && !item.categoryId)
+                    ? { ...item, quantity } : item;
+            }
+            return (item.product.id === productId && !item.variant && !item.categoryId)
+                ? { ...item, quantity } : item;
+        }));
     };
 
     const clearCart = () => {
