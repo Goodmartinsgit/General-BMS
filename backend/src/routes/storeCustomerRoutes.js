@@ -6,6 +6,7 @@ const ctrl = require('../controllers/storeCustomerController');
 const changeReqCtrl = require('../controllers/changeRequestController');
 const { storeAuth, optionalStoreAuth } = require('../middleware/storeAuthMiddleware');
 const sessionMiddleware = require('../middleware/sessionMiddleware');
+const upload = require('../middleware/upload');
 
 // Auth (public)
 router.post('/register', sessionMiddleware, ctrl.register);
@@ -21,6 +22,7 @@ router.post('/resend-verification', storeAuth, ctrl.resendVerification);
 // Profile (authenticated)
 router.get('/profile', storeAuth, ctrl.getProfile);
 router.patch('/profile', storeAuth, ctrl.updateProfile);
+router.post('/avatar', storeAuth, upload.single('avatar'), ctrl.uploadAvatar);
 router.patch('/change-password', storeAuth, ctrl.changePassword);
 router.patch('/change-email', storeAuth, ctrl.changeEmail);
 router.delete('/account', storeAuth, ctrl.deleteAccount);

@@ -38,6 +38,7 @@ function formatCustomer(customer, auth) {
     whatsappNumber: auth.whatsapp_number || null,
     isEmailVerified: auth.is_email_verified,
     isVerified: auth.is_verified !== undefined ? auth.is_verified : auth.is_email_verified,
+    avatarUrl: customer.avatar_url || null,
     lastLoginAt: auth.last_login_at,
     createdAt: customer.created_at,
   };
@@ -606,7 +607,7 @@ const getProfile = async (req, res) => {
     const { customerId } = req.customer;
 
     const profileRes = await query(
-      `SELECT c.*, ca.email as auth_email, ca.is_email_verified, ca.last_login_at
+      `SELECT c.*, ca.email as auth_email, ca.is_email_verified, ca.is_verified, ca.whatsapp_number, ca.last_login_at
        FROM customers c
        JOIN customer_auth ca ON ca.customer_id = c.id
        WHERE c.id = $1 AND c.deleted_at IS NULL`,
@@ -630,11 +631,14 @@ const getProfile = async (req, res) => {
       id: row.id,
       customer_name: row.customer_name,
       phone_number: row.phone_number,
+      avatar_url: row.avatar_url,
       created_at: row.created_at,
     };
     const authObj = {
       email: row.auth_email,
       is_email_verified: row.is_email_verified,
+      is_verified: row.is_verified,
+      whatsapp_number: row.whatsapp_number,
       last_login_at: row.last_login_at,
     };
 
@@ -1140,6 +1144,46 @@ function formatAddress(row) {
   };
 }
 
+// ---------------------------------------------------------------------------
+// POST /api/store/:slug/customers/avatar  (requires storeAuth, multipart)
+// ---------------------------------------------------------------------------
+const uploadAvatar = async (req, res) => {
+  try {
+    const { customerId } = req.customer;
+    if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
+
+    const { cloudinary } = require('../config/cloudinary');
+    const streamifier = require('streamifier');
+
+    const uploadFromBuffer = (buffer) =>
+      new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          {
+            folder: 'bms/customers',
+            transformation: [{ width: 400, height: 400, crop: 'fill', gravity: 'face' }],
+          },
+          (err, result) => {
+            if (err) reject(err);
+            else resolve(result);
+          }
+        );
+        streamifier.createReadStream(buffer).pipe(stream);
+      });
+
+    const result = await uploadFromBuffer(req.file.buffer);
+
+    await query(
+      `UPDATE customers SET avatar_url = $1, updated_at = NOW() WHERE id = $2`,
+      [result.secure_url, customerId]
+    );
+
+    res.json({ avatarUrl: result.secure_url });
+  } catch (err) {
+    console.error('[storeCustomerController.uploadAvatar]', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
 module.exports = {
   register,
   login,
@@ -1152,6 +1196,7 @@ module.exports = {
   resendVerification,
   getProfile,
   updateProfile,
+  uploadAvatar,
   changePassword,
   changeEmail,
   deleteAccount,
