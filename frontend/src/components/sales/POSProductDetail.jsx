@@ -373,15 +373,18 @@ const POSProductDetail = ({ productId, onBack }) => {
                                     const sel = leafSelections.find(s => s.categoryId === item.category_id);
                                     const stock = parseInt(item.stock_allocated) || 0;
                                     const price = parseFloat(item.price_override) || parseFloat(product.selling_price) || 0;
+                                    const isOOS = stock <= 0;
                                     return (
                                         <div
                                             key={item.category_id}
-                                            className={`flex items-center gap-2 p-2 rounded-lg border transition-all cursor-pointer ${
-                                                sel
-                                                    ? 'border-accent-gold bg-accent-gold/5'
-                                                    : 'border-theme bg-theme-primary hover:border-accent-gold/30'
+                                            className={`flex items-center gap-2 p-2 rounded-lg border transition-all ${
+                                                isOOS
+                                                    ? 'border-theme bg-theme-secondary opacity-50 cursor-not-allowed'
+                                                    : sel
+                                                        ? 'border-accent-gold bg-accent-gold/5 cursor-pointer'
+                                                        : 'border-theme bg-theme-primary hover:border-accent-gold/30 cursor-pointer'
                                             }`}
-                                            onClick={() => handleToggleLeaf(item)}
+                                            onClick={() => !isOOS && handleToggleLeaf(item)}
                                         >
                                             {/* Checkbox */}
                                             <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center shrink-0 transition ${
@@ -418,7 +421,8 @@ const POSProductDetail = ({ productId, onBack }) => {
                                                     <span className="w-6 text-center text-xs font-medium text-theme-primary">{sel.quantity}</span>
                                                     <button
                                                         onClick={() => handleLeafQtyChange(item.category_id, sel.quantity + 1)}
-                                                        className="p-1 rounded bg-theme-secondary border border-theme text-theme-muted hover:text-theme-primary"
+                                                        disabled={sel.quantity >= stock}
+                                                        className={`p-1 rounded bg-theme-secondary border border-theme ${sel.quantity >= stock ? 'opacity-30 cursor-not-allowed' : 'text-theme-muted hover:text-theme-primary'}`}
                                                     >
                                                         <Plus className="w-3 h-3" />
                                                     </button>
