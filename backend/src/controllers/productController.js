@@ -358,7 +358,7 @@ const getProductById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const [result, colorsResult, imagesResult, assignmentsResult] = await Promise.all([
+    const [result, colorsResult, imagesResult, assignmentsResult, variantsResult] = await Promise.all([
       query(`
         SELECT p.*,
           b.brand_name,
@@ -401,6 +401,14 @@ const getProductById = async (req, res) => {
          ORDER BY c.level, c.display_order, c.category_name`,
         [id]
       ),
+      query(
+        `SELECT pv.*,
+          (SELECT COALESCE(SUM(quantity_on_hand), 0) FROM variant_inventory WHERE variant_id = pv.id) as quantity_on_hand
+         FROM product_variants pv
+         WHERE pv.product_id = $1 AND pv.is_active = TRUE
+         ORDER BY pv.is_default DESC, pv.created_at`,
+        [id]
+      ),
     ]);
 
     if (result.rows.length === 0) {
@@ -411,6 +419,7 @@ const getProductById = async (req, res) => {
     product.colors = colorsResult.rows;
     product.images = imagesResult.rows;
     product.category_assignments = assignmentsResult.rows;
+    product.variants = variantsResult.rows;
 
     // Compute effective stock from leaf-level category assignments when inventory is 0
     const invStock = parseInt(product.total_stock) || 0;

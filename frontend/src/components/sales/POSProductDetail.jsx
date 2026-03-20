@@ -3,7 +3,6 @@ import { ArrowLeft, ShoppingCart, Package, Minus, Plus, Check, ChevronDown, Chev
 import { useCart } from '../../context/CartContext';
 import { useCurrency } from '../../context/CurrencyContext';
 import { productAPI } from '../../api/products';
-import api from '../../api/axios';
 import { LoadingSpinner } from '../ui';
 
 /**
@@ -15,7 +14,6 @@ const POSProductDetail = ({ productId, onBack }) => {
     const { formatCurrency } = useCurrency();
 
     const [product, setProduct] = useState(null);
-    const [variants, setVariants] = useState([]);
     const [loading, setLoading] = useState(true);
 
     // Selection state
@@ -26,10 +24,9 @@ const POSProductDetail = ({ productId, onBack }) => {
     const [added, setAdded] = useState(false);
 
     // Category attribute selection (multi-level hierarchy)
-    const [leafSelections, setLeafSelections] = useState([]); // [{categoryId, name, quantity, price, stock}]
-    const [expandedLevel, setExpandedLevel] = useState(null);
+    const [leafSelections, setLeafSelections] = useState([]);
 
-    // Fetch product details + variants
+    // Fetch product details (includes variants, colors, images, assignments)
     useEffect(() => {
         let cancelled = false;
         setLoading(true);
@@ -42,16 +39,11 @@ const POSProductDetail = ({ productId, onBack }) => {
 
         (async () => {
             try {
-                const [prod, varRes] = await Promise.all([
-                    productAPI.getProduct(productId),
-                    api.get(`/variants/products/${productId}/variants`).catch(() => ({ data: [] })),
-                ]);
+                const prod = await productAPI.getProduct(productId);
                 if (cancelled) return;
                 setProduct(prod);
-                const vars = Array.isArray(varRes.data) ? varRes.data : varRes.data?.variants || [];
-                setVariants(vars);
                 // Auto-select first variant
-                if (vars.length > 0) setSelectedVariant(vars[0]);
+                if (prod.variants?.length > 0) setSelectedVariant(prod.variants[0]);
             } catch (err) {
                 console.error('Failed to load product detail', err);
             } finally {
@@ -217,6 +209,7 @@ const POSProductDetail = ({ productId, onBack }) => {
     const isOutOfStock = stockQty <= 0 && leafSelections.length === 0;
     const displayImage = filteredImages[activeImageIndex]?.url || null;
     const hasColors = product.colors?.length > 0;
+    const variants = product.variants || [];
     const hasVariants = variants.length > 0;
     const hasCategoryAssignments = leafItems.length > 0;
 
