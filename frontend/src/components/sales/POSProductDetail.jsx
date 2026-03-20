@@ -278,13 +278,15 @@ const POSProductDetail = ({ productId, onBack }) => {
         if (!product) return;
 
         if (leafSelections.length > 0) {
-            // Add each selection as a separate cart item
+            // Add each selection as a separate cart item with full category path
             leafSelections.forEach(sel => {
+                const assignment = product.category_assignments?.find(a => a.category_id === sel.categoryId);
+                const fullPath = assignment ? buildLeafPath(assignment) : sel.name;
                 addToCart(
                     { ...product, effective_price: sel.price, selling_price: sel.price },
                     selectedVariant,
                     sel.categoryId,
-                    sel.name,
+                    fullPath,
                     sel.quantity
                 );
             });
@@ -559,7 +561,11 @@ const POSProductDetail = ({ productId, onBack }) => {
                                                         className="p-1 rounded bg-theme-primary border border-theme text-theme-muted hover:text-theme-primary disabled:opacity-30 disabled:cursor-not-allowed">
                                                         <Minus className="w-3 h-3" />
                                                     </button>
-                                                    <span className="w-6 text-center text-xs font-medium text-theme-primary">{qty}</span>
+                                                    <input type="number" min={1} max={stock > 0 ? stock : undefined} value={qty || ''}
+                                                        onChange={e => { const v = parseInt(e.target.value); if (e.target.value === '') setCatQuantity(primaryLeafId, 0); else if (!isNaN(v) && v >= 1 && (!stock || v <= stock)) setCatQuantity(primaryLeafId, v); }}
+                                                        onBlur={e => { if (!e.target.value || parseInt(e.target.value) < 1) setCatQuantity(primaryLeafId, 1); }}
+                                                        className="w-8 text-center text-xs font-medium text-theme-primary bg-transparent outline-none border border-theme rounded [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                    />
                                                     <button onClick={() => setCatQuantity(primaryLeafId, qty + 1)} disabled={stock > 0 && qty >= stock}
                                                         className={`p-1 rounded bg-theme-primary border border-theme ${stock > 0 && qty >= stock ? 'opacity-30 cursor-not-allowed' : 'text-theme-muted hover:text-theme-primary'}`}>
                                                         <Plus className="w-3 h-3" />
@@ -590,7 +596,11 @@ const POSProductDetail = ({ productId, onBack }) => {
                                                         className="p-1 rounded bg-theme-primary border border-theme text-theme-muted hover:text-theme-primary disabled:opacity-30 disabled:cursor-not-allowed">
                                                         <Minus className="w-3 h-3" />
                                                     </button>
-                                                    <span className="w-6 text-center text-xs font-medium text-theme-primary">{qty}</span>
+                                                    <input type="number" min={1} max={stock > 0 ? stock : undefined} value={qty || ''}
+                                                        onChange={e => { const v = parseInt(e.target.value); if (e.target.value === '') setCatQuantity(catId, 0); else if (!isNaN(v) && v >= 1 && (!stock || v <= stock)) setCatQuantity(catId, v); }}
+                                                        onBlur={e => { if (!e.target.value || parseInt(e.target.value) < 1) setCatQuantity(catId, 1); }}
+                                                        className="w-8 text-center text-xs font-medium text-theme-primary bg-transparent outline-none border border-theme rounded [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                                    />
                                                     <button onClick={() => setCatQuantity(catId, qty + 1)} disabled={stock > 0 && qty >= stock}
                                                         className={`p-1 rounded bg-theme-primary border border-theme ${stock > 0 && qty >= stock ? 'opacity-30 cursor-not-allowed' : 'text-theme-muted hover:text-theme-primary'}`}>
                                                         <Plus className="w-3 h-3" />
@@ -667,7 +677,16 @@ const POSProductDetail = ({ productId, onBack }) => {
                                 >
                                     <Minus className="w-4 h-4" />
                                 </button>
-                                <span className="w-10 text-center text-sm font-medium text-theme-primary">{quantity}</span>
+                                <input
+                                    type="number"
+                                    min={1}
+                                    value={quantity || ''}
+                                    onChange={e => {
+                                        const v = e.target.value === '' ? '' : parseInt(e.target.value);
+                                        if (v === '' || (v >= 1 && !isNaN(v))) setQuantity(v || 1);
+                                    }}
+                                    className="w-10 text-center text-sm font-medium text-theme-primary bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                />
                                 <button
                                     onClick={() => setQuantity(q => q + 1)}
                                     className="p-2 text-theme-muted hover:text-theme-primary transition"

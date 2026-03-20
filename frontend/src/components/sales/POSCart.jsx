@@ -92,9 +92,20 @@ const POSCart = () => {
                                         >
                                             <Minus className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                                         </button>
-                                        <span className="w-5 sm:w-6 text-center text-[10px] sm:text-xs font-medium text-theme-primary">
-                                            {item.quantity}
-                                        </span>
+                                        <input
+                                            type="number"
+                                            min={1}
+                                            value={item.quantity || ''}
+                                            onChange={e => {
+                                                const v = parseInt(e.target.value);
+                                                if (e.target.value === '') return;
+                                                if (!isNaN(v) && v >= 1) updateQuantity(item.product.id, item.variant?.id, v, item.categoryId);
+                                            }}
+                                            onBlur={e => {
+                                                if (!e.target.value || parseInt(e.target.value) < 1) updateQuantity(item.product.id, item.variant?.id, 1, item.categoryId);
+                                            }}
+                                            className="w-7 sm:w-8 text-center text-[10px] sm:text-xs font-medium text-theme-primary bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                        />
                                         <button
                                             onClick={() => updateQuantity(item.product.id, item.variant?.id, item.quantity + 1, item.categoryId)}
                                             className="p-0.5 sm:p-1 hover:bg-theme-primary hover:text-accent-gold rounded transition text-theme-muted"

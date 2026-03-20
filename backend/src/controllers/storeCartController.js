@@ -59,7 +59,7 @@ async function buildCartResponse(cartId, couponCode, couponDiscount) {
        pv.sku as variant_sku,
        pv.variant_name,
        pv.variant_values as variant_attributes,
-       cat.category_name as category_name,
+       cat_path.category_path as category_name,
        piv.v2_image_url,
        pca_img.cat_image_url,
        COALESCE(
@@ -73,7 +73,19 @@ async function buildCartResponse(cartId, couponCode, couponDiscount) {
      FROM cart_items ci
      JOIN products p ON p.id = ci.product_id
      LEFT JOIN product_variants pv ON pv.id = ci.variant_id
-     LEFT JOIN categories cat ON cat.id = ci.category_id
+     LEFT JOIN LATERAL (
+       WITH RECURSIVE cat_chain AS (
+         SELECT id, category_name, parent_category_id, level
+         FROM categories WHERE id = ci.category_id
+         UNION ALL
+         SELECT c.id, c.category_name, c.parent_category_id, c.level
+         FROM categories c
+         JOIN cat_chain cc ON c.id = cc.parent_category_id
+         WHERE c.level > 1
+       )
+       SELECT string_agg(category_name, ' / ' ORDER BY level) as category_path
+       FROM cat_chain
+     ) cat_path ON true
      LEFT JOIN LATERAL (
        SELECT image_url as v2_image_url
        FROM product_images_v2
