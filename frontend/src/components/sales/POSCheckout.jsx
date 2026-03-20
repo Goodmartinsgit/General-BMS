@@ -31,7 +31,8 @@ const POSCheckout = ({ onSaleComplete }) => {
     const [notes, setNotes] = useState('');
     const [processing, setProcessing] = useState(false);
     const [showReceipt, setShowReceipt] = useState(false);
-    const [completedSale, setCompletedSale] = useState(null);
+    const [completedSaleId, setCompletedSaleId] = useState(null);
+    const [completedSaleInfo, setCompletedSaleInfo] = useState({});
 
     const subtotal = getCartSubtotal();
     const total = getCartTotal();
@@ -69,28 +70,16 @@ const POSCheckout = ({ onSaleComplete }) => {
             const result = await salesAPI.createSale(saleData);
             toast.success(`Sale completed! #${result.saleNumber || result.sale_number}`);
 
-            const receiptData = {
-                sale_number: result.saleNumber || result.sale_number,
-                created_at: new Date().toISOString(),
-                items: cartItems.map(item => ({
-                    product_name: item.product.product_name,
-                    variant_name: item.variant?.variant_name,
-                    category_name: item.categoryName,
-                    quantity: item.quantity,
-                    unit_price: item.price
-                })),
-                subtotal: subtotal,
-                discount: discount,
-                tax: tax,
-                total: total,
-                payment_method: paymentMethod,
-                amount_paid: total,
-                customer_name: customer?.customer_name || customer?.name,
-                served_by: auth.user?.full_name,
-                branch_name: auth.user?.branch_name
-            };
-
-            setCompletedSale(receiptData);
+            // Store sale ID and customer info for the receipt modal
+            setCompletedSaleId(result.saleId || result.sale_id || result.id);
+            setCompletedSaleInfo({
+                receiptNumber: result.saleNumber || result.sale_number,
+                customerName: customer?.customer_name || customer?.name || '',
+                customerPhone: customer?.phone_number || customer?.phone || '',
+                customerEmail: customer?.email || '',
+                totalAmount: total,
+                saleDate: new Date().toISOString(),
+            });
             setShowReceipt(true);
 
             clearCart();
@@ -106,7 +95,8 @@ const POSCheckout = ({ onSaleComplete }) => {
 
     const handleCloseReceipt = () => {
         setShowReceipt(false);
-        setCompletedSale(null);
+        setCompletedSaleId(null);
+        setCompletedSaleInfo({});
     };
 
     return (
@@ -201,23 +191,17 @@ const POSCheckout = ({ onSaleComplete }) => {
                 </button>
             </div>
 
-            {/* Receipt Preview Modal */}
+            {/* Receipt Preview Modal — saleId-based */}
             <ReceiptPreviewModal
                 isOpen={showReceipt}
                 onClose={handleCloseReceipt}
-                sale={completedSale}
-                company={{
-                    company_name: 'General BMS Store',
-                    company_address: '',
-                    company_phone: '',
-                    company_email: ''
-                }}
-                settings={{
-                    show_logo: true,
-                    header_text: '',
-                    footer_text: 'Thank you for your business!',
-                    show_tax_breakdown: true
-                }}
+                saleId={completedSaleId}
+                receiptNumber={completedSaleInfo.receiptNumber}
+                customerName={completedSaleInfo.customerName}
+                customerPhone={completedSaleInfo.customerPhone}
+                customerEmail={completedSaleInfo.customerEmail}
+                totalAmount={completedSaleInfo.totalAmount}
+                saleDate={completedSaleInfo.saleDate}
             />
         </div>
     );
