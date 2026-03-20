@@ -660,7 +660,7 @@ const getProfile = async (req, res) => {
 const updateProfile = async (req, res) => {
   try {
     const { customerId } = req.customer;
-    const { firstName, lastName, phone } = req.body;
+    const { firstName, lastName, phone, address, city, state, country } = req.body;
 
     // Build update fields
     const updates = [];
@@ -685,6 +685,23 @@ const updateProfile = async (req, res) => {
     if (phone !== undefined) {
       params.push(phone);
       updates.push(`phone_number = $${params.length}`);
+    }
+
+    if (address !== undefined) {
+      params.push(address);
+      updates.push(`address = $${params.length}`);
+    }
+    if (city !== undefined) {
+      params.push(city);
+      updates.push(`city = $${params.length}`);
+    }
+    if (state !== undefined) {
+      params.push(state);
+      updates.push(`state = $${params.length}`);
+    }
+    if (country !== undefined) {
+      params.push(country);
+      updates.push(`country = $${params.length}`);
     }
 
     if (updates.length === 0) {

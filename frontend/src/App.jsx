@@ -98,6 +98,7 @@ import OnlineOrdersPage from './pages/OnlineOrdersPage';
 import OnlineOrderDetailPage from './pages/OnlineOrderDetailPage';
 import StoreSettingsPage from './pages/StoreSettingsPage';
 import WebsiteBuilderPage from './pages/WebsiteBuilderPage';
+import ChangeRequestsPage from './pages/ChangeRequestsPage';
 
 // Auth enhancements
 import ForgotPassword from './pages/ForgotPassword';
@@ -215,6 +216,7 @@ function App() {
                         <Route path="online-orders/:id" element={<OnlineOrderDetailPage />} />
                         <Route path="store-settings" element={<StoreSettingsPage />} />
                         <Route path="app-builder" element={<WebsiteBuilderPage />} />
+                        <Route path="change-requests" element={<ChangeRequestsPage />} />
 
                         {/* Analytics */}
                         <Route path="analytics/sales" element={<SalesAnalytics />} />

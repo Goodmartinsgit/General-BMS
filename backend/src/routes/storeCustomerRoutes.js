@@ -3,6 +3,7 @@
 const express = require('express');
 const router = express.Router({ mergeParams: true });
 const ctrl = require('../controllers/storeCustomerController');
+const changeReqCtrl = require('../controllers/changeRequestController');
 const { storeAuth, optionalStoreAuth } = require('../middleware/storeAuthMiddleware');
 const sessionMiddleware = require('../middleware/sessionMiddleware');
 
@@ -23,6 +24,10 @@ router.patch('/profile', storeAuth, ctrl.updateProfile);
 router.patch('/change-password', storeAuth, ctrl.changePassword);
 router.patch('/change-email', storeAuth, ctrl.changeEmail);
 router.delete('/account', storeAuth, ctrl.deleteAccount);
+
+// Change requests (authenticated)
+router.post('/change-request', storeAuth, changeReqCtrl.submitChangeRequest);
+router.get('/change-requests', storeAuth, changeReqCtrl.getMyChangeRequests);
 
 // Addresses (authenticated)
 router.get('/addresses', storeAuth, ctrl.getAddresses);

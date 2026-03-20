@@ -69,6 +69,7 @@ const storeCartRoutes = require('./routes/storeCartRoutes');
 const storeCheckoutRoutes = require('./routes/storeCheckoutRoutes');
 const storeOrderRoutes = require('./routes/storeOrderRoutes');
 const onlineOrderRoutes = require('./routes/onlineOrderRoutes');
+const changeRequestRoutes = require('./routes/changeRequestRoutes');
 
 const app = express();
 
@@ -177,6 +178,7 @@ app.use('/api/store/:slug/orders', storeOrderRoutes);
 // ─── Online Store — Admin-facing (staff JWT) ────────────────────────────────
 app.use('/api/store-config', storeAdminConfigRoutes);
 app.use('/api/online-orders', onlineOrderRoutes);
+app.use('/api/change-requests', changeRequestRoutes);
 
 // ─── Website Builder — Admin-facing ─────────────────────────────────────────
 app.use('/api/website-builder', websiteBuilderRoutes);

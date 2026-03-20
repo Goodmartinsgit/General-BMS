@@ -8,7 +8,7 @@ import {
   ImageIcon, PieChart, UserCheck, Building2, Calculator, FileText,
   TrendingUp, BookOpen, Scale, DollarSign, Bell, CheckSquare,
   GitMerge, Layers, Receipt, ScrollText, Briefcase, Key, LogIn,
-  Store, ShoppingBag, ExternalLink, Sliders, Monitor
+  Store, ShoppingBag, ExternalLink, Sliders, Monitor, RefreshCw
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { useBranding } from '../../context/BrandingContext';
@@ -153,6 +153,7 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, toggleCollapse }) => {
       roles: ['super_admin', 'admin'],
       children: [
         { name: 'Orders', href: '/online-orders', icon: ShoppingBag },
+        { name: 'Change Requests', href: '/change-requests', icon: RefreshCw },
         { name: 'App Builder', href: '/app-builder', icon: Monitor },
         { name: 'Store Settings', href: '/store-settings', icon: Sliders },
       ]
