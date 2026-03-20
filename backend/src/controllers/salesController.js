@@ -212,6 +212,28 @@ const createSale = async (req, res) => {
                      WHERE variant_id = $2 AND branch_id = $3`,
                     [quantity_after, item.variant_id, branch_id]
                 );
+            } else if (item.category_id) {
+                // Category-based stock: deduct from product_category_assignments
+                const pcaResult = await client.query(
+                    `SELECT stock_allocated FROM product_category_assignments
+                     WHERE product_id = $1 AND category_id = $2 FOR UPDATE`,
+                    [item.product_id, item.category_id]
+                );
+
+                if (pcaResult.rows.length > 0) {
+                    quantity_before = parseInt(pcaResult.rows[0].stock_allocated) || 0;
+                    quantity_after = quantity_before - item.quantity;
+
+                    if (quantity_after < 0) {
+                        throw new Error(`Insufficient stock for this item`);
+                    }
+
+                    await client.query(
+                        `UPDATE product_category_assignments SET stock_allocated = $1, updated_at = NOW()
+                         WHERE product_id = $2 AND category_id = $3`,
+                        [quantity_after, item.product_id, item.category_id]
+                    );
+                }
             } else {
                 // Ensure product inventory record exists for this branch
                 await client.query(
