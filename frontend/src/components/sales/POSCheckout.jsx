@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { CheckCircle, AlertCircle, RefreshCw, Printer } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
+import { useBranch } from '../../context/BranchContext';
 import { salesAPI } from '../../api/sales';
 import { Button, Input } from '../ui';
 import { toast } from 'react-toastify';
@@ -23,6 +24,7 @@ const POSCheckout = ({ onSaleComplete }) => {
         clearCart
     } = useCart();
     const { auth } = useAuth();
+    const { currentBranchId } = useBranch();
     const { formatCurrency, symbol } = useCurrency();
 
     const [paymentMethod, setPaymentMethod] = useState('Cash');
@@ -44,7 +46,7 @@ const POSCheckout = ({ onSaleComplete }) => {
         setProcessing(true);
         try {
             const saleData = {
-                branch_id: auth.user.current_branch_id,
+                branch_id: currentBranchId,
                 customer_id: customer?.id || null,
                 referrer_id: referrer?.id || null,
                 items: cartItems.map(item => ({
