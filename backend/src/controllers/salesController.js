@@ -187,16 +187,18 @@ const createSale = async (req, res) => {
             let quantity_after = 0;
 
             if (item.variant_id) {
-                // Update variant inventory
+                // Ensure variant inventory record exists for this branch
+                await client.query(
+                    `INSERT INTO variant_inventory (variant_id, branch_id, quantity_on_hand)
+                     VALUES ($1, $2, 0) ON CONFLICT (variant_id, branch_id) DO NOTHING`,
+                    [item.variant_id, branch_id]
+                );
+
                 const variantInvResult = await client.query(
                     `SELECT quantity_on_hand FROM variant_inventory
                      WHERE variant_id = $1 AND branch_id = $2 FOR UPDATE`,
                     [item.variant_id, branch_id]
                 );
-
-                if (variantInvResult.rows.length === 0) {
-                    throw new Error(`Variant ${item.variant_id} not found in inventory for branch ${branch_id}`);
-                }
 
                 quantity_before = variantInvResult.rows[0].quantity_on_hand;
                 quantity_after = quantity_before - item.quantity;
@@ -211,16 +213,18 @@ const createSale = async (req, res) => {
                     [quantity_after, item.variant_id, branch_id]
                 );
             } else {
-                // Update product inventory
+                // Ensure product inventory record exists for this branch
+                await client.query(
+                    `INSERT INTO inventory (product_id, branch_id, quantity_on_hand)
+                     VALUES ($1, $2, 0) ON CONFLICT (product_id, branch_id) DO NOTHING`,
+                    [item.product_id, branch_id]
+                );
+
                 const invResult = await client.query(
                     `SELECT quantity_on_hand FROM inventory
                      WHERE product_id = $1 AND branch_id = $2 FOR UPDATE`,
                     [item.product_id, branch_id]
                 );
-
-                if (invResult.rows.length === 0) {
-                    throw new Error(`Product ${item.product_id} not found in inventory for branch ${branch_id}`);
-                }
 
                 quantity_before = invResult.rows[0].quantity_on_hand;
                 quantity_after = quantity_before - item.quantity;
@@ -320,7 +324,11 @@ const createSale = async (req, res) => {
     } catch (err) {
         await client.query('ROLLBACK');
         console.error(err);
-        res.status(500).json({ message: 'Server error' });
+        const isBusinessError = err.message && (
+            err.message.startsWith('Insufficient stock') ||
+            err.message.startsWith('Cart is empty')
+        );
+        res.status(isBusinessError ? 400 : 500).json({ message: isBusinessError ? err.message : 'Server error' });
     } finally {
         client.release();
     }
