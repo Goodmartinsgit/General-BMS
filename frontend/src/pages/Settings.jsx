@@ -895,6 +895,7 @@ const ReceiptToggle = ({ field, label, checked, onChange }) => (
 
 const ReceiptSection = () => {
     const { symbol } = useCurrency();
+    const { config: brandingConfig } = useBranding();
     const [cfg, setCfg] = useState({
         company_name: '', company_address: '', company_phone: '', company_email: '',
         company_website: '', company_logo_url: '', show_logo: true, show_tax_number: true,
@@ -902,11 +903,13 @@ const ReceiptSection = () => {
         show_company_details: true, show_tax_breakdown: false, show_payment_details: true,
         show_customer_details: true, show_referrer_details: true, show_barcode: true, show_qr_code: false,
         receipt_bg_color: '#ffffff', receipt_text_color: '#111827', receipt_accent_color: '',
+        use_company_branding: false, use_company_info: false,
         footer_text: 'Thank you for your business!', terms_and_conditions: '',
         currency_symbol: '₦', currency_code: 'NGN', paper_size: 'A5', delivery_format: 'auto',
         email_enabled: false, email_subject_template: '', email_body_template: '',
         whatsapp_enabled: false, whatsapp_message_template: `Hello {customer_name},\n\nThank you for your purchase at {company_name}!\n\nReceipt Number: {receipt_number}\nTotal Amount: ₦{total_amount}\n\nFor any inquiries, please contact us.\n\nThank you for your business!\n\n- {company_name} Team`,
     });
+    const [companySettings, setCompanySettings] = useState({});
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [hasChanges, setHasChanges] = useState(false);
@@ -915,8 +918,12 @@ const ReceiptSection = () => {
     const fetchData = useCallback(async () => {
         setLoading(true);
         try {
-            const res = await api.get('/settings/receipt-template').catch(() => ({ data: {} }));
-            setCfg(p => ({ ...p, ...res.data }));
+            const [rcptRes, settingsRes] = await Promise.all([
+                api.get('/settings/receipt-template').catch(() => ({ data: {} })),
+                api.get('/settings/general').catch(() => ({ data: {} })),
+            ]);
+            setCfg(p => ({ ...p, ...rcptRes.data }));
+            setCompanySettings(settingsRes.data?.settings || settingsRes.data || {});
             setHasChanges(false);
         } catch { toast.error('Failed to load receipt settings'); }
         finally { setLoading(false); }
@@ -936,6 +943,23 @@ const ReceiptSection = () => {
     const toggleSection = (section) => setExpandedSections(p => ({ ...p, [section]: !p[section] }));
 
     if (loading) return <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">{Array(3).fill(0).map((_, i) => <div key={i} className="h-64 bg-theme-tertiary rounded-xl animate-pulse" />)}</div>;
+
+    // Build effective config by overlaying branding/company info when toggled
+    const eff = { ...cfg };
+    if (cfg.use_company_info) {
+        eff.company_name = companySettings.company_name || brandingConfig?.company_name || cfg.company_name;
+        eff.company_address = companySettings.company_address || cfg.company_address;
+        eff.company_phone = companySettings.company_phone || cfg.company_phone;
+        eff.company_email = companySettings.company_email || cfg.company_email;
+        eff.company_website = companySettings.company_website || cfg.company_website;
+        eff.company_logo_url = brandingConfig?.logo_url || cfg.company_logo_url;
+        eff.tax_number = companySettings.tax_number || cfg.tax_number;
+    }
+    if (cfg.use_company_branding) {
+        eff.receipt_accent_color = brandingConfig?.accent_color || brandingConfig?.primary_color || cfg.receipt_accent_color;
+        eff.receipt_bg_color = brandingConfig?.background_color || cfg.receipt_bg_color || '#ffffff';
+        eff.receipt_text_color = cfg.receipt_text_color || '#111827';
+    }
 
     const selectedTemplate = RECEIPT_TEMPLATES.find(t => t.id === (cfg.template_id || 1)) || RECEIPT_TEMPLATES[0];
     const cs = cfg.currency_symbol || symbol || '₦';
@@ -1019,8 +1043,8 @@ const ReceiptSection = () => {
                         </div>
                         <div className="flex-1 p-3 sm:p-4 bg-theme-primary overflow-auto">
                             <div className="rounded-lg border border-gray-200 max-w-[260px] mx-auto shadow-lg overflow-hidden"
-                                style={{ backgroundColor: cfg.receipt_bg_color || '#ffffff', color: cfg.receipt_text_color || '#111827' }}>
-                                <ReceiptLivePreview cfg={cfg} template={selectedTemplate} cs={cs} />
+                                style={{ backgroundColor: eff.receipt_bg_color || '#ffffff', color: eff.receipt_text_color || '#111827' }}>
+                                <ReceiptLivePreview cfg={eff} template={selectedTemplate} cs={cs} />
                             </div>
                         </div>
                         <div className="px-3 py-1.5 border-t border-theme text-[9px] text-center text-theme-muted bg-theme-secondary">
@@ -1034,40 +1058,58 @@ const ReceiptSection = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 mb-4 sm:mb-6">
                 {/* Company Information */}
                 <div className="bg-theme-secondary rounded-xl border border-theme shadow-theme-sm p-4 sm:p-5">
-                    <h3 className="text-sm sm:text-base font-semibold text-theme-primary mb-4 flex items-center gap-2">
-                        <Building2 size={16} className="text-accent-gold" />
-                        Company Information
-                    </h3>
-                    <div className="space-y-3 sm:space-y-4">
+                    <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-sm sm:text-base font-semibold text-theme-primary flex items-center gap-2">
+                            <Building2 size={16} className="text-accent-gold" />
+                            Company Information
+                        </h3>
+                        <div className="flex items-center gap-2">
+                            <span className="text-[9px] sm:text-[10px] text-theme-muted">Use General Settings</span>
+                            <button type="button" role="switch" aria-checked={cfg.use_company_info}
+                                onClick={() => set('use_company_info', !cfg.use_company_info)}
+                                className={`relative w-9 h-5 rounded-full transition-colors ${cfg.use_company_info ? 'bg-accent-gold' : 'bg-theme-tertiary'}`}>
+                                <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${cfg.use_company_info ? 'translate-x-4' : 'translate-x-0'}`} />
+                            </button>
+                        </div>
+                    </div>
+
+                    {cfg.use_company_info && (
+                        <div className="mb-4 p-2.5 rounded-lg border border-accent-gold/30 bg-accent-gold/5">
+                            <p className="text-[10px] sm:text-xs text-accent-gold font-medium">Using company info from General Settings</p>
+                            <p className="text-[9px] text-theme-muted mt-0.5">Name, address, phone, email, logo, and tax number are pulled from your company settings. Disable to set custom values for receipts.</p>
+                        </div>
+                    )}
+
+                    <div className={`space-y-3 sm:space-y-4 ${cfg.use_company_info ? 'opacity-50 pointer-events-none' : ''}`}>
                         <div>
                             <label className={labelClass}>Company Name</label>
-                            <input type="text" value={cfg.company_name} onChange={e => set('company_name', e.target.value)} className={inputClass} placeholder="Your Business Name" />
+                            <input type="text" value={cfg.use_company_info ? (eff.company_name || '') : cfg.company_name} onChange={e => set('company_name', e.target.value)} className={inputClass} placeholder="Your Business Name" readOnly={cfg.use_company_info} />
                         </div>
                         <div>
                             <label className={labelClass}>Address</label>
-                            <textarea value={cfg.company_address} onChange={e => set('company_address', e.target.value)} className={`${inputClass} resize-none`} rows={2} placeholder="Business address" />
+                            <textarea value={cfg.use_company_info ? (eff.company_address || '') : cfg.company_address} onChange={e => set('company_address', e.target.value)} className={`${inputClass} resize-none`} rows={2} placeholder="Business address" readOnly={cfg.use_company_info} />
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                             <div>
                                 <label className={labelClass}>Phone</label>
-                                <input type="text" value={cfg.company_phone} onChange={e => set('company_phone', e.target.value)} className={inputClass} placeholder="+234 800 000 0000" />
+                                <input type="text" value={cfg.use_company_info ? (eff.company_phone || '') : cfg.company_phone} onChange={e => set('company_phone', e.target.value)} className={inputClass} placeholder="+234 800 000 0000" readOnly={cfg.use_company_info} />
                             </div>
                             <div>
                                 <label className={labelClass}>Email</label>
-                                <input type="email" value={cfg.company_email} onChange={e => set('company_email', e.target.value)} className={inputClass} placeholder="info@company.com" />
+                                <input type="email" value={cfg.use_company_info ? (eff.company_email || '') : cfg.company_email} onChange={e => set('company_email', e.target.value)} className={inputClass} placeholder="info@company.com" readOnly={cfg.use_company_info} />
                             </div>
                         </div>
                         <div className="grid grid-cols-2 gap-3">
                             <div>
                                 <label className={labelClass}>Website</label>
-                                <input type="text" value={cfg.company_website || ''} onChange={e => set('company_website', e.target.value)} className={inputClass} placeholder="www.company.com" />
+                                <input type="text" value={cfg.use_company_info ? (eff.company_website || '') : (cfg.company_website || '')} onChange={e => set('company_website', e.target.value)} className={inputClass} placeholder="www.company.com" readOnly={cfg.use_company_info} />
                             </div>
                             <div>
                                 <label className={labelClass}>Tax / TIN Number</label>
-                                <input type="text" value={cfg.tax_number || ''} onChange={e => set('tax_number', e.target.value)} className={inputClass} placeholder="Tax ID" />
+                                <input type="text" value={cfg.use_company_info ? (eff.tax_number || '') : (cfg.tax_number || '')} onChange={e => set('tax_number', e.target.value)} className={inputClass} placeholder="Tax ID" readOnly={cfg.use_company_info} />
                             </div>
                         </div>
-                        <CloudinaryUpload category="receipts" label="Receipt Logo" value={cfg.company_logo_url || ''} onChange={url => set('company_logo_url', url)} />
+                        <CloudinaryUpload category="receipts" label="Receipt Logo" value={(cfg.use_company_info ? eff.company_logo_url : cfg.company_logo_url) || ''} onChange={url => set('company_logo_url', url)} />
                     </div>
                 </div>
 
@@ -1095,11 +1137,29 @@ const ReceiptSection = () => {
                         </div>
                         {/* Receipt Colors */}
                         <div className="mt-4 pt-4 border-t border-theme">
-                            <h4 className="text-[10px] sm:text-xs font-semibold text-theme-muted uppercase tracking-wider mb-3 flex items-center gap-2">
-                                <Palette size={14} className="text-accent-gold" />
-                                Receipt Colors
-                            </h4>
-                            <div className="grid grid-cols-3 gap-3">
+                            <div className="flex items-center justify-between mb-3">
+                                <h4 className="text-[10px] sm:text-xs font-semibold text-theme-muted uppercase tracking-wider flex items-center gap-2">
+                                    <Palette size={14} className="text-accent-gold" />
+                                    Receipt Colors
+                                </h4>
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[9px] sm:text-[10px] text-theme-muted">Use Branding</span>
+                                    <button type="button" role="switch" aria-checked={cfg.use_company_branding}
+                                        onClick={() => set('use_company_branding', !cfg.use_company_branding)}
+                                        className={`relative w-9 h-5 rounded-full transition-colors ${cfg.use_company_branding ? 'bg-accent-gold' : 'bg-theme-tertiary'}`}>
+                                        <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${cfg.use_company_branding ? 'translate-x-4' : 'translate-x-0'}`} />
+                                    </button>
+                                </div>
+                            </div>
+
+                            {cfg.use_company_branding && (
+                                <div className="mb-3 p-2.5 rounded-lg border border-accent-gold/30 bg-accent-gold/5">
+                                    <p className="text-[10px] sm:text-xs text-accent-gold font-medium">Using company branding colors</p>
+                                    <p className="text-[9px] text-theme-muted mt-0.5">Accent color is pulled from your branding settings{brandingConfig?.primary_color ? ` (${brandingConfig.primary_color})` : ''}. Disable to set custom receipt colors.</p>
+                                </div>
+                            )}
+
+                            <div className={`grid grid-cols-3 gap-3 ${cfg.use_company_branding ? 'opacity-50 pointer-events-none' : ''}`}>
                                 {[
                                     { field: 'receipt_bg_color', label: 'Background', fallback: '#ffffff' },
                                     { field: 'receipt_text_color', label: 'Text', fallback: '#111827' },
@@ -1110,13 +1170,13 @@ const ReceiptSection = () => {
                                         <div className="flex items-center gap-2">
                                             <input
                                                 type="color"
-                                                value={cfg[field] || fallback || '#000000'}
+                                                value={(cfg.use_company_branding ? eff[field] : cfg[field]) || fallback || '#000000'}
                                                 onChange={e => set(field, e.target.value)}
                                                 className="w-8 h-8 rounded-lg border border-theme cursor-pointer bg-transparent p-0.5"
                                             />
                                             <input
                                                 type="text"
-                                                value={cfg[field] || ''}
+                                                value={(cfg.use_company_branding ? eff[field] : cfg[field]) || ''}
                                                 onChange={e => set(field, e.target.value)}
                                                 className={`${inputClass} flex-1 font-mono text-[10px] sm:text-xs`}
                                                 placeholder={fallback || 'auto'}
@@ -1125,7 +1185,7 @@ const ReceiptSection = () => {
                                     </div>
                                 ))}
                             </div>
-                            <p className="text-[9px] text-theme-muted mt-2">Leave accent empty to use template default. Colors apply to receipt preview and printed receipts.</p>
+                            <p className="text-[9px] text-theme-muted mt-2">{cfg.use_company_branding ? 'Colors are synced from Branding settings.' : 'Leave accent empty to use template default. Colors apply to receipt preview and printed receipts.'}</p>
                         </div>
                     </div>
                     <div className="bg-theme-secondary rounded-xl border border-theme shadow-theme-sm p-4 sm:p-5">
