@@ -501,6 +501,22 @@ const MiniReceiptPreview = ({ template, isSelected }) => (
     </div>
 );
 
+// ── Auto-contrast helper: returns light or dark text based on background luminance ──
+const getContrastTextColor = (bgColor) => {
+    if (!bgColor || bgColor.length < 4) return '#111827';
+    let hex = bgColor.replace('#', '');
+    if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
+    if (hex.length !== 6) return '#111827';
+    const r = parseInt(hex.substr(0, 2), 16) / 255;
+    const g = parseInt(hex.substr(2, 2), 16) / 255;
+    const b = parseInt(hex.substr(4, 2), 16) / 255;
+    // sRGB luminance
+    const lum = 0.2126 * (r <= 0.03928 ? r / 12.92 : ((r + 0.055) / 1.055) ** 2.4)
+              + 0.7152 * (g <= 0.03928 ? g / 12.92 : ((g + 0.055) / 1.055) ** 2.4)
+              + 0.0722 * (b <= 0.03928 ? b / 12.92 : ((b + 0.055) / 1.055) ** 2.4);
+    return lum > 0.4 ? '#111827' : '#f9fafb';
+};
+
 // ── Receipt Live Preview (template-aware) ──
 const SAMPLE_SALE = {
     receipt_number: 'RCP-00247',
@@ -526,8 +542,10 @@ const ReceiptLivePreview = ({ cfg, template, cs }) => {
     const sale = SAMPLE_SALE;
     const tid = cfg.template_id || 1;
     const accent = cfg.receipt_accent_color || template.accent;
-    const textColor = cfg.receipt_text_color || '#111827';
-    const mutedColor = cfg.receipt_text_color ? `${cfg.receipt_text_color}99` : '#6b7280';
+    const bgColor = cfg.receipt_bg_color || '#ffffff';
+    const autoText = getContrastTextColor(bgColor);
+    const textColor = cfg.receipt_text_color || autoText;
+    const mutedColor = textColor === '#f9fafb' ? '#d1d5db99' : textColor === '#111827' ? '#6b728099' : `${textColor}99`;
     const fmt = (v) => `${cs}${Number(v).toLocaleString('en-NG')}`;
 
     if (cfg.show_tax_breakdown && cfg.tax_rate > 0) {
@@ -931,7 +949,17 @@ const ReceiptSection = () => {
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
-    const set = (field, value) => { setCfg(p => ({ ...p, [field]: value })); setHasChanges(true); };
+    const set = (field, value) => {
+        setCfg(p => {
+            const next = { ...p, [field]: value };
+            // Auto-adjust text color when background changes to maintain readability
+            if (field === 'receipt_bg_color') {
+                next.receipt_text_color = getContrastTextColor(value);
+            }
+            return next;
+        });
+        setHasChanges(true);
+    };
 
     const handleSave = async () => {
         setSaving(true);
@@ -958,8 +986,9 @@ const ReceiptSection = () => {
     if (cfg.use_company_branding) {
         eff.receipt_accent_color = brandingConfig?.accent_color || brandingConfig?.primary_color || cfg.receipt_accent_color;
         eff.receipt_bg_color = brandingConfig?.background_color || cfg.receipt_bg_color || '#ffffff';
-        eff.receipt_text_color = cfg.receipt_text_color || '#111827';
     }
+    // Auto-contrast: always ensure text is readable against the background
+    eff.receipt_text_color = cfg.receipt_text_color || getContrastTextColor(eff.receipt_bg_color || '#ffffff');
 
     const selectedTemplate = RECEIPT_TEMPLATES.find(t => t.id === (cfg.template_id || 1)) || RECEIPT_TEMPLATES[0];
     const cs = cfg.currency_symbol || symbol || '₦';
