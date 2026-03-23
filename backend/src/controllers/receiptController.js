@@ -76,58 +76,58 @@ const getReceiptConfig = async (req, res) => {
  */
 const updateReceiptConfig = async (req, res) => {
     try {
-        const {
-            company_name,
-            company_address,
-            company_phone,
-            company_email,
-            company_website,
-            company_logo_url,
-            show_logo,
-            show_tax_number,
-            tax_number,
-            tax_rate,
-            tax_label,
-            template_id,
-            template_style,
-            show_company_details,
-            show_tax_breakdown,
-            show_payment_details,
-            show_customer_details,
-            show_referrer_details,
-            footer_text,
-            terms_and_conditions,
-            currency_symbol,
-            currency_code,
-            paper_size,
-            delivery_format,
-            show_barcode,
-            show_qr_code,
-            email_enabled,
-            email_subject_template,
-            email_body_template,
-            whatsapp_enabled,
-            whatsapp_message_template
-        } = req.body;
+        // Discover which columns actually exist in the table
+        const colResult = await pool.query(
+            `SELECT column_name FROM information_schema.columns WHERE table_name = 'receipt_config'`
+        );
+        const existingColumns = new Set(colResult.rows.map(r => r.column_name));
 
-        // Check if config exists
-        const existingConfig = await pool.query('SELECT id FROM receipt_config LIMIT 1');
-
-        const fields = {
-            company_name, company_address, company_phone, company_email,
-            company_website, company_logo_url, show_logo, show_tax_number,
-            tax_number, tax_rate, tax_label, template_id, template_style,
-            show_company_details, show_tax_breakdown, show_payment_details,
-            show_customer_details, show_referrer_details, footer_text,
-            terms_and_conditions, currency_symbol, currency_code, paper_size,
-            delivery_format, show_barcode, show_qr_code, email_enabled,
-            email_subject_template, email_body_template, whatsapp_enabled,
-            whatsapp_message_template
+        // All possible fields the frontend may send
+        const allFields = {
+            company_name: req.body.company_name,
+            company_address: req.body.company_address,
+            company_phone: req.body.company_phone,
+            company_email: req.body.company_email,
+            company_website: req.body.company_website,
+            company_logo_url: req.body.company_logo_url,
+            show_logo: req.body.show_logo,
+            show_tax_number: req.body.show_tax_number,
+            tax_number: req.body.tax_number,
+            tax_rate: req.body.tax_rate,
+            tax_label: req.body.tax_label,
+            template_id: req.body.template_id,
+            template_style: req.body.template_style,
+            show_company_details: req.body.show_company_details,
+            show_tax_breakdown: req.body.show_tax_breakdown,
+            show_payment_details: req.body.show_payment_details,
+            show_customer_details: req.body.show_customer_details,
+            show_referrer_details: req.body.show_referrer_details,
+            footer_text: req.body.footer_text,
+            terms_and_conditions: req.body.terms_and_conditions,
+            currency_symbol: req.body.currency_symbol,
+            currency_code: req.body.currency_code,
+            paper_size: req.body.paper_size,
+            delivery_format: req.body.delivery_format,
+            show_barcode: req.body.show_barcode,
+            show_qr_code: req.body.show_qr_code,
+            email_enabled: req.body.email_enabled,
+            email_subject_template: req.body.email_subject_template,
+            email_body_template: req.body.email_body_template,
+            whatsapp_enabled: req.body.whatsapp_enabled,
+            whatsapp_message_template: req.body.whatsapp_message_template,
         };
 
-        // Filter out undefined values
-        const definedFields = Object.entries(fields).filter(([_, v]) => v !== undefined);
-        
+        // Only include fields that are defined AND whose column exists in the DB
+        const definedFields = Object.entries(allFields)
+            .filter(([key, v]) => v !== undefined && existingColumns.has(key));
+
+        if (definedFields.length === 0) {
+            return res.json({ message: 'No updatable fields provided', config: {} });
+        }
+
+        // Check if config row exists
+        const existingConfig = await pool.query('SELECT id FROM receipt_config LIMIT 1');
+
         let result;
         if (existingConfig.rows.length > 0) {
             const setClauses = definedFields.map(([key], i) => `${key} = $${i + 1}`);
