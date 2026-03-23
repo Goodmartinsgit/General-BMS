@@ -501,6 +501,385 @@ const MiniReceiptPreview = ({ template, isSelected }) => (
     </div>
 );
 
+// ── Receipt Live Preview (template-aware) ──
+const SAMPLE_SALE = {
+    receipt_number: 'RCP-00247',
+    date: new Date().toLocaleDateString('en-NG', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+    customer_name: 'John Doe',
+    customer_phone: '08012345678',
+    cashier: 'Admin User',
+    referrer: 'Jane Smith',
+    items: [
+        { name: 'Premium Floor Tile', code: 'FLR-001', qty: 3, price: 5000, total: 15000 },
+        { name: 'Wall Tile Set', code: 'WLL-002', qty: 1, price: 8500, total: 8500 },
+    ],
+    subtotal: 23500,
+    discount: 500,
+    tax: 0,
+    total: 23000,
+    paid: 25000,
+    change: 2000,
+    payment_method: 'Cash',
+};
+
+const ReceiptLivePreview = ({ cfg, template, cs }) => {
+    const sale = SAMPLE_SALE;
+    const tid = cfg.template_id || 1;
+    const accent = template.accent;
+    const fmt = (v) => `${cs}${Number(v).toLocaleString('en-NG')}`;
+
+    if (cfg.show_tax_breakdown && cfg.tax_rate > 0) {
+        sale.tax = Math.round((sale.subtotal - sale.discount) * cfg.tax_rate / 100);
+    } else {
+        sale.tax = 0;
+    }
+
+    // Shared pieces
+    const Logo = () => cfg.show_logo && cfg.company_logo_url ? <img src={cfg.company_logo_url} alt="Logo" className="w-10 h-10 object-contain" /> : null;
+    const CompanyName = ({ className = '' }) => <p className={`font-bold ${className}`}>{cfg.company_name || 'Your Business'}</p>;
+    const CompanyDetails = ({ className = '', size = 'text-[8px]' }) => cfg.show_company_details ? (
+        <div className={`${size} text-gray-500 ${className}`}>
+            {cfg.company_address && <p>{cfg.company_address}</p>}
+            {cfg.company_phone && <p>Tel: {cfg.company_phone}</p>}
+            {cfg.company_email && <p>{cfg.company_email}</p>}
+            {cfg.company_website && <p>{cfg.company_website}</p>}
+        </div>
+    ) : null;
+    const TaxNumber = ({ className = '' }) => cfg.show_tax_number && cfg.tax_number ? <p className={`text-[8px] text-gray-500 ${className}`}>{cfg.tax_label || 'TIN'}: {cfg.tax_number}</p> : null;
+    const Dash = () => <div className="border-t border-dashed border-gray-300 my-1.5" />;
+    const SolidLine = ({ color = '#e5e7eb' }) => <div className="my-1.5" style={{ borderTop: `1px solid ${color}` }} />;
+    const AccentLine = () => <div className="my-1.5" style={{ borderTop: `2px solid ${accent}` }} />;
+
+    const ItemsTable = ({ showCode = false, headerBg = '', headerText = '' }) => (
+        <table className="w-full text-[8px]">
+            <thead>
+                <tr style={headerBg ? { background: headerBg, color: headerText || '#fff' } : {}}>
+                    <th className={`text-left py-0.5 px-0.5 ${!headerBg ? 'border-b border-gray-200' : ''}`}>Item</th>
+                    {showCode && <th className={`text-left py-0.5 px-0.5 ${!headerBg ? 'border-b border-gray-200' : ''}`}>Code</th>}
+                    <th className={`text-center py-0.5 px-0.5 ${!headerBg ? 'border-b border-gray-200' : ''}`}>Qty</th>
+                    <th className={`text-right py-0.5 px-0.5 ${!headerBg ? 'border-b border-gray-200' : ''}`}>Price</th>
+                    <th className={`text-right py-0.5 px-0.5 ${!headerBg ? 'border-b border-gray-200' : ''}`}>Total</th>
+                </tr>
+            </thead>
+            <tbody>
+                {sale.items.map((item, i) => (
+                    <tr key={i} className="border-b border-gray-100">
+                        <td className="py-0.5 px-0.5">{item.name}</td>
+                        {showCode && <td className="py-0.5 px-0.5 text-gray-400">{item.code}</td>}
+                        <td className="text-center py-0.5 px-0.5">{item.qty}</td>
+                        <td className="text-right py-0.5 px-0.5">{fmt(item.price)}</td>
+                        <td className="text-right py-0.5 px-0.5 font-medium">{fmt(item.total)}</td>
+                    </tr>
+                ))}
+            </tbody>
+        </table>
+    );
+
+    const Totals = ({ bold = false }) => (
+        <div className="text-[8px] space-y-0.5">
+            <div className="flex justify-between"><span className="text-gray-500">Subtotal</span><span>{fmt(sale.subtotal)}</span></div>
+            {sale.discount > 0 && <div className="flex justify-between text-red-500"><span>Discount</span><span>-{fmt(sale.discount)}</span></div>}
+            {cfg.show_tax_breakdown && <div className="flex justify-between"><span className="text-gray-500">{cfg.tax_label || 'VAT'} {cfg.tax_rate > 0 ? `(${cfg.tax_rate}%)` : ''}</span><span>{fmt(sale.tax)}</span></div>}
+            <div className={`flex justify-between pt-0.5 mt-0.5 border-t border-gray-300 ${bold ? 'font-bold text-[10px]' : 'font-bold text-[9px]'}`}>
+                <span>Total</span><span>{fmt(sale.total)}</span>
+            </div>
+        </div>
+    );
+
+    const PaymentInfo = () => cfg.show_payment_details ? (
+        <div className="text-[8px] space-y-0.5">
+            <div className="flex justify-between"><span className="text-gray-500">Payment</span><span>{sale.payment_method}</span></div>
+            <div className="flex justify-between"><span className="text-gray-500">Paid</span><span>{fmt(sale.paid)}</span></div>
+            {sale.change > 0 && <div className="flex justify-between font-semibold text-green-600"><span>Change</span><span>{fmt(sale.change)}</span></div>}
+        </div>
+    ) : null;
+
+    const ReferrerInfo = () => cfg.show_referrer_details ? (
+        <div className="text-[8px]"><div className="flex justify-between"><span className="text-gray-500">Referred by</span><span>{sale.referrer}</span></div></div>
+    ) : null;
+
+    const FooterBlock = () => (
+        <>
+            {cfg.footer_text && <p className="text-[8px] text-gray-500 text-center italic">{cfg.footer_text}</p>}
+            {cfg.terms_and_conditions && <p className="text-[7px] text-gray-400 text-center mt-0.5">{cfg.terms_and_conditions}</p>}
+        </>
+    );
+
+    const BarcodeBlock = () => cfg.show_barcode ? (
+        <div className="mt-1.5 flex justify-center gap-px">{Array(25).fill(0).map((_, i) => <div key={i} className="bg-gray-900" style={{ width: i % 3 === 0 ? 2 : 1, height: 18 }} />)}</div>
+    ) : null;
+
+    const QRBlock = () => cfg.show_qr_code ? (
+        <div className="mt-1.5 flex justify-center"><div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center border border-gray-200"><QrCode size={20} className="text-gray-400" /></div></div>
+    ) : null;
+
+    const InfoRow = ({ label, value }) => <div className="flex justify-between text-[8px]"><span className="text-gray-500">{label}</span><span className="font-medium">{value}</span></div>;
+
+    // ── Template 1: Standard (Classic) ──
+    if (tid === 1) return (
+        <div className="p-4 text-gray-900">
+            <div className="text-center mb-2">
+                <div className="flex justify-center mb-1"><Logo /></div>
+                <CompanyName className="text-sm" />
+                <CompanyDetails className="mt-0.5" />
+                <TaxNumber className="mt-0.5" />
+            </div>
+            <Dash />
+            <div className="space-y-0.5 mb-1.5">
+                <InfoRow label="Receipt #" value={sale.receipt_number} />
+                <InfoRow label="Date" value={sale.date} />
+                {cfg.show_customer_details && <InfoRow label="Customer" value={sale.customer_name} />}
+                <InfoRow label="Cashier" value={sale.cashier} />
+            </div>
+            <Dash />
+            <ItemsTable />
+            <Dash />
+            <Totals />
+            {cfg.show_payment_details && <><Dash /><PaymentInfo /></>}
+            {cfg.show_referrer_details && <><Dash /><ReferrerInfo /></>}
+            <Dash />
+            <FooterBlock />
+            <BarcodeBlock />
+            <QRBlock />
+        </div>
+    );
+
+    // ── Template 2: Modern (Clean & Bold) ──
+    if (tid === 2) return (
+        <div className="text-gray-900">
+            <div className="p-3">
+                <div className="flex items-center gap-2 mb-2">
+                    <Logo />
+                    <div>
+                        <CompanyName className="text-sm" />
+                        <CompanyDetails size="text-[7px]" />
+                    </div>
+                </div>
+                <TaxNumber />
+            </div>
+            <div className="px-3 py-1.5 text-white text-[8px] flex justify-between" style={{ background: accent }}>
+                <span className="font-bold">{sale.receipt_number}</span>
+                <span>{sale.date}</span>
+            </div>
+            <div className="p-3">
+                {cfg.show_customer_details && <div className="text-[8px] mb-2"><span className="text-gray-500">Customer: </span><span className="font-medium">{sale.customer_name}</span></div>}
+                <ItemsTable headerBg={accent} headerText="#fff" />
+                <div className="mt-2" />
+                <Totals bold />
+                {cfg.show_payment_details && <><SolidLine color={accent} /><PaymentInfo /></>}
+                {cfg.show_referrer_details && <><SolidLine /><ReferrerInfo /></>}
+                <div className="mt-2" />
+                <FooterBlock />
+                <BarcodeBlock />
+                <QRBlock />
+            </div>
+        </div>
+    );
+
+    // ── Template 3: Bold (High Contrast) ──
+    if (tid === 3) return (
+        <div className="p-4 text-gray-900">
+            <div className="text-center mb-2">
+                <div className="flex justify-center mb-1"><Logo /></div>
+                <CompanyName className="text-base uppercase tracking-wide" />
+                <CompanyDetails className="mt-0.5" />
+                <TaxNumber className="mt-0.5" />
+            </div>
+            <div className="border-b-2 border-gray-900 my-2" />
+            <p className="text-center font-mono font-bold text-[10px] tracking-widest mb-1" style={{ color: accent }}>{sale.receipt_number}</p>
+            <p className="text-center text-[8px] text-gray-500 mb-1.5">{sale.date}</p>
+            <div className="space-y-0.5 mb-1.5">
+                {cfg.show_customer_details && <InfoRow label="Customer" value={sale.customer_name} />}
+                <InfoRow label="Cashier" value={sale.cashier} />
+            </div>
+            <div className="border-b-2 border-gray-900 my-2" />
+            <ItemsTable />
+            <div className="border-b-2 border-gray-900 my-2" />
+            <Totals bold />
+            {cfg.show_payment_details && <><div className="border-b border-gray-400 my-1.5" /><PaymentInfo /></>}
+            {cfg.show_referrer_details && <><div className="border-b border-gray-400 my-1.5" /><ReferrerInfo /></>}
+            <div className="border-b-2 border-gray-900 my-2" />
+            <FooterBlock />
+            <BarcodeBlock />
+            <QRBlock />
+        </div>
+    );
+
+    // ── Template 4: Invoice Pro ──
+    if (tid === 4) return (
+        <div className="text-gray-900">
+            <div className="px-3 py-2 text-[7px] text-gray-400 text-right border-b border-gray-200">{sale.date}</div>
+            <div className="p-3">
+                <div className="flex items-start justify-between mb-2">
+                    <div className="flex items-center gap-1.5"><Logo /><CompanyName className="text-xs" /></div>
+                    <div className="text-right text-[8px]"><span className="font-bold" style={{ color: accent }}>INVOICE</span><br /><span className="text-gray-500">{sale.receipt_number}</span></div>
+                </div>
+                <CompanyDetails size="text-[7px]" />
+                <TaxNumber className="mt-0.5" />
+                <div className="grid grid-cols-3 gap-1.5 my-2 text-[7px]">
+                    <div className="bg-gray-50 rounded p-1.5">
+                        <p className="text-gray-400 uppercase text-[6px] font-bold">Bill To</p>
+                        {cfg.show_customer_details && <p className="font-medium">{sale.customer_name}</p>}
+                    </div>
+                    <div className="bg-gray-50 rounded p-1.5">
+                        <p className="text-gray-400 uppercase text-[6px] font-bold">Date</p>
+                        <p className="font-medium">{sale.date}</p>
+                    </div>
+                    <div className="bg-gray-50 rounded p-1.5">
+                        <p className="text-gray-400 uppercase text-[6px] font-bold">Cashier</p>
+                        <p className="font-medium">{sale.cashier}</p>
+                    </div>
+                </div>
+                <ItemsTable showCode headerBg={accent} />
+                <div className="mt-2" />
+                <Totals bold />
+                {cfg.show_payment_details && <><SolidLine /><PaymentInfo /></>}
+                {cfg.show_referrer_details && <><SolidLine /><ReferrerInfo /></>}
+                <div className="mt-2" />
+                <FooterBlock />
+                <BarcodeBlock />
+                <QRBlock />
+            </div>
+        </div>
+    );
+
+    // ── Template 5: Invoice Classic (Professional) ──
+    if (tid === 5) return (
+        <div className="text-gray-900">
+            <div className="p-3 border-b-2" style={{ borderColor: accent }}>
+                <div className="flex items-start justify-between">
+                    <div><div className="flex items-center gap-1.5"><Logo /><CompanyName className="text-xs" /></div><CompanyDetails size="text-[7px]" className="mt-0.5" /></div>
+                    <div className="text-right"><p className="text-[10px] font-bold" style={{ color: accent }}>RECEIPT</p><p className="text-[7px] text-gray-500">{sale.receipt_number}</p></div>
+                </div>
+            </div>
+            <div className="p-3">
+                <TaxNumber className="mb-1" />
+                <div className="grid grid-cols-2 gap-2 my-2 text-[7px]">
+                    <div>{cfg.show_customer_details && <><p className="text-gray-400 uppercase text-[6px] font-bold mb-0.5">Customer</p><p className="font-medium">{sale.customer_name}</p><p className="text-gray-500">{sale.customer_phone}</p></>}</div>
+                    <div className="text-right"><p className="text-gray-400 uppercase text-[6px] font-bold mb-0.5">Details</p><p>{sale.date}</p><p>Cashier: {sale.cashier}</p></div>
+                </div>
+                <ItemsTable showCode />
+                <div className="mt-2" />
+                <Totals bold />
+                {cfg.show_payment_details && <><SolidLine /><PaymentInfo /></>}
+                {cfg.show_referrer_details && <><SolidLine /><ReferrerInfo /></>}
+                <div className="mt-2" />
+                <FooterBlock />
+                <BarcodeBlock />
+                <QRBlock />
+            </div>
+        </div>
+    );
+
+    // ── Template 6: Detailed (Boxed Grid) ──
+    if (tid === 6) return (
+        <div className="text-gray-900">
+            <div className="p-2.5 border-2 border-gray-800 m-2 rounded text-center">
+                <div className="flex justify-center mb-1"><Logo /></div>
+                <CompanyName className="text-sm" />
+                <CompanyDetails className="mt-0.5" />
+                <TaxNumber className="mt-0.5" />
+            </div>
+            <div className="px-3 pb-3">
+                <div className="grid grid-cols-2 gap-1.5 mb-2">
+                    <div className="border border-gray-300 rounded p-1.5">
+                        <p className="text-[6px] font-bold text-gray-400 uppercase mb-0.5">Bill To</p>
+                        {cfg.show_customer_details && <p className="text-[8px] font-medium">{sale.customer_name}</p>}
+                        {cfg.show_customer_details && <p className="text-[7px] text-gray-500">{sale.customer_phone}</p>}
+                    </div>
+                    <div className="border border-gray-300 rounded p-1.5">
+                        <p className="text-[6px] font-bold text-gray-400 uppercase mb-0.5">Receipt Info</p>
+                        <p className="text-[8px] font-medium">{sale.receipt_number}</p>
+                        <p className="text-[7px] text-gray-500">{sale.date}</p>
+                        <p className="text-[7px] text-gray-500">Cashier: {sale.cashier}</p>
+                    </div>
+                </div>
+                <ItemsTable showCode headerBg="#212529" />
+                <div className="mt-2 border border-gray-300 rounded p-1.5">
+                    <Totals bold />
+                </div>
+                {cfg.show_payment_details && <div className="mt-1.5"><PaymentInfo /></div>}
+                {cfg.show_referrer_details && <div className="mt-1.5"><ReferrerInfo /></div>}
+                <div className="mt-2" />
+                <FooterBlock />
+                <BarcodeBlock />
+                <QRBlock />
+            </div>
+        </div>
+    );
+
+    // ── Template 7: Elegant (Serif Luxury) ──
+    if (tid === 7) return (
+        <div className="p-4 text-gray-900" style={{ fontFamily: 'Georgia, "Times New Roman", serif' }}>
+            <div className="text-center mb-2">
+                <div className="flex justify-center mb-1"><Logo /></div>
+                <CompanyName className="text-sm tracking-wider" />
+                <CompanyDetails className="mt-0.5" />
+                <TaxNumber className="mt-0.5" />
+            </div>
+            <p className="text-center text-[9px] font-bold tracking-[0.2em] uppercase mb-1" style={{ color: accent }}>Official Receipt</p>
+            <div className="flex items-center gap-1.5 my-2"><div className="flex-1 border-t border-gray-300" /><div className="w-1.5 h-1.5 rounded-full" style={{ background: accent }} /><div className="flex-1 border-t border-gray-300" /></div>
+            <div className="space-y-0.5 mb-2">
+                <InfoRow label="Receipt #" value={sale.receipt_number} />
+                <InfoRow label="Date" value={sale.date} />
+                {cfg.show_customer_details && <InfoRow label="Customer" value={sale.customer_name} />}
+                <InfoRow label="Cashier" value={sale.cashier} />
+            </div>
+            <div className="flex items-center gap-1.5 my-2"><div className="flex-1 border-t border-gray-300" /><div className="w-1.5 h-1.5 rounded-full" style={{ background: accent }} /><div className="flex-1 border-t border-gray-300" /></div>
+            <ItemsTable />
+            <div className="flex items-center gap-1.5 my-2"><div className="flex-1 border-t border-gray-300" /><div className="w-1.5 h-1.5 rounded-full" style={{ background: accent }} /><div className="flex-1 border-t border-gray-300" /></div>
+            <Totals bold />
+            {cfg.show_payment_details && <><SolidLine /><PaymentInfo /></>}
+            {cfg.show_referrer_details && <><SolidLine /><ReferrerInfo /></>}
+            <div className="mt-2" />
+            <FooterBlock />
+            <BarcodeBlock />
+            <QRBlock />
+        </div>
+    );
+
+    // ── Template 8: Corporate (Formal Blue/Dark Header) ──
+    if (tid === 8) return (
+        <div className="text-gray-900">
+            <div className="p-3 text-white relative" style={{ background: '#2c3e50' }}>
+                <div className="flex items-center gap-2">
+                    <Logo />
+                    <div>
+                        <CompanyName className="text-sm text-white" />
+                        {cfg.show_company_details && <div className="text-[7px] text-gray-300">{cfg.company_address && <span>{cfg.company_address}</span>}{cfg.company_phone && <span> &bull; {cfg.company_phone}</span>}</div>}
+                    </div>
+                </div>
+                <TaxNumber className="mt-1 !text-gray-300" />
+            </div>
+            <div className="h-1" style={{ background: accent }} />
+            <div className="p-3">
+                <div className="flex justify-between text-[8px] mb-2">
+                    <div>
+                        {cfg.show_customer_details && <><p className="text-gray-400 text-[6px] uppercase font-bold">Customer</p><p className="font-medium">{sale.customer_name}</p></>}
+                    </div>
+                    <div className="text-right">
+                        <p className="font-bold" style={{ color: '#2c3e50' }}>{sale.receipt_number}</p>
+                        <p className="text-gray-500">{sale.date}</p>
+                        <p className="text-gray-500">Cashier: {sale.cashier}</p>
+                    </div>
+                </div>
+                <ItemsTable showCode headerBg="#2c3e50" />
+                <div className="mt-2" />
+                <Totals bold />
+                {cfg.show_payment_details && <><SolidLine /><PaymentInfo /></>}
+                {cfg.show_referrer_details && <><SolidLine /><ReferrerInfo /></>}
+                <div className="mt-2" />
+                <FooterBlock />
+                <BarcodeBlock />
+                <QRBlock />
+            </div>
+        </div>
+    );
+
+    // Fallback to template 1
+    return null;
+};
+
 const ReceiptToggle = ({ field, label, checked, onChange }) => (
     <label className="flex items-center justify-between p-2 sm:p-2.5 bg-theme-primary rounded-lg border border-theme cursor-pointer hover:border-accent-gold/30 transition-colors">
         <span className="text-[11px] sm:text-xs font-medium text-theme-secondary">{label}</span>
@@ -636,74 +1015,8 @@ const ReceiptSection = () => {
                             </span>
                         </div>
                         <div className="flex-1 p-3 sm:p-4 bg-theme-primary overflow-auto">
-                            <div className="bg-white rounded-lg border border-gray-200 p-4 sm:p-5 max-w-[240px] mx-auto text-gray-900 shadow-lg">
-                                {cfg.show_logo && cfg.company_logo_url && (
-                                    <img src={cfg.company_logo_url} alt="Logo" className="w-12 h-12 mx-auto mb-2 object-contain" />
-                                )}
-                                {cfg.show_company_details && (
-                                    <div className="text-center mb-2.5">
-                                        <p className="font-bold text-sm">{cfg.company_name || 'Your Business'}</p>
-                                        {cfg.company_address && <p className="text-[9px] text-gray-500 mt-0.5">{cfg.company_address}</p>}
-                                        {cfg.company_phone && <p className="text-[9px] text-gray-500">{cfg.company_phone}</p>}
-                                        {cfg.company_email && <p className="text-[9px] text-gray-500">{cfg.company_email}</p>}
-                                        {cfg.company_website && <p className="text-[9px] text-gray-500">{cfg.company_website}</p>}
-                                    </div>
-                                )}
-                                {cfg.show_tax_number && cfg.tax_number && (
-                                    <p className="text-[9px] text-gray-500 text-center mb-2">{cfg.tax_label || 'TIN'}: {cfg.tax_number}</p>
-                                )}
-                                <div className="border-t border-dashed border-gray-300 my-1.5" />
-                                <div className="text-[9px] space-y-0.5 mb-1.5">
-                                    <div className="flex justify-between"><span className="text-gray-500">Receipt #</span><span className="font-medium">INV-0001</span></div>
-                                    <div className="flex justify-between"><span className="text-gray-500">Date</span><span className="font-medium">{new Date().toLocaleDateString()}</span></div>
-                                    {cfg.show_customer_details && <div className="flex justify-between"><span className="text-gray-500">Customer</span><span className="font-medium">John Doe</span></div>}
-                                    <div className="flex justify-between"><span className="text-gray-500">Cashier</span><span className="font-medium">Staff User</span></div>
-                                </div>
-                                <div className="border-t border-dashed border-gray-300 my-1.5" />
-                                <div className="text-[9px] space-y-0.5 mb-1.5">
-                                    <div className="flex justify-between"><span>Sample Product x2</span><span className="font-medium">{cs}5,000</span></div>
-                                    <div className="flex justify-between"><span>Another Item x1</span><span className="font-medium">{cs}2,500</span></div>
-                                </div>
-                                <div className="border-t border-dashed border-gray-300 my-1.5" />
-                                <div className="text-[9px] space-y-0.5">
-                                    <div className="flex justify-between"><span className="text-gray-500">Subtotal</span><span>{cs}7,500</span></div>
-                                    {cfg.show_tax_breakdown && <div className="flex justify-between"><span className="text-gray-500">{cfg.tax_label || 'VAT'}</span><span>{cs}0</span></div>}
-                                    <div className="flex justify-between font-bold text-[10px] pt-1 border-t border-gray-200 mt-1">
-                                        <span>Total</span><span>{cs}7,500</span>
-                                    </div>
-                                </div>
-                                {cfg.show_payment_details && (
-                                    <>
-                                        <div className="border-t border-dashed border-gray-300 my-1.5" />
-                                        <div className="text-[9px] space-y-0.5">
-                                            <div className="flex justify-between"><span className="text-gray-500">Payment</span><span>Cash</span></div>
-                                            <div className="flex justify-between"><span className="text-gray-500">Paid</span><span>{cs}10,000</span></div>
-                                            <div className="flex justify-between font-semibold text-green-600"><span>Change</span><span>{cs}2,500</span></div>
-                                        </div>
-                                    </>
-                                )}
-                                {cfg.show_referrer_details && (
-                                    <>
-                                        <div className="border-t border-dashed border-gray-300 my-1.5" />
-                                        <div className="text-[9px]"><div className="flex justify-between"><span className="text-gray-500">Referred by</span><span>Jane Smith</span></div></div>
-                                    </>
-                                )}
-                                <div className="border-t border-dashed border-gray-300 my-1.5" />
-                                {cfg.footer_text && <p className="text-[9px] text-gray-500 text-center italic">{cfg.footer_text}</p>}
-                                {cfg.show_barcode && (
-                                    <div className="mt-1.5 flex justify-center gap-px">
-                                        {Array(25).fill(0).map((_, i) => (
-                                            <div key={i} className="bg-gray-900" style={{ width: i % 3 === 0 ? 2 : 1, height: 20 }} />
-                                        ))}
-                                    </div>
-                                )}
-                                {cfg.show_qr_code && (
-                                    <div className="mt-1.5 flex justify-center">
-                                        <div className="w-12 h-12 bg-gray-100 rounded flex items-center justify-center border border-gray-200">
-                                            <QrCode size={24} className="text-gray-400" />
-                                        </div>
-                                    </div>
-                                )}
+                            <div className="bg-white rounded-lg border border-gray-200 max-w-[260px] mx-auto text-gray-900 shadow-lg overflow-hidden">
+                                <ReceiptLivePreview cfg={cfg} template={selectedTemplate} cs={cs} />
                             </div>
                         </div>
                         <div className="px-3 py-1.5 border-t border-theme text-[9px] text-center text-theme-muted bg-theme-secondary">
