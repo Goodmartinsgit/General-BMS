@@ -25,9 +25,17 @@ export const salesAPI = {
         return response.data;
     },
 
+    // Unreverse (reactivate) a sale
+    unreverseSale: async (id, reason) => {
+        const response = await api.post(`/sales/${id}/unreverse`, { unreverse_reason: reason });
+        return response.data;
+    },
+
     // Add comment to a sale
-    addComment: async (id, comment) => {
-        const response = await api.post(`/sales/${id}/comments`, { comment });
+    addComment: async (id, formData) => {
+        const response = await api.post(`/sales/${id}/comments`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' }
+        });
         return response.data;
     },
 
