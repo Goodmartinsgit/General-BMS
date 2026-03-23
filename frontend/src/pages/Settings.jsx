@@ -525,7 +525,9 @@ const SAMPLE_SALE = {
 const ReceiptLivePreview = ({ cfg, template, cs }) => {
     const sale = SAMPLE_SALE;
     const tid = cfg.template_id || 1;
-    const accent = template.accent;
+    const accent = cfg.receipt_accent_color || template.accent;
+    const textColor = cfg.receipt_text_color || '#111827';
+    const mutedColor = cfg.receipt_text_color ? `${cfg.receipt_text_color}99` : '#6b7280';
     const fmt = (v) => `${cs}${Number(v).toLocaleString('en-NG')}`;
 
     if (cfg.show_tax_breakdown && cfg.tax_rate > 0) {
@@ -534,38 +536,38 @@ const ReceiptLivePreview = ({ cfg, template, cs }) => {
         sale.tax = 0;
     }
 
-    // Shared pieces
+    // Shared pieces — use dynamic colors
     const Logo = () => cfg.show_logo && cfg.company_logo_url ? <img src={cfg.company_logo_url} alt="Logo" className="w-10 h-10 object-contain" /> : null;
-    const CompanyName = ({ className = '' }) => <p className={`font-bold ${className}`}>{cfg.company_name || 'Your Business'}</p>;
+    const CompanyName = ({ className = '', style: s = {} }) => <p className={`font-bold ${className}`} style={s}>{cfg.company_name || 'Your Business'}</p>;
     const CompanyDetails = ({ className = '', size = 'text-[8px]' }) => cfg.show_company_details ? (
-        <div className={`${size} text-gray-500 ${className}`}>
+        <div className={`${size} ${className}`} style={{ color: mutedColor }}>
             {cfg.company_address && <p>{cfg.company_address}</p>}
             {cfg.company_phone && <p>Tel: {cfg.company_phone}</p>}
             {cfg.company_email && <p>{cfg.company_email}</p>}
             {cfg.company_website && <p>{cfg.company_website}</p>}
         </div>
     ) : null;
-    const TaxNumber = ({ className = '' }) => cfg.show_tax_number && cfg.tax_number ? <p className={`text-[8px] text-gray-500 ${className}`}>{cfg.tax_label || 'TIN'}: {cfg.tax_number}</p> : null;
-    const Dash = () => <div className="border-t border-dashed border-gray-300 my-1.5" />;
-    const SolidLine = ({ color = '#e5e7eb' }) => <div className="my-1.5" style={{ borderTop: `1px solid ${color}` }} />;
+    const TaxNumber = ({ className = '' }) => cfg.show_tax_number && cfg.tax_number ? <p className={`text-[8px] ${className}`} style={{ color: mutedColor }}>{cfg.tax_label || 'TIN'}: {cfg.tax_number}</p> : null;
+    const Dash = () => <div className="my-1.5" style={{ borderTop: `1px dashed ${mutedColor}50` }} />;
+    const SolidLine = ({ color }) => <div className="my-1.5" style={{ borderTop: `1px solid ${color || mutedColor + '40'}` }} />;
     const AccentLine = () => <div className="my-1.5" style={{ borderTop: `2px solid ${accent}` }} />;
 
     const ItemsTable = ({ showCode = false, headerBg = '', headerText = '' }) => (
         <table className="w-full text-[8px]">
             <thead>
                 <tr style={headerBg ? { background: headerBg, color: headerText || '#fff' } : {}}>
-                    <th className={`text-left py-0.5 px-0.5 ${!headerBg ? 'border-b border-gray-200' : ''}`}>Item</th>
-                    {showCode && <th className={`text-left py-0.5 px-0.5 ${!headerBg ? 'border-b border-gray-200' : ''}`}>Code</th>}
-                    <th className={`text-center py-0.5 px-0.5 ${!headerBg ? 'border-b border-gray-200' : ''}`}>Qty</th>
-                    <th className={`text-right py-0.5 px-0.5 ${!headerBg ? 'border-b border-gray-200' : ''}`}>Price</th>
-                    <th className={`text-right py-0.5 px-0.5 ${!headerBg ? 'border-b border-gray-200' : ''}`}>Total</th>
+                    <th className="text-left py-0.5 px-0.5" style={!headerBg ? { borderBottom: `1px solid ${mutedColor}30` } : {}}>Item</th>
+                    {showCode && <th className="text-left py-0.5 px-0.5" style={!headerBg ? { borderBottom: `1px solid ${mutedColor}30` } : {}}>Code</th>}
+                    <th className="text-center py-0.5 px-0.5" style={!headerBg ? { borderBottom: `1px solid ${mutedColor}30` } : {}}>Qty</th>
+                    <th className="text-right py-0.5 px-0.5" style={!headerBg ? { borderBottom: `1px solid ${mutedColor}30` } : {}}>Price</th>
+                    <th className="text-right py-0.5 px-0.5" style={!headerBg ? { borderBottom: `1px solid ${mutedColor}30` } : {}}>Total</th>
                 </tr>
             </thead>
             <tbody>
                 {sale.items.map((item, i) => (
-                    <tr key={i} className="border-b border-gray-100">
+                    <tr key={i} style={{ borderBottom: `1px solid ${mutedColor}20` }}>
                         <td className="py-0.5 px-0.5">{item.name}</td>
-                        {showCode && <td className="py-0.5 px-0.5 text-gray-400">{item.code}</td>}
+                        {showCode && <td className="py-0.5 px-0.5" style={{ color: mutedColor }}>{item.code}</td>}
                         <td className="text-center py-0.5 px-0.5">{item.qty}</td>
                         <td className="text-right py-0.5 px-0.5">{fmt(item.price)}</td>
                         <td className="text-right py-0.5 px-0.5 font-medium">{fmt(item.total)}</td>
@@ -577,10 +579,10 @@ const ReceiptLivePreview = ({ cfg, template, cs }) => {
 
     const Totals = ({ bold = false }) => (
         <div className="text-[8px] space-y-0.5">
-            <div className="flex justify-between"><span className="text-gray-500">Subtotal</span><span>{fmt(sale.subtotal)}</span></div>
-            {sale.discount > 0 && <div className="flex justify-between text-red-500"><span>Discount</span><span>-{fmt(sale.discount)}</span></div>}
-            {cfg.show_tax_breakdown && <div className="flex justify-between"><span className="text-gray-500">{cfg.tax_label || 'VAT'} {cfg.tax_rate > 0 ? `(${cfg.tax_rate}%)` : ''}</span><span>{fmt(sale.tax)}</span></div>}
-            <div className={`flex justify-between pt-0.5 mt-0.5 border-t border-gray-300 ${bold ? 'font-bold text-[10px]' : 'font-bold text-[9px]'}`}>
+            <div className="flex justify-between"><span style={{ color: mutedColor }}>Subtotal</span><span>{fmt(sale.subtotal)}</span></div>
+            {sale.discount > 0 && <div className="flex justify-between" style={{ color: '#ef4444' }}><span>Discount</span><span>-{fmt(sale.discount)}</span></div>}
+            {cfg.show_tax_breakdown && <div className="flex justify-between"><span style={{ color: mutedColor }}>{cfg.tax_label || 'VAT'} {cfg.tax_rate > 0 ? `(${cfg.tax_rate}%)` : ''}</span><span>{fmt(sale.tax)}</span></div>}
+            <div className={`flex justify-between pt-0.5 mt-0.5 ${bold ? 'font-bold text-[10px]' : 'font-bold text-[9px]'}`} style={{ borderTop: `1px solid ${mutedColor}40` }}>
                 <span>Total</span><span>{fmt(sale.total)}</span>
             </div>
         </div>
@@ -588,32 +590,32 @@ const ReceiptLivePreview = ({ cfg, template, cs }) => {
 
     const PaymentInfo = () => cfg.show_payment_details ? (
         <div className="text-[8px] space-y-0.5">
-            <div className="flex justify-between"><span className="text-gray-500">Payment</span><span>{sale.payment_method}</span></div>
-            <div className="flex justify-between"><span className="text-gray-500">Paid</span><span>{fmt(sale.paid)}</span></div>
-            {sale.change > 0 && <div className="flex justify-between font-semibold text-green-600"><span>Change</span><span>{fmt(sale.change)}</span></div>}
+            <div className="flex justify-between"><span style={{ color: mutedColor }}>Payment</span><span>{sale.payment_method}</span></div>
+            <div className="flex justify-between"><span style={{ color: mutedColor }}>Paid</span><span>{fmt(sale.paid)}</span></div>
+            {sale.change > 0 && <div className="flex justify-between font-semibold" style={{ color: '#16a34a' }}><span>Change</span><span>{fmt(sale.change)}</span></div>}
         </div>
     ) : null;
 
     const ReferrerInfo = () => cfg.show_referrer_details ? (
-        <div className="text-[8px]"><div className="flex justify-between"><span className="text-gray-500">Referred by</span><span>{sale.referrer}</span></div></div>
+        <div className="text-[8px]"><div className="flex justify-between"><span style={{ color: mutedColor }}>Referred by</span><span>{sale.referrer}</span></div></div>
     ) : null;
 
     const FooterBlock = () => (
         <>
-            {cfg.footer_text && <p className="text-[8px] text-gray-500 text-center italic">{cfg.footer_text}</p>}
-            {cfg.terms_and_conditions && <p className="text-[7px] text-gray-400 text-center mt-0.5">{cfg.terms_and_conditions}</p>}
+            {cfg.footer_text && <p className="text-[8px] text-center italic" style={{ color: mutedColor }}>{cfg.footer_text}</p>}
+            {cfg.terms_and_conditions && <p className="text-[7px] text-center mt-0.5" style={{ color: mutedColor + 'aa' }}>{cfg.terms_and_conditions}</p>}
         </>
     );
 
     const BarcodeBlock = () => cfg.show_barcode ? (
-        <div className="mt-1.5 flex justify-center gap-px">{Array(25).fill(0).map((_, i) => <div key={i} className="bg-gray-900" style={{ width: i % 3 === 0 ? 2 : 1, height: 18 }} />)}</div>
+        <div className="mt-1.5 flex justify-center gap-px">{Array(25).fill(0).map((_, i) => <div key={i} style={{ background: textColor, width: i % 3 === 0 ? 2 : 1, height: 18 }} />)}</div>
     ) : null;
 
     const QRBlock = () => cfg.show_qr_code ? (
-        <div className="mt-1.5 flex justify-center"><div className="w-10 h-10 bg-gray-100 rounded flex items-center justify-center border border-gray-200"><QrCode size={20} className="text-gray-400" /></div></div>
+        <div className="mt-1.5 flex justify-center"><div className="w-10 h-10 rounded flex items-center justify-center" style={{ border: `1px solid ${mutedColor}40`, background: mutedColor + '10' }}><QrCode size={20} style={{ color: mutedColor }} /></div></div>
     ) : null;
 
-    const InfoRow = ({ label, value }) => <div className="flex justify-between text-[8px]"><span className="text-gray-500">{label}</span><span className="font-medium">{value}</span></div>;
+    const InfoRow = ({ label, value }) => <div className="flex justify-between text-[8px]"><span style={{ color: mutedColor }}>{label}</span><span className="font-medium">{value}</span></div>;
 
     // ── Template 1: Standard (Classic) ──
     if (tid === 1) return (
@@ -899,6 +901,7 @@ const ReceiptSection = () => {
         tax_number: '', tax_rate: 0, tax_label: 'VAT', template_id: 1, template_style: 'modern',
         show_company_details: true, show_tax_breakdown: false, show_payment_details: true,
         show_customer_details: true, show_referrer_details: true, show_barcode: true, show_qr_code: false,
+        receipt_bg_color: '#ffffff', receipt_text_color: '#111827', receipt_accent_color: '',
         footer_text: 'Thank you for your business!', terms_and_conditions: '',
         currency_symbol: '₦', currency_code: 'NGN', paper_size: 'A5', delivery_format: 'auto',
         email_enabled: false, email_subject_template: '', email_body_template: '',
@@ -1015,7 +1018,8 @@ const ReceiptSection = () => {
                             </span>
                         </div>
                         <div className="flex-1 p-3 sm:p-4 bg-theme-primary overflow-auto">
-                            <div className="bg-white rounded-lg border border-gray-200 max-w-[260px] mx-auto text-gray-900 shadow-lg overflow-hidden">
+                            <div className="rounded-lg border border-gray-200 max-w-[260px] mx-auto shadow-lg overflow-hidden"
+                                style={{ backgroundColor: cfg.receipt_bg_color || '#ffffff', color: cfg.receipt_text_color || '#111827' }}>
                                 <ReceiptLivePreview cfg={cfg} template={selectedTemplate} cs={cs} />
                             </div>
                         </div>
@@ -1088,6 +1092,40 @@ const ReceiptSection = () => {
                             ].map(({ field, label }) => (
                                 <ReceiptToggle key={field} field={field} label={label} checked={cfg[field]} onChange={set} />
                             ))}
+                        </div>
+                        {/* Receipt Colors */}
+                        <div className="mt-4 pt-4 border-t border-theme">
+                            <h4 className="text-[10px] sm:text-xs font-semibold text-theme-muted uppercase tracking-wider mb-3 flex items-center gap-2">
+                                <Palette size={14} className="text-accent-gold" />
+                                Receipt Colors
+                            </h4>
+                            <div className="grid grid-cols-3 gap-3">
+                                {[
+                                    { field: 'receipt_bg_color', label: 'Background', fallback: '#ffffff' },
+                                    { field: 'receipt_text_color', label: 'Text', fallback: '#111827' },
+                                    { field: 'receipt_accent_color', label: 'Accent', fallback: '' },
+                                ].map(({ field, label, fallback }) => (
+                                    <div key={field}>
+                                        <label className={labelClass}>{label}</label>
+                                        <div className="flex items-center gap-2">
+                                            <input
+                                                type="color"
+                                                value={cfg[field] || fallback || '#000000'}
+                                                onChange={e => set(field, e.target.value)}
+                                                className="w-8 h-8 rounded-lg border border-theme cursor-pointer bg-transparent p-0.5"
+                                            />
+                                            <input
+                                                type="text"
+                                                value={cfg[field] || ''}
+                                                onChange={e => set(field, e.target.value)}
+                                                className={`${inputClass} flex-1 font-mono text-[10px] sm:text-xs`}
+                                                placeholder={fallback || 'auto'}
+                                            />
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                            <p className="text-[9px] text-theme-muted mt-2">Leave accent empty to use template default. Colors apply to receipt preview and printed receipts.</p>
                         </div>
                     </div>
                     <div className="bg-theme-secondary rounded-xl border border-theme shadow-theme-sm p-4 sm:p-5">

@@ -31,6 +31,9 @@ const DEFAULT_CONFIG = {
     delivery_format: 'auto',
     show_barcode: true,
     show_qr_code: false,
+    receipt_bg_color: '#ffffff',
+    receipt_text_color: '#111827',
+    receipt_accent_color: '',
     email_enabled: false,
     email_subject_template: '',
     email_body_template: '',
@@ -115,6 +118,9 @@ const updateReceiptConfig = async (req, res) => {
             email_body_template: req.body.email_body_template,
             whatsapp_enabled: req.body.whatsapp_enabled,
             whatsapp_message_template: req.body.whatsapp_message_template,
+            receipt_bg_color: req.body.receipt_bg_color,
+            receipt_text_color: req.body.receipt_text_color,
+            receipt_accent_color: req.body.receipt_accent_color,
         };
 
         // Only include fields that are defined AND whose column exists in the DB
