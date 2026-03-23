@@ -6,7 +6,7 @@ import { CURRENCIES, getCurrencySymbol } from '../utils/currency';
 import {
     Settings as SettingsIcon, Building2, CreditCard, Bell, Shield, Palette,
     Save, RefreshCw, Receipt, Calendar, Calculator, Eye, EyeOff, ShieldAlert,
-    Plus, Lock, Unlock, Play, Trash2, XCircle, Image, Type, FileText,
+    Plus, Lock, Unlock, Play, Trash2, XCircle, Image, Type, FileText, Mail,
     QrCode, Barcode, Hash, Layout, Monitor, ChevronRight, ChevronDown, ChevronUp, Globe, Clock, Check
 } from 'lucide-react';
 import PageHeader from '../components/common/PageHeader';
