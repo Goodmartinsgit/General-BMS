@@ -883,11 +883,11 @@ const ReceiptLivePreview = ({ cfg, template, cs }) => {
 const ReceiptToggle = ({ field, label, checked, onChange }) => (
     <label className="flex items-center justify-between p-2 sm:p-2.5 bg-theme-primary rounded-lg border border-theme cursor-pointer hover:border-accent-gold/30 transition-colors">
         <span className="text-[11px] sm:text-xs font-medium text-theme-secondary">{label}</span>
-        <div className="relative w-8 h-4 sm:w-9 sm:h-5">
-            <input type="checkbox" checked={checked} onChange={e => onChange(field, e.target.checked)} className="sr-only peer" />
-            <div className="absolute inset-0 bg-theme-tertiary rounded-full peer-checked:bg-accent-gold transition-colors" />
-            <div className="absolute left-0.5 top-0.5 w-3 h-3 sm:w-4 sm:h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-4" />
-        </div>
+        <button type="button" role="switch" aria-checked={checked}
+            onClick={() => onChange(field, !checked)}
+            className={`relative w-9 h-5 rounded-full transition-colors ${checked ? 'bg-accent-gold' : 'bg-theme-tertiary'}`}>
+            <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${checked ? 'translate-x-4' : 'translate-x-0'}`} />
+        </button>
     </label>
 );
 
@@ -1149,13 +1149,11 @@ const ReceiptSection = () => {
                             Email Settings
                         </h3>
                         <div className="flex items-center gap-2">
-                            <label className="flex items-center cursor-pointer" onClick={e => e.stopPropagation()}>
-                                <div className="relative w-8 h-4 sm:w-9 sm:h-5">
-                                    <input type="checkbox" checked={cfg.email_enabled} onChange={e => set('email_enabled', e.target.checked)} className="sr-only peer" />
-                                    <div className="absolute inset-0 bg-theme-tertiary rounded-full peer-checked:bg-accent-gold transition-colors" />
-                                    <div className="absolute left-0.5 top-0.5 w-3 h-3 sm:w-4 sm:h-4 bg-white rounded-full shadow-sm transition-transform peer-checked:translate-x-4" />
-                                </div>
-                            </label>
+                            <button type="button" role="switch" aria-checked={cfg.email_enabled}
+                                onClick={e => { e.stopPropagation(); set('email_enabled', !cfg.email_enabled); }}
+                                className={`relative w-9 h-5 rounded-full transition-colors ${cfg.email_enabled ? 'bg-accent-gold' : 'bg-theme-tertiary'}`}>
+                                <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${cfg.email_enabled ? 'translate-x-4' : 'translate-x-0'}`} />
+                            </button>
                             {expandedSections.email ? <ChevronUp size={14} className="text-theme-muted" /> : <ChevronDown size={14} className="text-theme-muted" />}
                         </div>
                     </button>
