@@ -543,9 +543,8 @@ const ReceiptLivePreview = ({ cfg, template, cs }) => {
     const tid = cfg.template_id || 1;
     const accent = cfg.receipt_accent_color || template.accent;
     const bgColor = cfg.receipt_bg_color || '#ffffff';
-    const autoText = getContrastTextColor(bgColor);
-    const textColor = cfg.receipt_text_color || autoText;
-    const mutedColor = textColor === '#f9fafb' ? '#d1d5db99' : textColor === '#111827' ? '#6b728099' : `${textColor}99`;
+    const textColor = getContrastTextColor(bgColor);
+    const mutedColor = textColor === '#f9fafb' ? '#d1d5db99' : '#6b728099';
     const fmt = (v) => `${cs}${Number(v).toLocaleString('en-NG')}`;
 
     if (cfg.show_tax_breakdown && cfg.tax_rate > 0) {
@@ -987,8 +986,8 @@ const ReceiptSection = () => {
         eff.receipt_accent_color = brandingConfig?.accent_color || brandingConfig?.primary_color || cfg.receipt_accent_color;
         eff.receipt_bg_color = brandingConfig?.background_color || cfg.receipt_bg_color || '#ffffff';
     }
-    // Auto-contrast: always ensure text is readable against the background
-    eff.receipt_text_color = cfg.receipt_text_color || getContrastTextColor(eff.receipt_bg_color || '#ffffff');
+    // Auto-contrast: always compute text color from effective background for readability
+    eff.receipt_text_color = getContrastTextColor(eff.receipt_bg_color || '#ffffff');
 
     const selectedTemplate = RECEIPT_TEMPLATES.find(t => t.id === (cfg.template_id || 1)) || RECEIPT_TEMPLATES[0];
     const cs = cfg.currency_symbol || symbol || '₦';
@@ -1188,10 +1187,9 @@ const ReceiptSection = () => {
                                 </div>
                             )}
 
-                            <div className={`grid grid-cols-3 gap-3 ${cfg.use_company_branding ? 'opacity-50 pointer-events-none' : ''}`}>
+                            <div className={`grid grid-cols-2 gap-3 ${cfg.use_company_branding ? 'opacity-50 pointer-events-none' : ''}`}>
                                 {[
                                     { field: 'receipt_bg_color', label: 'Background', fallback: '#ffffff' },
-                                    { field: 'receipt_text_color', label: 'Text', fallback: '#111827' },
                                     { field: 'receipt_accent_color', label: 'Accent', fallback: '' },
                                 ].map(({ field, label, fallback }) => (
                                     <div key={field}>
@@ -1214,7 +1212,7 @@ const ReceiptSection = () => {
                                     </div>
                                 ))}
                             </div>
-                            <p className="text-[9px] text-theme-muted mt-2">{cfg.use_company_branding ? 'Colors are synced from Branding settings.' : 'Leave accent empty to use template default. Colors apply to receipt preview and printed receipts.'}</p>
+                            <p className="text-[9px] text-theme-muted mt-2">{cfg.use_company_branding ? 'Colors are synced from Branding settings.' : 'Text color adjusts automatically for readability. Leave accent empty to use template default.'}</p>
                         </div>
                     </div>
                     <div className="bg-theme-secondary rounded-xl border border-theme shadow-theme-sm p-4 sm:p-5">
