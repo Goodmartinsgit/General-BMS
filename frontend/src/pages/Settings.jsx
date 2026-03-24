@@ -563,7 +563,7 @@ const ReceiptLivePreview = ({ cfg, template, cs }) => {
 
     // Shared pieces — use dynamic colors throughout
     const Logo = () => cfg.show_logo && cfg.company_logo_url ? <img src={cfg.company_logo_url} alt="Logo" className="w-10 h-10 object-contain" /> : null;
-    const CompanyName = ({ className = '', style: s = {} }) => <p className={`font-bold ${className}`} style={{ color: headingColor, ...s }}>{cfg.company_name || 'Your Business'}</p>;
+    const CompanyName = ({ className = '', style: s = {} }) => <p className={`font-bold ${className}`} style={{ color: textColor, ...s }}>{cfg.company_name || 'Your Business'}</p>;
     const CompanyDetails = ({ className = '', size = 'text-[8px]' }) => cfg.show_company_details ? (
         <div className={`${size} ${className}`} style={{ color: labelColor }}>
             {cfg.company_address && <p>{cfg.company_address}</p>}
