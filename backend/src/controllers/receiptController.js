@@ -32,7 +32,7 @@ const DEFAULT_CONFIG = {
     show_barcode: true,
     show_qr_code: false,
     receipt_bg_color: '#ffffff',
-    receipt_text_color: '#111827',
+    receipt_text_color: '',
     receipt_accent_color: '',
     use_company_branding: false,
     use_company_info: false,
@@ -70,8 +70,11 @@ const getReceiptConfig = async (req, res) => {
             return res.json(DEFAULT_CONFIG);
         }
 
-        // Merge with defaults to ensure all fields exist
-        const config = { ...DEFAULT_CONFIG, ...result.rows[0] };
+        // Merge with defaults — filter out null/undefined DB values so defaults fill gaps
+        const dbRow = Object.fromEntries(
+            Object.entries(result.rows[0]).filter(([_, v]) => v !== null && v !== undefined)
+        );
+        const config = { ...DEFAULT_CONFIG, ...dbRow };
         res.json(config);
     } catch (err) {
         console.error(err);

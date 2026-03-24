@@ -953,7 +953,10 @@ const ReceiptSection = () => {
                 api.get('/settings/receipt-template').catch(() => ({ data: {} })),
                 api.get('/settings/general').catch(() => ({ data: {} })),
             ]);
-            setCfg(p => ({ ...p, ...rcptRes.data }));
+            const clean = Object.fromEntries(
+                Object.entries(rcptRes.data || {}).filter(([_, v]) => v !== null && v !== undefined)
+            );
+            setCfg(p => ({ ...p, ...clean }));
             setCompanySettings(settingsRes.data?.settings || settingsRes.data || {});
             setHasChanges(false);
         } catch { toast.error('Failed to load receipt settings'); }
