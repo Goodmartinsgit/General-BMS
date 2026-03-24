@@ -1,10 +1,38 @@
 const { pool } = require('../config/db');
 
+// ── Helper: get role permissions for the current user ────────────────────────
+async function getUserPermissions(userId) {
+    const res = await pool.query(
+        `SELECT r.permissions, r.role_level
+         FROM users u JOIN roles r ON u.role_id = r.id
+         WHERE u.id = $1 AND u.deleted_at IS NULL`,
+        [userId]
+    );
+    if (res.rows.length === 0) return { permissions: {}, role_level: 99 };
+    return {
+        permissions: res.rows[0].permissions || {},
+        role_level: res.rows[0].role_level ?? 99
+    };
+}
+
+function hasPermission(perms, key) {
+    return perms[key] === true || perms['admin'] === true;
+}
+
 const getDashboardStats = async (req, res) => {
     try {
-        const roleName = (req.user.role_name || '').toLowerCase().replace(/\s+/g, '_');
         const userId = req.user.id;
-        const branchId = req.user.current_branch_id;
+
+        // Fetch fresh permissions from DB (not JWT — always current)
+        const { permissions, role_level } = await getUserPermissions(userId);
+
+        // Determine dashboard type from permissions:
+        //  - Users with view_all_sales or view_dashboard_financials → admin dashboard
+        //  - Users with admin permission or role_level <= 2 → admin dashboard
+        //  - Everyone else → staff dashboard (personal data only)
+        const isAdmin = hasPermission(permissions, 'view_dashboard_financials')
+            || hasPermission(permissions, 'view_all_sales')
+            || role_level <= 2;
 
         // Date filtering
         const { start_date, end_date } = req.query;
@@ -24,7 +52,7 @@ const getDashboardStats = async (req, res) => {
         }
 
         // ---------- STAFF DASHBOARD ----------
-        if (['staff', 'branch_staff'].includes(roleName)) {
+        if (!isAdmin) {
             const [personalStats, itemsSoldResult, customersServedResult, recentSales] = await Promise.all([
                 pool.query(
                     `SELECT
@@ -78,7 +106,7 @@ const getDashboardStats = async (req, res) => {
             });
         }
 
-        // ---------- ADMIN / SUPER ADMIN DASHBOARD ----------
+        // ---------- ADMIN / MANAGER DASHBOARD ----------
 
         // Parallel queries for performance
         const [
@@ -109,7 +137,7 @@ const getDashboardStats = async (req, res) => {
             pool.query('SELECT COUNT(*) as total_customers FROM customers'),
             // New customers (30 days)
             pool.query(
-                `SELECT COUNT(*) as new_customers FROM customers 
+                `SELECT COUNT(*) as new_customers FROM customers
                  WHERE created_at >= NOW() - INTERVAL '30 days'`
             ),
             // Inventory value
@@ -127,13 +155,13 @@ const getDashboardStats = async (req, res) => {
             ),
             // Expenses
             pool.query(
-                `SELECT COALESCE(SUM(amount), 0) as total_expenses 
-                 FROM expenses 
+                `SELECT COALESCE(SUM(amount), 0) as total_expenses
+                 FROM expenses
                  WHERE expense_date >= DATE_TRUNC('month', CURRENT_DATE)`
             ),
             // Profit calculation
             pool.query(
-                `SELECT 
+                `SELECT
                     COALESCE(SUM(total_amount), 0) as gross_revenue,
                     COALESCE(SUM(profit_total), 0) as gross_profit
                  FROM sales WHERE status != 'cancelled'${adminDateFilter}`,
@@ -152,7 +180,7 @@ const getDashboardStats = async (req, res) => {
             ),
             // Top products
             pool.query(
-                `SELECT p.product_name, p.product_code, 
+                `SELECT p.product_name, p.product_code,
                         SUM(si.quantity) as total_sold,
                         SUM(si.line_total) as total_revenue
                  FROM sale_items si
@@ -184,16 +212,19 @@ const getDashboardStats = async (req, res) => {
         const netProfit = grossProfit - totalExpenses;
         const profitMargin = totalRevenue > 0 ? ((netProfit / totalRevenue) * 100).toFixed(1) : 0;
 
+        // If user doesn't have view_dashboard_financials, zero out financial data
+        const showFinancials = hasPermission(permissions, 'view_dashboard_financials');
+
         res.json({
             success: true,
             data: {
                 dashboard: {
                     overview: {
                         sales: {
-                            total_revenue: totalRevenue,
+                            total_revenue: showFinancials ? totalRevenue : undefined,
                             total_sales_count: parseInt(salesResult.rows[0].total_sales_count),
                             today: {
-                                revenue: parseFloat(todaySalesResult.rows[0].revenue),
+                                revenue: showFinancials ? parseFloat(todaySalesResult.rows[0].revenue) : undefined,
                                 sales_count: parseInt(todaySalesResult.rows[0].sales_count)
                             }
                         },
@@ -203,16 +234,16 @@ const getDashboardStats = async (req, res) => {
                         },
                         inventory: {
                             total_products: parseInt(inventoryResult.rows[0].total_products),
-                            total_inventory_value: parseFloat(inventoryResult.rows[0].total_inventory_value),
+                            total_inventory_value: showFinancials ? parseFloat(inventoryResult.rows[0].total_inventory_value) : undefined,
                             low_stock_count: parseInt(lowStockResult.rows[0].low_stock_count)
                         },
-                        financial_health: {
+                        financial_health: showFinancials ? {
                             gross_profit: grossProfit,
                             net_profit: netProfit,
                             profit_margin: parseFloat(profitMargin),
                             total_expenses: totalExpenses,
                             total_deductions: totalExpenses
-                        }
+                        } : undefined
                     },
                     charts: {
                         sales_trend: trendResult.rows,
@@ -231,24 +262,57 @@ const getDashboardStats = async (req, res) => {
 const getActivityFeed = async (req, res) => {
     try {
         const { limit = 20 } = req.query;
+        const userId = req.user.id;
 
-        const activities = await pool.query(`
-            (SELECT 'sale_' || s.id::text as id, 'sale' as type,
-             'New sale #' || COALESCE(s.sale_number, s.id::text) as description,
-             u.full_name as user_name,
-             s.total_amount as amount, s.created_at
-             FROM sales s LEFT JOIN users u ON s.processed_by = u.id
-             WHERE s.status != 'cancelled'
-             ORDER BY s.created_at DESC LIMIT 10)
-            UNION ALL
-            (SELECT 'expense_' || e.id::text as id, 'expense' as type,
-             e.description, u.full_name as user_name,
-             e.amount, e.created_at
-             FROM expenses e LEFT JOIN users u ON e.submitted_by = u.id
-             ORDER BY e.created_at DESC LIMIT 10)
-            ORDER BY created_at DESC LIMIT $1
-        `, [parseInt(limit)]);
+        // Check if user can see all activity or only their own
+        const { permissions } = await getUserPermissions(userId);
+        const canSeeAll = hasPermission(permissions, 'view_all_sales');
 
+        const userFilter = canSeeAll ? '' : ` WHERE s.processed_by = '${userId}'`;
+        const expenseFilter = canSeeAll ? '' : ` WHERE e.submitted_by = '${userId}'`;
+
+        // Use parameterised userId to avoid injection
+        let queryText;
+        let queryParams;
+
+        if (canSeeAll) {
+            queryText = `
+                (SELECT 'sale_' || s.id::text as id, 'sale' as type,
+                 'New sale #' || COALESCE(s.sale_number, s.id::text) as description,
+                 u.full_name as user_name,
+                 s.total_amount as amount, s.created_at
+                 FROM sales s LEFT JOIN users u ON s.processed_by = u.id
+                 WHERE s.status != 'cancelled'
+                 ORDER BY s.created_at DESC LIMIT 10)
+                UNION ALL
+                (SELECT 'expense_' || e.id::text as id, 'expense' as type,
+                 e.description, u.full_name as user_name,
+                 e.amount, e.created_at
+                 FROM expenses e LEFT JOIN users u ON e.submitted_by = u.id
+                 ORDER BY e.created_at DESC LIMIT 10)
+                ORDER BY created_at DESC LIMIT $1`;
+            queryParams = [parseInt(limit)];
+        } else {
+            queryText = `
+                (SELECT 'sale_' || s.id::text as id, 'sale' as type,
+                 'New sale #' || COALESCE(s.sale_number, s.id::text) as description,
+                 u.full_name as user_name,
+                 s.total_amount as amount, s.created_at
+                 FROM sales s LEFT JOIN users u ON s.processed_by = u.id
+                 WHERE s.status != 'cancelled' AND s.processed_by = $1
+                 ORDER BY s.created_at DESC LIMIT 10)
+                UNION ALL
+                (SELECT 'expense_' || e.id::text as id, 'expense' as type,
+                 e.description, u.full_name as user_name,
+                 e.amount, e.created_at
+                 FROM expenses e LEFT JOIN users u ON e.submitted_by = u.id
+                 WHERE e.submitted_by = $1
+                 ORDER BY e.created_at DESC LIMIT 10)
+                ORDER BY created_at DESC LIMIT $2`;
+            queryParams = [userId, parseInt(limit)];
+        }
+
+        const activities = await pool.query(queryText, queryParams);
         res.json(activities.rows);
     } catch (err) {
         console.error('Error fetching activity feed:', err);

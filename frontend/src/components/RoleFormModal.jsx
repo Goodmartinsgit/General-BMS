@@ -11,12 +11,14 @@ const PERMISSION_GROUPS = [
     permissions: [
       { key: 'view_analytics', label: 'View Analytics' },
       { key: 'view_reports', label: 'View Reports' },
+      { key: 'view_dashboard_financials', label: 'View Financial Data on Dashboard' },
     ],
   },
   {
     group: 'Sales',
     permissions: [
-      { key: 'view_sales', label: 'View Sales' },
+      { key: 'view_sales', label: 'View Own Sales' },
+      { key: 'view_all_sales', label: 'View All Sales (all staff)' },
       { key: 'create_sales', label: 'Create Sales' },
       { key: 'reverse_sales', label: 'Reverse / Void Sales' },
     ],

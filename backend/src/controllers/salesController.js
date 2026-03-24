@@ -360,6 +360,8 @@ const createSale = async (req, res) => {
 const getAllSales = async (req, res) => {
     try {
         const { branchId, startDate, endDate, status, includeReversed } = req.query;
+        const userId = req.user.id;
+
         let q = `SELECT s.*, b.branch_name, c.customer_name, u.full_name as salesperson,
                  r.full_name as referrer_name, p.promotion_name,
                  CASE WHEN s.reversed_at IS NOT NULL THEN true ELSE false END as is_reversed
@@ -371,6 +373,19 @@ const getAllSales = async (req, res) => {
                  LEFT JOIN promotions p ON s.promotion_id = p.id
                  WHERE 1=1`;
         const params = [];
+
+        // Role-based scoping: users without view_all_sales only see their own
+        const permRes = await pool.query(
+            `SELECT r.permissions FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = $1`,
+            [userId]
+        );
+        const perms = permRes.rows[0]?.permissions || {};
+        const canSeeAll = perms['view_all_sales'] === true || perms['admin'] === true;
+
+        if (!canSeeAll) {
+            params.push(userId);
+            q += ` AND s.processed_by = $${params.length}`;
+        }
 
         if (branchId) {
             params.push(branchId);
@@ -853,10 +868,23 @@ const getSaleComments = async (req, res) => {
 const getSaleStatistics = async (req, res) => {
     try {
         const { branchId, startDate, endDate } = req.query;
+        const userId = req.user.id;
         let params = [];
+
+        // Role-based scoping
+        const permRes = await pool.query(
+            `SELECT r.permissions FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = $1`,
+            [userId]
+        );
+        const perms = permRes.rows[0]?.permissions || {};
+        const canSeeAll = perms['view_all_sales'] === true || perms['admin'] === true;
 
         // Total sales
         let totalQuery = 'SELECT COUNT(*) as total_sales, COALESCE(SUM(total_amount), 0) as total_revenue FROM sales WHERE reversed_at IS NULL';
+        if (!canSeeAll) {
+            params.push(userId);
+            totalQuery += ` AND processed_by = $${params.length}`;
+        }
         if (branchId) {
             params.push(branchId);
             totalQuery += ` AND branch_id = $${params.length}`;
@@ -875,6 +903,10 @@ const getSaleStatistics = async (req, res) => {
         // Cost and profit
         params = [];
         let profitQuery = 'SELECT COALESCE(SUM(cost_total), 0) as total_cost, COALESCE(SUM(profit_total), 0) as total_profit FROM sales WHERE reversed_at IS NULL';
+        if (!canSeeAll) {
+            params.push(userId);
+            profitQuery += ` AND processed_by = $${params.length}`;
+        }
         if (branchId) {
             params.push(branchId);
             profitQuery += ` AND branch_id = $${params.length}`;
@@ -893,6 +925,10 @@ const getSaleStatistics = async (req, res) => {
         // Reversed sales
         params = [];
         let reversedQuery = 'SELECT COUNT(*) as reversed_sales, COALESCE(SUM(total_amount), 0) as reversed_amount FROM sales WHERE reversed_at IS NOT NULL';
+        if (!canSeeAll) {
+            params.push(userId);
+            reversedQuery += ` AND processed_by = $${params.length}`;
+        }
         if (branchId) {
             params.push(branchId);
             reversedQuery += ` AND branch_id = $${params.length}`;
@@ -911,6 +947,10 @@ const getSaleStatistics = async (req, res) => {
         // Promotion usage
         params = [];
         let promoQuery = 'SELECT COUNT(*) as sales_with_promotions, COALESCE(SUM(promotion_discount), 0) as total_promotion_discounts FROM sales WHERE promotion_id IS NOT NULL AND reversed_at IS NULL';
+        if (!canSeeAll) {
+            params.push(userId);
+            promoQuery += ` AND processed_by = $${params.length}`;
+        }
         if (branchId) {
             params.push(branchId);
             promoQuery += ` AND branch_id = $${params.length}`;

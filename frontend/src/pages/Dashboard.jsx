@@ -76,50 +76,36 @@ const Dashboard = () => {
     setDateRangeReady(true);
   }, []);
 
-  const roleName = (user?.role_name || user?.role || '').toLowerCase().replace(/\s+/g, '_');
-  const isStaff = ['staff', 'branch_staff'].includes(roleName);
-
-  const getRoleDisplay = (role) => {
-    const map = {
-      super_admin: 'Super Administrator',
-      admin: 'Administrator',
-      staff: 'Staff Member',
-      branch_staff: 'Branch Staff',
-      branch_admin: 'Branch Admin',
-    };
-    return map[role] || role;
-  };
-
-  const getRoleBadgeColor = (role) => {
-    const map = {
-      super_admin: 'bg-accent-gold text-black',
-      admin: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
-      staff: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
-      branch_staff: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300',
-      branch_admin: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
-    };
-    return map[role] || 'bg-gray-100 text-gray-800';
-  };
+  // Permission-based dashboard detection:
+  // Users with view_dashboard_financials, view_all_sales, admin, or role_level <= 2 → admin dashboard
+  // Everyone else → staff dashboard (personal data only)
+  const permissions = user?.permissions || {};
+  const roleLevel = user?.role_level ?? 99;
+  const hasAdminPerm = (key) => permissions[key] === true || permissions['admin'] === true;
+  const isStaff = !(hasAdminPerm('view_dashboard_financials') || hasAdminPerm('view_all_sales') || roleLevel <= 2);
 
   // ─────────────────────────── ADMIN DASHBOARD ───────────────────────────
   const renderAdminDashboard = () => {
     const { overview, charts } = dashboardData || {};
     const { sales, customers, inventory, financial_health } = overview || {};
+    const showFinancials = !!financial_health;
 
     return (
       <>
         {/* Primary KPIs */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6">
-          <KPICard
-            title="Total Revenue"
-            value={formatCurrency(sales?.total_revenue || 0)}
-            change={`Today: ${formatCurrency(sales?.today?.revenue || 0)}`}
-            changeType="neutral"
-            icon={DollarSign}
-            iconColor="bg-accent-gold"
-            loading={loading}
-            error={error}
-          />
+        <div className={`grid grid-cols-1 sm:grid-cols-2 ${showFinancials ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-4 md:gap-6 mb-6`}>
+          {showFinancials && (
+            <KPICard
+              title="Total Revenue"
+              value={formatCurrency(sales?.total_revenue || 0)}
+              change={`Today: ${formatCurrency(sales?.today?.revenue || 0)}`}
+              changeType="neutral"
+              icon={DollarSign}
+              iconColor="bg-accent-gold"
+              loading={loading}
+              error={error}
+            />
+          )}
           <KPICard
             title="Total Sales"
             value={formatNumber(sales?.total_sales_count || 0)}
@@ -140,31 +126,35 @@ const Dashboard = () => {
             loading={loading}
             error={error}
           />
-          <KPICard
-            title="Net Profit"
-            value={formatCurrency(financial_health?.net_profit || 0)}
-            change={formatPercentage(financial_health?.profit_margin || 0)}
-            changeType={financial_health?.net_profit >= 0 ? 'positive' : 'negative'}
-            valueColorType={financial_health?.net_profit >= 0 ? 'positive' : 'negative'}
-            icon={TrendingUp}
-            iconColor={financial_health?.net_profit >= 0 ? 'bg-green-500' : 'bg-red-500'}
-            loading={loading}
-            error={error}
-          />
+          {showFinancials && (
+            <KPICard
+              title="Net Profit"
+              value={formatCurrency(financial_health?.net_profit || 0)}
+              change={formatPercentage(financial_health?.profit_margin || 0)}
+              changeType={financial_health?.net_profit >= 0 ? 'positive' : 'negative'}
+              valueColorType={financial_health?.net_profit >= 0 ? 'positive' : 'negative'}
+              icon={TrendingUp}
+              iconColor={financial_health?.net_profit >= 0 ? 'bg-green-500' : 'bg-red-500'}
+              loading={loading}
+              error={error}
+            />
+          )}
         </div>
 
         {/* Secondary KPIs */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-6">
-          <KPICard
-            title="Inventory Value"
-            value={formatCurrency(inventory?.total_inventory_value || 0)}
-            change={`${inventory?.total_products || 0} Products`}
-            changeType="neutral"
-            icon={Box}
-            iconColor="bg-indigo-500"
-            loading={loading}
-            error={error}
-          />
+        <div className={`grid grid-cols-1 sm:grid-cols-2 ${showFinancials ? 'lg:grid-cols-4' : 'lg:grid-cols-2'} gap-4 md:gap-6 mb-6`}>
+          {showFinancials && (
+            <KPICard
+              title="Inventory Value"
+              value={formatCurrency(inventory?.total_inventory_value || 0)}
+              change={`${inventory?.total_products || 0} Products`}
+              changeType="neutral"
+              icon={Box}
+              iconColor="bg-indigo-500"
+              loading={loading}
+              error={error}
+            />
+          )}
           <KPICard
             title="Low Stock Items"
             value={formatNumber(inventory?.low_stock_count || 0)}
@@ -175,30 +165,34 @@ const Dashboard = () => {
             loading={loading}
             error={error}
           />
-          <KPICard
-            title="Gross Profit"
-            value={formatCurrency(financial_health?.gross_profit || 0)}
-            change={`Margin: ${
-              financial_health?.gross_profit && sales?.total_revenue
-                ? ((financial_health.gross_profit / sales.total_revenue) * 100).toFixed(1)
-                : 0
-            }%`}
-            changeType="neutral"
-            icon={TrendingUp}
-            iconColor="bg-emerald-500"
-            loading={loading}
-            error={error}
-          />
-          <KPICard
-            title="Total Expenses"
-            value={formatCurrency(financial_health?.total_expenses || 0)}
-            change="Current month"
-            changeType="negative"
-            icon={Wallet}
-            iconColor="bg-orange-500"
-            loading={loading}
-            error={error}
-          />
+          {showFinancials && (
+            <>
+              <KPICard
+                title="Gross Profit"
+                value={formatCurrency(financial_health?.gross_profit || 0)}
+                change={`Margin: ${
+                  financial_health?.gross_profit && sales?.total_revenue
+                    ? ((financial_health.gross_profit / sales.total_revenue) * 100).toFixed(1)
+                    : 0
+                }%`}
+                changeType="neutral"
+                icon={TrendingUp}
+                iconColor="bg-emerald-500"
+                loading={loading}
+                error={error}
+              />
+              <KPICard
+                title="Total Expenses"
+                value={formatCurrency(financial_health?.total_expenses || 0)}
+                change="Current month"
+                changeType="negative"
+                icon={Wallet}
+                iconColor="bg-orange-500"
+                loading={loading}
+                error={error}
+              />
+            </>
+          )}
         </div>
 
         {/* Charts Row 1 */}

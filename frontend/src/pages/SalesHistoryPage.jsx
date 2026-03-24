@@ -18,9 +18,13 @@ import PageHeader from '../components/common/PageHeader';
 import DataTable from '../components/common/DataTable';
 import { ReceiptPreviewModal } from '../components/receipt';
 import { useCurrency } from '../context/CurrencyContext';
+import { useAuth } from '../context/AuthContext';
 
 const SalesHistoryPage = () => {
     const { formatCurrency } = useCurrency();
+    const { auth } = useAuth();
+    const userPerms = auth?.user?.permissions || {};
+    const canSeeAllSales = userPerms['view_all_sales'] === true || userPerms['admin'] === true;
     const [sales, setSales] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -119,8 +123,8 @@ const SalesHistoryPage = () => {
         <div className="space-y-6 max-w-[1700px] mx-auto pb-10">
             <PageHeader
               title="Sales History"
-              subtitle="View all past transactions"
-              badge={`${sales.length} Sales`}
+              subtitle={canSeeAllSales ? 'View all past transactions' : 'View your past transactions'}
+              badge={`${sales.length} Sale${sales.length !== 1 ? 's' : ''}`}
               icon={History}
               actions={actions}
             />
