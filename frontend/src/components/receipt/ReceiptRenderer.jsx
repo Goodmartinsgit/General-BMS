@@ -90,7 +90,7 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
 
     // ── Shared building blocks ──
     const Logo = () => cfg.show_logo && cfg.company_logo_url
-        ? <img src={cfg.company_logo_url} alt="Logo" className="w-10 h-10 object-contain rounded-lg" />
+        ? <img src={cfg.company_logo_url} alt="Logo" crossOrigin="anonymous" className="w-10 h-10 object-contain rounded-lg" />
         : null;
     const CompanyName = ({ className = '', style: s = {} }) =>
         <p className={`font-bold ${className}`} style={{ color: textColor, ...s }}>{cfg.company_name || 'Your Business'}</p>;
@@ -187,10 +187,11 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
     );
 
     const outerStyle = { backgroundColor: bgColor };
+    const outerProps = { ref, style: outerStyle, 'data-receipt-root': true };
 
     // ── Template 1: Standard ──
     if (tid === 1) return (
-        <div ref={ref} style={outerStyle}>
+        <div {...outerProps}>
             <div className="p-4" style={{ color: textColor, fontWeight }}>
                 <div className="text-center mb-2">
                     <div className="flex justify-center mb-1"><Logo /></div>
@@ -222,7 +223,7 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
 
     // ── Template 2: Modern ──
     if (tid === 2) return (
-        <div ref={ref} style={outerStyle}>
+        <div {...outerProps}>
             <div style={{ color: textColor, fontWeight }}>
                 <div className="p-3">
                     <div className="flex items-center gap-2 mb-2">
@@ -256,7 +257,7 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
 
     // ── Template 3: Bold ──
     if (tid === 3) return (
-        <div ref={ref} style={outerStyle}>
+        <div {...outerProps}>
             <div className="p-4" style={{ color: textColor, fontWeight }}>
                 <div className="text-center mb-2">
                     <div className="flex justify-center mb-1"><Logo /></div>
@@ -287,7 +288,7 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
 
     // ── Template 4: Invoice Pro ──
     if (tid === 4) return (
-        <div ref={ref} style={outerStyle}>
+        <div {...outerProps}>
             <div style={{ color: textColor, fontWeight }}>
                 <div className="px-3 py-2 text-[7px] text-right" style={{ color: mutedSolid, borderBottom: `1px solid ${borderColor}` }}>{dateStr}</div>
                 <div className="p-3">
@@ -327,7 +328,7 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
 
     // ── Template 5: Invoice Classic ──
     if (tid === 5) return (
-        <div ref={ref} style={outerStyle}>
+        <div {...outerProps}>
             <div style={{ color: textColor, fontWeight }}>
                 <div className="p-3 border-b-2" style={{ borderColor: accent }}>
                     <div className="flex items-start justify-between">
@@ -357,7 +358,7 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
 
     // ── Template 6: Detailed (Boxed Grid) ──
     if (tid === 6) return (
-        <div ref={ref} style={outerStyle}>
+        <div {...outerProps}>
             <div style={{ color: textColor, fontWeight }}>
                 <div className="p-2.5 m-2 rounded text-center" style={{ border: `2px solid ${borderStrong}` }}>
                     <div className="flex justify-center mb-1"><Logo /></div>
@@ -396,7 +397,7 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
 
     // ── Template 7: Elegant (Serif Luxury) ──
     if (tid === 7) return (
-        <div ref={ref} style={outerStyle}>
+        <div {...outerProps}>
             <div className="p-4" style={{ color: textColor, fontWeight, fontFamily: 'Georgia, "Times New Roman", serif' }}>
                 <div className="text-center mb-2">
                     <div className="flex justify-center mb-1"><Logo /></div>
@@ -428,7 +429,7 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
 
     // ── Template 8: Corporate ──
     if (tid === 8) return (
-        <div ref={ref} style={outerStyle}>
+        <div {...outerProps}>
             <div style={{ color: textColor, fontWeight }}>
                 <div className="p-3 text-white relative" style={{ background: isDark ? 'rgba(255,255,255,0.12)' : '#2c3e50' }}>
                     <div className="flex items-center gap-2">

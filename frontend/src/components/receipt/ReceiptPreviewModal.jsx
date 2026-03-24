@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
     Printer, Download, Mail, X, Loader2, RefreshCw,
-    CheckCircle, AlertCircle, Send
+    CheckCircle, AlertCircle, Send, Image, FileText, ChevronDown
 } from 'lucide-react';
 import WhatsAppIcon from '../icons/WhatsAppIcon';
 import WhatsAppSendModal from './WhatsAppSendModal';
@@ -11,7 +11,7 @@ import { getReceiptData } from '../../api/receipts';
 /**
  * ReceiptPreviewModal — saleId-based
  * Fetches receipt data from backend, renders via ReceiptRenderer (template-aware),
- * supports Print, Download, WhatsApp, and Email actions.
+ * supports Print, Download (Image/PDF), WhatsApp, and Email actions.
  */
 const ReceiptPreviewModal = ({
     isOpen,
@@ -35,6 +35,11 @@ const ReceiptPreviewModal = ({
     const [emailMessage, setEmailMessage] = useState('');
     const [emailSending, setEmailSending] = useState(false);
     const [emailSent, setEmailSent] = useState(false);
+
+    // Download
+    const [showDownloadMenu, setShowDownloadMenu] = useState(false);
+    const [downloading, setDownloading] = useState(false);
+    const downloadMenuRef = useRef(null);
 
     const receiptRef = useRef(null);
 
@@ -63,6 +68,81 @@ const ReceiptPreviewModal = ({
         }
     }, [isOpen, saleId, fetchReceiptData, customerEmail]);
 
+    // Close download menu on outside click
+    useEffect(() => {
+        const handleClickOutside = (e) => {
+            if (downloadMenuRef.current && !downloadMenuRef.current.contains(e.target)) {
+                setShowDownloadMenu(false);
+            }
+        };
+        if (showDownloadMenu) document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, [showDownloadMenu]);
+
+    const fileName = receiptData?.sale?.sale_number || receiptNumber || 'receipt';
+
+    // ── Helper: convert cross-origin images to inline data URLs ──
+    const inlineExternalImages = async (element) => {
+        const images = element.querySelectorAll('img');
+        await Promise.all(Array.from(images).map(async (img) => {
+            if (!img.src || img.src.startsWith('data:')) return;
+            try {
+                const resp = await fetch(img.src, { mode: 'cors' });
+                const blob = await resp.blob();
+                const dataUrl = await new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result);
+                    reader.readAsDataURL(blob);
+                });
+                img.src = dataUrl;
+            } catch {
+                // If CORS fetch fails, leave as-is
+            }
+        }));
+    };
+
+    // ── Helper: create a standalone receipt clone with all styles inlined ──
+    const createStandaloneClone = async () => {
+        if (!receiptRef.current) return null;
+
+        // Clone the receipt DOM
+        const clone = receiptRef.current.cloneNode(true);
+
+        // Create an off-screen container
+        const container = document.createElement('div');
+        container.style.position = 'fixed';
+        container.style.left = '-9999px';
+        container.style.top = '0';
+        container.style.width = '320px';
+        document.body.appendChild(container);
+        container.appendChild(clone);
+
+        // Copy computed styles from original to clone recursively
+        const copyComputedStyles = (source, target) => {
+            const computed = window.getComputedStyle(source);
+            for (let i = 0; i < computed.length; i++) {
+                const prop = computed[i];
+                try {
+                    target.style.setProperty(prop, computed.getPropertyValue(prop));
+                } catch { /* skip read-only */ }
+            }
+            const sourceChildren = source.children;
+            const targetChildren = target.children;
+            for (let i = 0; i < sourceChildren.length; i++) {
+                if (targetChildren[i]) {
+                    copyComputedStyles(sourceChildren[i], targetChildren[i]);
+                }
+            }
+        };
+        copyComputedStyles(receiptRef.current, clone);
+
+        // Inline external images as data URLs
+        await inlineExternalImages(clone);
+
+        document.body.removeChild(container);
+        return clone;
+    };
+
     // ── Print ──
     const handlePrint = () => {
         if (!receiptRef.current) return;
@@ -72,7 +152,6 @@ const ReceiptPreviewModal = ({
             return;
         }
 
-        // Collect all stylesheets from the parent page for Tailwind class support
         const styleSheets = Array.from(document.styleSheets);
         let cssText = '';
         styleSheets.forEach(sheet => {
@@ -84,7 +163,7 @@ const ReceiptPreviewModal = ({
         const bgColor = receiptData?.config?.receipt_bg_color || '#ffffff';
 
         printWindow.document.write(`<!DOCTYPE html><html><head>
-            <title>Receipt - ${receiptData?.sale?.sale_number || receiptNumber || 'Print'}</title>
+            <title>Receipt - ${fileName}</title>
             <style>${cssText}
             * { margin:0; padding:0; box-sizing:border-box; }
             body { padding:10px; background:#fff; }
@@ -105,24 +184,84 @@ const ReceiptPreviewModal = ({
         }
     };
 
-    // ── Download ──
-    const handleDownload = async () => {
-        if (!receiptRef.current) return;
+    // ── Capture receipt to canvas (shared by image + PDF downloads) ──
+    const captureToCanvas = async () => {
+        if (!receiptRef.current) return null;
         const bgColor = receiptData?.config?.receipt_bg_color || '#ffffff';
+        const html2canvas = (await import('html2canvas')).default;
+        return html2canvas(receiptRef.current, {
+            scale: 3,
+            backgroundColor: bgColor,
+            useCORS: true,
+            allowTaint: false,
+            logging: false,
+            imageTimeout: 15000,
+            onclone: async (clonedDoc) => {
+                // Inline external images in the cloned document
+                const clonedEl = clonedDoc.body.querySelector('[data-receipt-root]') || clonedDoc.body;
+                await inlineExternalImages(clonedEl);
+            },
+        });
+    };
+
+    // ── Download as Image ──
+    const handleDownloadImage = async () => {
+        setDownloading(true);
+        setShowDownloadMenu(false);
         try {
-            const html2canvas = (await import('html2canvas')).default;
-            const canvas = await html2canvas(receiptRef.current, { scale: 2, backgroundColor: bgColor });
+            const canvas = await captureToCanvas();
+            if (!canvas) return;
             const link = document.createElement('a');
-            link.download = `receipt-${receiptData?.sale?.sale_number || receiptNumber || 'download'}.png`;
+            link.download = `receipt-${fileName}.png`;
             link.href = canvas.toDataURL('image/png');
             link.click();
-        } catch {
-            const blob = new Blob([receiptRef.current.outerHTML], { type: 'text/html' });
-            const link = document.createElement('a');
-            link.download = `receipt-${receiptData?.sale?.sale_number || receiptNumber || 'download'}.html`;
-            link.href = URL.createObjectURL(blob);
-            link.click();
-            URL.revokeObjectURL(link.href);
+        } catch (err) {
+            console.error('Image download failed:', err);
+            // Fallback to HTML download
+            if (receiptRef.current) {
+                const blob = new Blob([receiptRef.current.outerHTML], { type: 'text/html' });
+                const link = document.createElement('a');
+                link.download = `receipt-${fileName}.html`;
+                link.href = URL.createObjectURL(blob);
+                link.click();
+                URL.revokeObjectURL(link.href);
+            }
+        } finally {
+            setDownloading(false);
+        }
+    };
+
+    // ── Download as PDF ──
+    const handleDownloadPDF = async () => {
+        setDownloading(true);
+        setShowDownloadMenu(false);
+        try {
+            const canvas = await captureToCanvas();
+            if (!canvas) return;
+            const { default: jsPDF } = await import('jspdf');
+
+            const imgData = canvas.toDataURL('image/png');
+            const imgWidth = canvas.width;
+            const imgHeight = canvas.height;
+
+            // Use receipt aspect ratio for PDF size (in mm)
+            const pdfWidth = 80; // 80mm receipt width
+            const pdfHeight = (imgHeight * pdfWidth) / imgWidth;
+
+            const pdf = new jsPDF({
+                orientation: pdfHeight > pdfWidth ? 'portrait' : 'landscape',
+                unit: 'mm',
+                format: [pdfWidth, pdfHeight + 10], // +10mm padding
+            });
+
+            pdf.addImage(imgData, 'PNG', 0, 5, pdfWidth, pdfHeight);
+            pdf.save(`receipt-${fileName}.pdf`);
+        } catch (err) {
+            console.error('PDF download failed:', err);
+            // Fallback to image download
+            handleDownloadImage();
+        } finally {
+            setDownloading(false);
         }
     };
 
@@ -178,7 +317,46 @@ const ReceiptPreviewModal = ({
                     {/* Action Bar */}
                     <div className="flex items-center justify-center gap-2 px-4 py-3 border-b border-theme bg-theme-secondary">
                         <ActionBtn icon={Printer} label="Print" onClick={handlePrint} disabled={loading || !!error} />
-                        <ActionBtn icon={Download} label="Download" onClick={handleDownload} disabled={loading || !!error} />
+
+                        {/* Download with format dropdown */}
+                        <div className="relative" ref={downloadMenuRef}>
+                            <button
+                                onClick={() => setShowDownloadMenu(!showDownloadMenu)}
+                                disabled={loading || !!error || downloading}
+                                className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium rounded-lg border border-theme text-theme-secondary hover:bg-theme-primary transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                                {downloading ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
+                                <span className="hidden sm:inline">Download</span>
+                                <ChevronDown size={12} className={`transition-transform ${showDownloadMenu ? 'rotate-180' : ''}`} />
+                            </button>
+
+                            {showDownloadMenu && (
+                                <div className="absolute top-full left-0 mt-1 w-44 bg-theme-secondary border border-theme rounded-lg shadow-xl overflow-hidden z-10 animate-in fade-in slide-in-from-top-1 duration-150">
+                                    <button
+                                        onClick={handleDownloadImage}
+                                        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-theme-secondary hover:bg-theme-primary transition-colors text-left"
+                                    >
+                                        <Image size={15} className="text-purple-500 shrink-0" />
+                                        <div>
+                                            <p className="font-medium">Image (PNG)</p>
+                                            <p className="text-[10px] text-theme-muted">High quality image</p>
+                                        </div>
+                                    </button>
+                                    <div className="border-t border-theme" />
+                                    <button
+                                        onClick={handleDownloadPDF}
+                                        className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-theme-secondary hover:bg-theme-primary transition-colors text-left"
+                                    >
+                                        <FileText size={15} className="text-red-500 shrink-0" />
+                                        <div>
+                                            <p className="font-medium">PDF Document</p>
+                                            <p className="text-[10px] text-theme-muted">Ready to print or share</p>
+                                        </div>
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
                         <ActionBtn
                             icon={() => <WhatsAppIcon size={16} color="#25D366" />}
                             label="WhatsApp"
