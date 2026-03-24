@@ -191,7 +191,7 @@ const generateReceiptData = async (saleId) => {
         `SELECT s.*, b.branch_name, b.address as branch_address, b.phone_number as branch_phone,
                 c.customer_name, c.phone_number as customer_phone, c.email as customer_email,
                 u.full_name as salesperson_name,
-                r.referrer_name
+                r.referrer_code as referrer_name
          FROM sales s
          JOIN branches b ON s.branch_id = b.id
          LEFT JOIN customers c ON s.customer_id = c.id
