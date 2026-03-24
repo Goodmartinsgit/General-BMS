@@ -223,7 +223,7 @@ const ReceiptPreviewModal = ({
                                 <div className="p-5 text-gray-900">
                                     {/* Company Header */}
                                     {config.show_logo && config.company_logo_url && (
-                                        <img src={config.company_logo_url} alt="Logo" className="w-14 h-14 mx-auto mb-2 object-contain" />
+                                        <img src={config.company_logo_url} alt="Logo" className="w-14 h-14 mx-auto mb-2 object-contain rounded-lg" />
                                     )}
                                     {config.show_company_details && (
                                         <div className="text-center mb-3">

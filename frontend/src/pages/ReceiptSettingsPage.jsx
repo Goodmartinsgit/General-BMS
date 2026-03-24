@@ -348,7 +348,7 @@ Thank you for your business!
                             <div className="bg-white rounded-lg border border-gray-200 p-5 max-w-xs mx-auto text-gray-900 shadow-lg">
                                 {/* Company header */}
                                 {config.show_logo && config.company_logo_url && (
-                                    <img src={config.company_logo_url} alt="Logo" className="w-14 h-14 mx-auto mb-2 object-contain" />
+                                    <img src={config.company_logo_url} alt="Logo" className="w-14 h-14 mx-auto mb-2 object-contain rounded-lg" />
                                 )}
                                 {config.show_company_details && (
                                     <div className="text-center mb-3">

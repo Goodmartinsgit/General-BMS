@@ -52,7 +52,7 @@ const Login = () => {
                             <img
                                 src={logoUrl}
                                 alt={companyName}
-                                className="h-14 sm:h-16 mx-auto mb-3 object-contain"
+                                className="h-14 sm:h-16 mx-auto mb-3 object-contain rounded-lg"
                             />
                         ) : (
                             <div

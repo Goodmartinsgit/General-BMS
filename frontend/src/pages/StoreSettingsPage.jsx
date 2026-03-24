@@ -881,7 +881,7 @@ const StoreSettingsPage = () => {
                                     <SectionLabel>Preview</SectionLabel>
                                     <div className="bg-white rounded-lg border border-gray-200 p-4 text-gray-900 text-center max-w-[200px] mx-auto">
                                         {rc.show_logo && rc.company_logo_url && (
-                                            <img src={rc.company_logo_url} alt="Logo" className="w-12 h-12 mx-auto mb-2 object-contain" />
+                                            <img src={rc.company_logo_url} alt="Logo" className="w-12 h-12 mx-auto mb-2 object-contain rounded-lg" />
                                         )}
                                         <p className="font-bold text-sm">{rc.company_name || 'Your Business'}</p>
                                         {rc.company_address && <p className="text-[10px] text-gray-500 mt-0.5">{rc.company_address}</p>}
