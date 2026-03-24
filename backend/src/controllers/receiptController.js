@@ -194,7 +194,7 @@ const generateReceiptData = async (saleId) => {
          FROM sales s
          JOIN branches b ON s.branch_id = b.id
          LEFT JOIN customers c ON s.customer_id = c.id
-         LEFT JOIN users u ON s.performed_by = u.id
+         LEFT JOIN users u ON s.processed_by = u.id
          WHERE s.id = $1`,
         [saleId]
     );
