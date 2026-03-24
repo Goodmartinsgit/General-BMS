@@ -188,7 +188,7 @@ const updateReceiptConfig = async (req, res) => {
  */
 const generateReceiptData = async (saleId) => {
     const saleResult = await pool.query(
-        `SELECT s.*, b.branch_name, b.branch_address, b.branch_phone,
+        `SELECT s.*, b.branch_name, b.address as branch_address, b.phone_number as branch_phone,
                 c.customer_name, c.phone_number as customer_phone, c.email as customer_email,
                 u.full_name as salesperson_name
          FROM sales s
