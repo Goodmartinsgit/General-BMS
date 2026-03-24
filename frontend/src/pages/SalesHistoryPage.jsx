@@ -16,7 +16,7 @@ import {
 import { format } from 'date-fns';
 import PageHeader from '../components/common/PageHeader';
 import DataTable from '../components/common/DataTable';
-import InvoicePrintModal from '../components/InvoicePrintModal';
+import { ReceiptPreviewModal } from '../components/receipt';
 import { useCurrency } from '../context/CurrencyContext';
 
 const SalesHistoryPage = () => {
@@ -25,7 +25,7 @@ const SalesHistoryPage = () => {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
     const [selectedSale, setSelectedSale] = useState(null);
-    const [isInvoiceOpen, setIsInvoiceOpen] = useState(false);
+    const [isReceiptOpen, setIsReceiptOpen] = useState(false);
 
     useEffect(() => {
         fetchSales();
@@ -43,14 +43,9 @@ const SalesHistoryPage = () => {
         }
     };
 
-    const viewInvoice = async (id) => {
-        try {
-            const response = await api.get(`/sales/${id}`);
-            setSelectedSale(response.data);
-            setIsInvoiceOpen(true);
-        } catch (error) {
-            alert('Failed to load invoice details');
-        }
+    const viewReceipt = (row) => {
+        setSelectedSale(row);
+        setIsReceiptOpen(true);
     };
 
     const filteredSales = sales.filter(s =>
@@ -155,18 +150,23 @@ const SalesHistoryPage = () => {
               emptyIcon={ShoppingBag}
               renderActions={(row) => (
                 <button
-                  onClick={() => viewInvoice(row.id)}
+                  onClick={() => viewReceipt(row)}
                   className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-theme-muted hover:text-accent-gold hover:bg-accent-gold/10 rounded-lg transition"
                 >
-                  <Eye size={16} /> View
+                  <Eye size={16} /> Receipt
                 </button>
               )}
             />
 
-            <InvoicePrintModal
-                isOpen={isInvoiceOpen}
-                onClose={() => setIsInvoiceOpen(false)}
-                data={selectedSale}
+            <ReceiptPreviewModal
+                isOpen={isReceiptOpen}
+                onClose={() => setIsReceiptOpen(false)}
+                saleId={selectedSale?.id}
+                receiptNumber={selectedSale?.sale_number}
+                customerName={selectedSale?.customer_name}
+                customerPhone={selectedSale?.phone_number}
+                totalAmount={selectedSale?.total_amount}
+                saleDate={selectedSale?.created_at}
             />
         </div>
     );

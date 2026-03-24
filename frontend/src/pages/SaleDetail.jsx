@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { salesAPI } from '../api/sales';
 import { Button, LoadingSpinner, Badge } from '../components/ui';
+import { ReceiptPreviewModal } from '../components/receipt';
 import { toast } from 'react-toastify';
 import { format } from 'date-fns';
 
@@ -15,6 +16,7 @@ const SaleDetail = () => {
     const navigate = useNavigate();
     const [sale, setSale] = useState(null);
     const [loading, setLoading] = useState(true);
+    const [showReceipt, setShowReceipt] = useState(false);
 
     useEffect(() => {
         fetchSaleDetails();
@@ -68,8 +70,8 @@ const SaleDetail = () => {
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
-                    <Button variant="white" className="gap-2">
-                        <Printer className="w-4 h-4" /> Print Receipt
+                    <Button variant="white" className="gap-2" onClick={() => setShowReceipt(true)}>
+                        <Printer className="w-4 h-4" /> View Receipt
                     </Button>
                     {!isReversed && (
                         <Button variant="danger" className="gap-2">
@@ -208,6 +210,17 @@ import { SaleCommentList, SaleCommentForm } from '../components/sales';
                     </div>
                 </div>
             </div>
+            <ReceiptPreviewModal
+                isOpen={showReceipt}
+                onClose={() => setShowReceipt(false)}
+                saleId={id}
+                receiptNumber={sale.sale_number}
+                customerName={sale.customer_name}
+                customerPhone={sale.phone_number}
+                customerEmail={sale.customer_email}
+                totalAmount={sale.total_amount}
+                saleDate={sale.created_at}
+            />
         </div>
     );
 };

@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
     ArrowLeft, ShoppingBag, User, MapPin, CreditCard, Building2,
     CheckCircle, XCircle, Truck, FileText, Clock, Package,
-    ChevronDown, Image as ImageIcon, ExternalLink, Loader2
+    ChevronDown, Image as ImageIcon, ExternalLink, Loader2, Printer
 } from 'lucide-react';
 import PageHeader from '../components/common/PageHeader';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
@@ -267,6 +267,61 @@ const OnlineOrderDetailPage = () => {
         );
     }
 
+    const handlePrintOrderReceipt = () => {
+        const customerName = order.customer_name || order.customer?.name || 'Customer';
+        const customerEmail = order.customer_email || order.customer?.email || '';
+        const customerPhone = order.customer_phone || order.customer?.phone || '';
+        const orderItems = order.items || order.order_items || [];
+        const sub = order.subtotal ?? order.sub_total ?? 0;
+        const ship = order.shipping_cost ?? order.shipping ?? 0;
+        const tax = order.tax_amount ?? order.tax ?? 0;
+        const disc = order.discount_amount ?? order.discount ?? 0;
+        const total = order.total_amount ?? order.total ?? 0;
+        const pw = window.open('', '_blank');
+        if (!pw) return;
+        pw.document.write(`<!DOCTYPE html><html><head><title>Order Receipt - ${order.order_number}</title>
+        <style>body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;max-width:400px;margin:40px auto;padding:20px;color:#111}
+        .center{text-align:center}.mb{margin-bottom:12px}.line{border-top:1px dashed #ccc;margin:12px 0}
+        table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:4px 0;text-align:left}th{border-bottom:1px solid #ddd}
+        .right{text-align:right}.bold{font-weight:700}.muted{color:#666}.total-row{border-top:1px solid #333;font-weight:700;font-size:14px}
+        @media print{body{margin:0;padding:10px}}</style></head><body>
+        <div class="center mb"><h2 style="margin:0">ORDER RECEIPT</h2>
+        <p class="muted" style="margin:4px 0">${order.order_number}</p>
+        <p class="muted" style="margin:2px 0;font-size:12px">${order.created_at ? new Date(order.created_at).toLocaleString() : ''}</p></div>
+        <div class="line"></div>
+        <div class="mb" style="font-size:13px">
+        <div><strong>Customer:</strong> ${customerName}</div>
+        ${customerPhone ? `<div><strong>Phone:</strong> ${customerPhone}</div>` : ''}
+        ${customerEmail ? `<div><strong>Email:</strong> ${customerEmail}</div>` : ''}
+        </div><div class="line"></div>
+        <table><thead><tr><th>Item</th><th class="right">Qty</th><th class="right">Price</th><th class="right">Total</th></tr></thead><tbody>
+        ${orderItems.map(item => `<tr><td>${item.product_name || item.name || 'Item'}</td><td class="right">${item.quantity}</td><td class="right">${formatCurrency(item.unit_price || item.price || 0)}</td><td class="right">${formatCurrency((item.unit_price || item.price || 0) * item.quantity)}</td></tr>`).join('')}
+        </tbody></table><div class="line"></div>
+        <table style="font-size:13px">
+        <tr><td class="muted">Subtotal</td><td class="right">${formatCurrency(sub)}</td></tr>
+        ${disc > 0 ? `<tr><td class="muted">Discount</td><td class="right" style="color:#ef4444">-${formatCurrency(disc)}</td></tr>` : ''}
+        ${ship > 0 ? `<tr><td class="muted">Shipping</td><td class="right">${formatCurrency(ship)}</td></tr>` : ''}
+        ${tax > 0 ? `<tr><td class="muted">Tax</td><td class="right">${formatCurrency(tax)}</td></tr>` : ''}
+        <tr class="total-row"><td>Total</td><td class="right">${formatCurrency(total)}</td></tr>
+        </table><div class="line"></div>
+        <div style="font-size:12px" class="muted"><div><strong>Payment:</strong> ${order.payment_method || '—'}</div>
+        <div><strong>Status:</strong> ${order.status || order.order_status || '—'}</div></div>
+        <div class="line"></div>
+        <p class="center muted" style="font-size:11px">Thank you for your order!</p>
+        </body></html>`);
+        pw.document.close();
+        pw.focus();
+        pw.print();
+    };
+
+    // Auto-print receipt if navigated with ?receipt=true
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('receipt') === 'true' && order) {
+            setTimeout(() => handlePrintOrderReceipt(), 500);
+        }
+    }, [order]);
+
     const orderStatus = order.status || order.order_status;
     const paymentStatus = order.payment_status;
     const statusCfg = ORDER_STATUS_CONFIG[orderStatus] || ORDER_STATUS_CONFIG.PENDING;
@@ -294,12 +349,20 @@ const OnlineOrderDetailPage = () => {
                 <ArrowLeft size={16} /> Back to Online Orders
             </button>
 
-            <PageHeader
-                title={`Order #${order.order_number}`}
-                subtitle={`Placed on ${order.created_at ? new Date(order.created_at).toLocaleDateString(undefined, { dateStyle: 'long' }) : '—'}`}
-                icon={ShoppingBag}
-                badge={<StatusBadge status={orderStatus} config={ORDER_STATUS_CONFIG} />}
-            />
+            <div className="flex items-start justify-between gap-4">
+                <PageHeader
+                    title={`Order #${order.order_number}`}
+                    subtitle={`Placed on ${order.created_at ? new Date(order.created_at).toLocaleDateString(undefined, { dateStyle: 'long' }) : '—'}`}
+                    icon={ShoppingBag}
+                    badge={<StatusBadge status={orderStatus} config={ORDER_STATUS_CONFIG} />}
+                />
+                <button
+                    onClick={handlePrintOrderReceipt}
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-accent-gold/10 text-accent-gold hover:bg-accent-gold hover:text-white transition shrink-0"
+                >
+                    <Printer size={14} /> Print Receipt
+                </button>
+            </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
                 {/* LEFT COLUMN — 2/3 */}

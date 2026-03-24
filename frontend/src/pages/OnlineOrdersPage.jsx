@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
     ShoppingBag, Search, Filter, Eye, Building2, CreditCard,
-    ChevronLeft, ChevronRight, RefreshCw, Package, Clock, CheckCircle, TrendingUp
+    ChevronLeft, ChevronRight, RefreshCw, Package, Clock, CheckCircle, TrendingUp, Printer
 } from 'lucide-react';
 import PageHeader from '../components/common/PageHeader';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
@@ -353,12 +353,23 @@ const OnlineOrdersPage = () => {
                                                 </span>
                                             </td>
                                             <td className="px-4 sm:px-6 py-3 sm:py-4 text-right">
-                                                <button
-                                                    onClick={() => navigate(`/online-orders/${order.id}`)}
-                                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-accent-gold/10 text-accent-gold hover:bg-accent-gold hover:text-white transition"
-                                                >
-                                                    <Eye size={12} /> View
-                                                </button>
+                                                <div className="flex items-center justify-end gap-1.5">
+                                                    {(order.status === 'DELIVERED' || order.order_status === 'DELIVERED') && (
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); navigate(`/online-orders/${order.id}?receipt=true`); }}
+                                                            className="inline-flex items-center gap-1 px-2 py-1.5 text-xs font-medium rounded-lg bg-green-500/10 text-green-600 hover:bg-green-500 hover:text-white transition"
+                                                            title="Print Receipt"
+                                                        >
+                                                            <Printer size={12} />
+                                                        </button>
+                                                    )}
+                                                    <button
+                                                        onClick={() => navigate(`/online-orders/${order.id}`)}
+                                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-accent-gold/10 text-accent-gold hover:bg-accent-gold hover:text-white transition"
+                                                    >
+                                                        <Eye size={12} /> View
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     );
