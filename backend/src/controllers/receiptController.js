@@ -190,11 +190,13 @@ const generateReceiptData = async (saleId) => {
     const saleResult = await pool.query(
         `SELECT s.*, b.branch_name, b.address as branch_address, b.phone_number as branch_phone,
                 c.customer_name, c.phone_number as customer_phone, c.email as customer_email,
-                u.full_name as salesperson_name
+                u.full_name as salesperson_name,
+                r.referrer_name
          FROM sales s
          JOIN branches b ON s.branch_id = b.id
          LEFT JOIN customers c ON s.customer_id = c.id
          LEFT JOIN users u ON s.processed_by = u.id
+         LEFT JOIN referrers r ON s.referrer_id = r.id
          WHERE s.id = $1`,
         [saleId]
     );
@@ -219,9 +221,63 @@ const generateReceiptData = async (saleId) => {
         'SELECT * FROM receipt_config ORDER BY updated_at DESC LIMIT 1'
     );
 
-    const config = configResult.rows.length > 0
-        ? { ...DEFAULT_CONFIG, ...configResult.rows[0] }
-        : DEFAULT_CONFIG;
+    const dbRow = configResult.rows.length > 0
+        ? Object.fromEntries(
+            Object.entries(configResult.rows[0]).filter(([_, v]) => v !== null && v !== undefined)
+          )
+        : {};
+    const config = { ...DEFAULT_CONFIG, ...dbRow };
+
+    // ── Apply "Use General Settings" overlay ──
+    if (config.use_company_info) {
+        try {
+            // Fetch general settings (company info from organizations + settings table)
+            const orgRes = await pool.query('SELECT * FROM organizations LIMIT 1');
+            const org = orgRes.rows[0] || {};
+            const orgId = org.id || null;
+
+            let generalSettings = {};
+            if (orgId) {
+                const settingsRes = await pool.query(
+                    "SELECT settings FROM settings WHERE organization_id = $1 AND category = 'general'",
+                    [orgId]
+                );
+                generalSettings = settingsRes.rows[0]?.settings || {};
+            }
+
+            // Fetch branding config for logo
+            const brandingRes = await pool.query(
+                'SELECT * FROM branding_config ORDER BY updated_at DESC NULLS LAST, id DESC LIMIT 1'
+            );
+            const branding = brandingRes.rows[0] || {};
+
+            // Overlay company info — general settings override org defaults, receipt-specific is fallback
+            config.company_name = generalSettings.company_name || org.organization_name || config.company_name;
+            config.company_address = generalSettings.company_address || org.address || config.company_address;
+            config.company_phone = generalSettings.company_phone || org.phone || config.company_phone;
+            config.company_email = generalSettings.company_email || org.email || config.company_email;
+            config.company_website = generalSettings.company_website || config.company_website;
+            config.company_logo_url = branding.logo_url || config.company_logo_url;
+            config.tax_number = generalSettings.tax_number || config.tax_number;
+        } catch (err) {
+            console.error('Failed to overlay company info for receipt:', err);
+        }
+    }
+
+    // ── Apply "Use Company Branding" overlay ──
+    if (config.use_company_branding) {
+        try {
+            const brandingRes = await pool.query(
+                'SELECT * FROM branding_config ORDER BY updated_at DESC NULLS LAST, id DESC LIMIT 1'
+            );
+            const branding = brandingRes.rows[0] || {};
+
+            config.receipt_accent_color = branding.accent_color || branding.primary_color || config.receipt_accent_color;
+            config.receipt_bg_color = branding.background_color || config.receipt_bg_color || '#ffffff';
+        } catch (err) {
+            console.error('Failed to overlay branding for receipt:', err);
+        }
+    }
 
     return {
         sale,
