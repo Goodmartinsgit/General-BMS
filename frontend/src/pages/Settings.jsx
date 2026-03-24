@@ -12,6 +12,7 @@ import {
 import PageHeader from '../components/common/PageHeader';
 import SearchableSelect from '../components/ui/SearchableSelect';
 import CloudinaryUpload from '../components/common/CloudinaryUpload';
+import ReceiptRenderer, { getContrastTextColor } from '../components/receipt/ReceiptRenderer';
 import { toast } from 'react-toastify';
 import { settingsAPI } from '../api/settings';
 import { fiscalPeriodsAPI } from '../api/fiscalPeriods';
@@ -501,415 +502,41 @@ const MiniReceiptPreview = ({ template, isSelected }) => (
     </div>
 );
 
-// ── Auto-contrast helper: returns light or dark text based on background luminance ──
-const getContrastTextColor = (bgColor) => {
-    if (!bgColor || bgColor.length < 4) return '#111827';
-    let hex = bgColor.replace('#', '');
-    if (hex.length === 3) hex = hex.split('').map(c => c + c).join('');
-    if (hex.length !== 6) return '#111827';
-    const r = parseInt(hex.substr(0, 2), 16) / 255;
-    const g = parseInt(hex.substr(2, 2), 16) / 255;
-    const b = parseInt(hex.substr(4, 2), 16) / 255;
-    // sRGB luminance
-    const lum = 0.2126 * (r <= 0.03928 ? r / 12.92 : ((r + 0.055) / 1.055) ** 2.4)
-              + 0.7152 * (g <= 0.03928 ? g / 12.92 : ((g + 0.055) / 1.055) ** 2.4)
-              + 0.0722 * (b <= 0.03928 ? b / 12.92 : ((b + 0.055) / 1.055) ** 2.4);
-    return lum > 0.4 ? '#111827' : '#f9fafb';
-};
-
-// ── Receipt Live Preview (template-aware) ──
+// ── Receipt Live Preview (template-aware via shared ReceiptRenderer) ──
 const SAMPLE_SALE = {
-    receipt_number: 'RCP-00247',
-    date: new Date().toLocaleDateString('en-NG', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
+    sale_number: 'RCP-00247',
+    created_at: new Date().toISOString(),
     customer_name: 'John Doe',
     customer_phone: '08012345678',
-    cashier: 'Admin User',
-    referrer: 'Jane Smith',
-    items: [
-        { name: 'Premium Floor Tile', code: 'FLR-001', qty: 3, price: 5000, total: 15000 },
-        { name: 'Wall Tile Set', code: 'WLL-002', qty: 1, price: 8500, total: 8500 },
-    ],
+    salesperson_name: 'Admin User',
+    referrer_name: 'Jane Smith',
     subtotal: 23500,
-    discount: 500,
-    tax: 0,
-    total: 23000,
-    paid: 25000,
-    change: 2000,
+    discount_amount: 500,
+    tax_amount: 0,
+    total_amount: 23000,
+    amount_paid: 25000,
     payment_method: 'Cash',
 };
 
+const SAMPLE_ITEMS = [
+    { product_name: 'Premium Floor Tile', product_code: 'FLR-001', quantity: 3, unit_price: 5000, line_total: 15000 },
+    { product_name: 'Wall Tile Set', product_code: 'WLL-002', quantity: 1, unit_price: 8500, line_total: 8500 },
+];
+
 const ReceiptLivePreview = ({ cfg, template, cs }) => {
-    const sale = SAMPLE_SALE;
-    const tid = cfg.template_id || 1;
-    const accent = cfg.receipt_accent_color || template.accent;
-    const bgColor = cfg.receipt_bg_color || '#ffffff';
-    const autoText = getContrastTextColor(bgColor);
-    const textColor = cfg.receipt_text_color || autoText;
-    const isDark = autoText === '#f9fafb';
-    const headingColor = cfg.receipt_heading_color || textColor;
-    const labelColor = cfg.receipt_label_color || (isDark ? '#9ca3af' : '#6b7280');
-    const mutedSolid = labelColor;
-    const mutedColor = isDark ? 'rgba(209,213,219,0.6)' : 'rgba(107,114,128,0.6)';
-    const borderColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)';
-    const borderStrong = isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)';
-    const subtleBg = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.03)';
-    const fontWeight = cfg.receipt_font_weight || 'normal';
-    const fmt = (v) => `${cs}${Number(v).toLocaleString('en-NG')}`;
-
-    if (cfg.show_tax_breakdown && cfg.tax_rate > 0) {
-        sale.tax = Math.round((sale.subtotal - sale.discount) * cfg.tax_rate / 100);
-    } else {
-        sale.tax = 0;
+    // Apply auto-contrast text color
+    const effectiveConfig = { ...cfg };
+    if (!effectiveConfig.receipt_text_color) {
+        effectiveConfig.receipt_text_color = getContrastTextColor(effectiveConfig.receipt_bg_color || '#ffffff');
     }
-
-    // Shared pieces — use dynamic colors throughout
-    const Logo = () => cfg.show_logo && cfg.company_logo_url ? <img src={cfg.company_logo_url} alt="Logo" className="w-10 h-10 object-contain rounded-lg" /> : null;
-    const CompanyName = ({ className = '', style: s = {} }) => <p className={`font-bold ${className}`} style={{ color: textColor, ...s }}>{cfg.company_name || 'Your Business'}</p>;
-    const CompanyDetails = ({ className = '', size = 'text-[8px]' }) => cfg.show_company_details ? (
-        <div className={`${size} ${className}`} style={{ color: labelColor }}>
-            {cfg.company_address && <p>{cfg.company_address}</p>}
-            {cfg.company_phone && <p>Tel: {cfg.company_phone}</p>}
-            {cfg.company_email && <p>{cfg.company_email}</p>}
-            {cfg.company_website && <p>{cfg.company_website}</p>}
-        </div>
-    ) : null;
-    const TaxNumber = ({ className = '' }) => cfg.show_tax_number && cfg.tax_number ? <p className={`text-[8px] ${className}`} style={{ color: labelColor }}>{cfg.tax_label || 'TIN'}: {cfg.tax_number}</p> : null;
-    const Dash = () => <div className="my-1.5" style={{ borderTop: `1px dashed ${borderColor}` }} />;
-    const SolidLine = ({ color }) => <div className="my-1.5" style={{ borderTop: `1px solid ${color || borderColor}` }} />;
-    const AccentLine = () => <div className="my-1.5" style={{ borderTop: `2px solid ${accent}` }} />;
-
-    const ItemsTable = ({ showCode = false, headerBg = '', headerText = '' }) => {
-        const thStyle = headerBg
-            ? { background: headerBg, color: headerText || getContrastTextColor(headerBg) }
-            : { color: headingColor, borderBottom: `1px solid ${borderColor}` };
-        return (
-        <table className="w-full text-[8px]" style={{ color: textColor, fontWeight }}>
-            <thead>
-                <tr style={headerBg ? { background: headerBg, color: thStyle.color } : {}}>
-                    <th className="text-left py-0.5 px-0.5" style={!headerBg ? thStyle : {}}>Item</th>
-                    {showCode && <th className="text-left py-0.5 px-0.5" style={!headerBg ? thStyle : {}}>Code</th>}
-                    <th className="text-center py-0.5 px-0.5" style={!headerBg ? thStyle : {}}>Qty</th>
-                    <th className="text-right py-0.5 px-0.5" style={!headerBg ? thStyle : {}}>Price</th>
-                    <th className="text-right py-0.5 px-0.5" style={!headerBg ? thStyle : {}}>Total</th>
-                </tr>
-            </thead>
-            <tbody>
-                {sale.items.map((item, i) => (
-                    <tr key={i} style={{ borderBottom: `1px solid ${borderColor}` }}>
-                        <td className="py-0.5 px-0.5">{item.name}</td>
-                        {showCode && <td className="py-0.5 px-0.5" style={{ color: labelColor }}>{item.code}</td>}
-                        <td className="text-center py-0.5 px-0.5">{item.qty}</td>
-                        <td className="text-right py-0.5 px-0.5">{fmt(item.price)}</td>
-                        <td className="text-right py-0.5 px-0.5 font-medium">{fmt(item.total)}</td>
-                    </tr>
-                ))}
-            </tbody>
-        </table>
-    );};
-
-    const Totals = ({ bold = false }) => (
-        <div className="text-[8px] space-y-0.5" style={{ color: textColor, fontWeight }}>
-            <div className="flex justify-between"><span style={{ color: labelColor }}>Subtotal</span><span>{fmt(sale.subtotal)}</span></div>
-            {sale.discount > 0 && <div className="flex justify-between" style={{ color: '#ef4444' }}><span>Discount</span><span>-{fmt(sale.discount)}</span></div>}
-            {cfg.show_tax_breakdown && <div className="flex justify-between"><span style={{ color: labelColor }}>{cfg.tax_label || 'VAT'} {cfg.tax_rate > 0 ? `(${cfg.tax_rate}%)` : ''}</span><span>{fmt(sale.tax)}</span></div>}
-            <div className={`flex justify-between pt-0.5 mt-0.5 ${bold ? 'font-bold text-[10px]' : 'font-bold text-[9px]'}`} style={{ borderTop: `1px solid ${borderColor}` }}>
-                <span>Total</span><span>{fmt(sale.total)}</span>
-            </div>
-        </div>
+    return (
+        <ReceiptRenderer
+            config={effectiveConfig}
+            sale={SAMPLE_SALE}
+            items={SAMPLE_ITEMS}
+            currencySymbol={cs}
+        />
     );
-
-    const PaymentInfo = () => cfg.show_payment_details ? (
-        <div className="text-[8px] space-y-0.5" style={{ color: textColor, fontWeight }}>
-            <div className="flex justify-between"><span style={{ color: labelColor }}>Payment</span><span>{sale.payment_method}</span></div>
-            <div className="flex justify-between"><span style={{ color: labelColor }}>Paid</span><span>{fmt(sale.paid)}</span></div>
-            {sale.change > 0 && <div className="flex justify-between font-semibold" style={{ color: '#16a34a' }}><span>Change</span><span>{fmt(sale.change)}</span></div>}
-        </div>
-    ) : null;
-
-    const ReferrerInfo = () => cfg.show_referrer_details ? (
-        <div className="text-[8px]" style={{ color: textColor, fontWeight }}><div className="flex justify-between"><span style={{ color: labelColor }}>Referred by</span><span>{sale.referrer}</span></div></div>
-    ) : null;
-
-    const FooterBlock = () => (
-        <>
-            {cfg.footer_text && <p className="text-[8px] text-center italic" style={{ color: labelColor }}>{cfg.footer_text}</p>}
-            {cfg.terms_and_conditions && <p className="text-[7px] text-center mt-0.5" style={{ color: mutedColor }}>{cfg.terms_and_conditions}</p>}
-        </>
-    );
-
-    const BarcodeBlock = () => cfg.show_barcode ? (
-        <div className="mt-1.5 flex justify-center gap-px">{Array(25).fill(0).map((_, i) => <div key={i} style={{ background: textColor, width: i % 3 === 0 ? 2 : 1, height: 18 }} />)}</div>
-    ) : null;
-
-    const QRBlock = () => cfg.show_qr_code ? (
-        <div className="mt-1.5 flex justify-center"><div className="w-10 h-10 rounded flex items-center justify-center" style={{ border: `1px solid ${borderColor}`, background: subtleBg }}><QrCode size={20} style={{ color: labelColor }} /></div></div>
-    ) : null;
-
-    const InfoRow = ({ label, value }) => <div className="flex justify-between text-[8px]" style={{ color: textColor, fontWeight }}><span style={{ color: labelColor }}>{label}</span><span className="font-medium">{value}</span></div>;
-
-    // ── Template 1: Standard (Classic) ──
-    if (tid === 1) return (
-        <div className="p-4" style={{ color: textColor, fontWeight }}>
-            <div className="text-center mb-2">
-                <div className="flex justify-center mb-1"><Logo /></div>
-                <CompanyName className="text-sm" />
-                <CompanyDetails className="mt-0.5" />
-                <TaxNumber className="mt-0.5" />
-            </div>
-            <Dash />
-            <div className="space-y-0.5 mb-1.5">
-                <InfoRow label="Receipt #" value={sale.receipt_number} />
-                <InfoRow label="Date" value={sale.date} />
-                {cfg.show_customer_details && <InfoRow label="Customer" value={sale.customer_name} />}
-                <InfoRow label="Cashier" value={sale.cashier} />
-            </div>
-            <Dash />
-            <ItemsTable />
-            <Dash />
-            <Totals />
-            {cfg.show_payment_details && <><Dash /><PaymentInfo /></>}
-            {cfg.show_referrer_details && <><Dash /><ReferrerInfo /></>}
-            <Dash />
-            <FooterBlock />
-            <BarcodeBlock />
-            <QRBlock />
-        </div>
-    );
-
-    // ── Template 2: Modern (Clean & Bold) ──
-    if (tid === 2) return (
-        <div style={{ color: textColor, fontWeight }}>
-            <div className="p-3">
-                <div className="flex items-center gap-2 mb-2">
-                    <Logo />
-                    <div>
-                        <CompanyName className="text-sm" />
-                        <CompanyDetails size="text-[7px]" />
-                    </div>
-                </div>
-                <TaxNumber />
-            </div>
-            <div className="px-3 py-1.5 text-white text-[8px] flex justify-between" style={{ background: accent }}>
-                <span className="font-bold">{sale.receipt_number}</span>
-                <span>{sale.date}</span>
-            </div>
-            <div className="p-3">
-                {cfg.show_customer_details && <div className="text-[8px] mb-2"><span style={{ color: mutedSolid }}>Customer: </span><span className="font-medium">{sale.customer_name}</span></div>}
-                <ItemsTable headerBg={accent} headerText="#fff" />
-                <div className="mt-2" />
-                <Totals bold />
-                {cfg.show_payment_details && <><SolidLine color={accent} /><PaymentInfo /></>}
-                {cfg.show_referrer_details && <><SolidLine /><ReferrerInfo /></>}
-                <div className="mt-2" />
-                <FooterBlock />
-                <BarcodeBlock />
-                <QRBlock />
-            </div>
-        </div>
-    );
-
-    // ── Template 3: Bold (High Contrast) ──
-    if (tid === 3) return (
-        <div className="p-4" style={{ color: textColor, fontWeight }}>
-            <div className="text-center mb-2">
-                <div className="flex justify-center mb-1"><Logo /></div>
-                <CompanyName className="text-base uppercase tracking-wide" />
-                <CompanyDetails className="mt-0.5" />
-                <TaxNumber className="mt-0.5" />
-            </div>
-            <div className="my-2" style={{ borderBottom: `2px solid ${borderStrong}` }} />
-            <p className="text-center font-mono font-bold text-[10px] tracking-widest mb-1" style={{ color: accent }}>{sale.receipt_number}</p>
-            <p className="text-center text-[8px] mb-1.5" style={{ color: mutedSolid }}>{sale.date}</p>
-            <div className="space-y-0.5 mb-1.5">
-                {cfg.show_customer_details && <InfoRow label="Customer" value={sale.customer_name} />}
-                <InfoRow label="Cashier" value={sale.cashier} />
-            </div>
-            <div className="my-2" style={{ borderBottom: `2px solid ${borderStrong}` }} />
-            <ItemsTable />
-            <div className="my-2" style={{ borderBottom: `2px solid ${borderStrong}` }} />
-            <Totals bold />
-            {cfg.show_payment_details && <><div className="my-1.5" style={{ borderBottom: `1px solid ${borderColor}` }} /><PaymentInfo /></>}
-            {cfg.show_referrer_details && <><div className="my-1.5" style={{ borderBottom: `1px solid ${borderColor}` }} /><ReferrerInfo /></>}
-            <div className="my-2" style={{ borderBottom: `2px solid ${borderStrong}` }} />
-            <FooterBlock />
-            <BarcodeBlock />
-            <QRBlock />
-        </div>
-    );
-
-    // ── Template 4: Invoice Pro ──
-    if (tid === 4) return (
-        <div style={{ color: textColor, fontWeight }}>
-            <div className="px-3 py-2 text-[7px] text-right" style={{ color: mutedSolid, borderBottom: `1px solid ${borderColor}` }}>{sale.date}</div>
-            <div className="p-3">
-                <div className="flex items-start justify-between mb-2">
-                    <div className="flex items-center gap-1.5"><Logo /><CompanyName className="text-xs" /></div>
-                    <div className="text-right text-[8px]"><span className="font-bold" style={{ color: accent }}>INVOICE</span><br /><span style={{ color: mutedSolid }}>{sale.receipt_number}</span></div>
-                </div>
-                <CompanyDetails size="text-[7px]" />
-                <TaxNumber className="mt-0.5" />
-                <div className="grid grid-cols-3 gap-1.5 my-2 text-[7px]">
-                    <div className="rounded p-1.5" style={{ background: subtleBg }}>
-                        <p className="uppercase text-[6px] font-bold" style={{ color: mutedSolid }}>Bill To</p>
-                        {cfg.show_customer_details && <p className="font-medium">{sale.customer_name}</p>}
-                    </div>
-                    <div className="rounded p-1.5" style={{ background: subtleBg }}>
-                        <p className="uppercase text-[6px] font-bold" style={{ color: mutedSolid }}>Date</p>
-                        <p className="font-medium">{sale.date}</p>
-                    </div>
-                    <div className="rounded p-1.5" style={{ background: subtleBg }}>
-                        <p className="uppercase text-[6px] font-bold" style={{ color: mutedSolid }}>Cashier</p>
-                        <p className="font-medium">{sale.cashier}</p>
-                    </div>
-                </div>
-                <ItemsTable showCode headerBg={accent} />
-                <div className="mt-2" />
-                <Totals bold />
-                {cfg.show_payment_details && <><SolidLine /><PaymentInfo /></>}
-                {cfg.show_referrer_details && <><SolidLine /><ReferrerInfo /></>}
-                <div className="mt-2" />
-                <FooterBlock />
-                <BarcodeBlock />
-                <QRBlock />
-            </div>
-        </div>
-    );
-
-    // ── Template 5: Invoice Classic (Professional) ──
-    if (tid === 5) return (
-        <div style={{ color: textColor, fontWeight }}>
-            <div className="p-3 border-b-2" style={{ borderColor: accent }}>
-                <div className="flex items-start justify-between">
-                    <div><div className="flex items-center gap-1.5"><Logo /><CompanyName className="text-xs" /></div><CompanyDetails size="text-[7px]" className="mt-0.5" /></div>
-                    <div className="text-right"><p className="text-[10px] font-bold" style={{ color: accent }}>RECEIPT</p><p className="text-[7px]" style={{ color: mutedSolid }}>{sale.receipt_number}</p></div>
-                </div>
-            </div>
-            <div className="p-3">
-                <TaxNumber className="mb-1" />
-                <div className="grid grid-cols-2 gap-2 my-2 text-[7px]">
-                    <div>{cfg.show_customer_details && <><p className="uppercase text-[6px] font-bold mb-0.5" style={{ color: mutedSolid }}>Customer</p><p className="font-medium">{sale.customer_name}</p><p style={{ color: mutedSolid }}>{sale.customer_phone}</p></>}</div>
-                    <div className="text-right"><p className="uppercase text-[6px] font-bold mb-0.5" style={{ color: mutedSolid }}>Details</p><p>{sale.date}</p><p>Cashier: {sale.cashier}</p></div>
-                </div>
-                <ItemsTable showCode />
-                <div className="mt-2" />
-                <Totals bold />
-                {cfg.show_payment_details && <><SolidLine /><PaymentInfo /></>}
-                {cfg.show_referrer_details && <><SolidLine /><ReferrerInfo /></>}
-                <div className="mt-2" />
-                <FooterBlock />
-                <BarcodeBlock />
-                <QRBlock />
-            </div>
-        </div>
-    );
-
-    // ── Template 6: Detailed (Boxed Grid) ──
-    if (tid === 6) return (
-        <div style={{ color: textColor, fontWeight }}>
-            <div className="p-2.5 m-2 rounded text-center" style={{ border: `2px solid ${borderStrong}` }}>
-                <div className="flex justify-center mb-1"><Logo /></div>
-                <CompanyName className="text-sm" />
-                <CompanyDetails className="mt-0.5" />
-                <TaxNumber className="mt-0.5" />
-            </div>
-            <div className="px-3 pb-3">
-                <div className="grid grid-cols-2 gap-1.5 mb-2">
-                    <div className="rounded p-1.5" style={{ border: `1px solid ${borderColor}` }}>
-                        <p className="text-[6px] font-bold uppercase mb-0.5" style={{ color: mutedSolid }}>Bill To</p>
-                        {cfg.show_customer_details && <p className="text-[8px] font-medium">{sale.customer_name}</p>}
-                        {cfg.show_customer_details && <p className="text-[7px]" style={{ color: mutedSolid }}>{sale.customer_phone}</p>}
-                    </div>
-                    <div className="rounded p-1.5" style={{ border: `1px solid ${borderColor}` }}>
-                        <p className="text-[6px] font-bold uppercase mb-0.5" style={{ color: mutedSolid }}>Receipt Info</p>
-                        <p className="text-[8px] font-medium">{sale.receipt_number}</p>
-                        <p className="text-[7px]" style={{ color: mutedSolid }}>{sale.date}</p>
-                        <p className="text-[7px]" style={{ color: mutedSolid }}>Cashier: {sale.cashier}</p>
-                    </div>
-                </div>
-                <ItemsTable showCode headerBg={isDark ? '#374151' : '#212529'} />
-                <div className="mt-2 rounded p-1.5" style={{ border: `1px solid ${borderColor}` }}>
-                    <Totals bold />
-                </div>
-                {cfg.show_payment_details && <div className="mt-1.5"><PaymentInfo /></div>}
-                {cfg.show_referrer_details && <div className="mt-1.5"><ReferrerInfo /></div>}
-                <div className="mt-2" />
-                <FooterBlock />
-                <BarcodeBlock />
-                <QRBlock />
-            </div>
-        </div>
-    );
-
-    // ── Template 7: Elegant (Serif Luxury) ──
-    if (tid === 7) return (
-        <div className="p-4" style={{ color: textColor, fontWeight, fontFamily: 'Georgia, "Times New Roman", serif' }}>
-            <div className="text-center mb-2">
-                <div className="flex justify-center mb-1"><Logo /></div>
-                <CompanyName className="text-sm tracking-wider" />
-                <CompanyDetails className="mt-0.5" />
-                <TaxNumber className="mt-0.5" />
-            </div>
-            <p className="text-center text-[9px] font-bold tracking-[0.2em] uppercase mb-1" style={{ color: accent }}>Official Receipt</p>
-            <div className="flex items-center gap-1.5 my-2"><div className="flex-1" style={{ borderTop: `1px solid ${borderColor}` }} /><div className="w-1.5 h-1.5 rounded-full" style={{ background: accent }} /><div className="flex-1" style={{ borderTop: `1px solid ${borderColor}` }} /></div>
-            <div className="space-y-0.5 mb-2">
-                <InfoRow label="Receipt #" value={sale.receipt_number} />
-                <InfoRow label="Date" value={sale.date} />
-                {cfg.show_customer_details && <InfoRow label="Customer" value={sale.customer_name} />}
-                <InfoRow label="Cashier" value={sale.cashier} />
-            </div>
-            <div className="flex items-center gap-1.5 my-2"><div className="flex-1" style={{ borderTop: `1px solid ${borderColor}` }} /><div className="w-1.5 h-1.5 rounded-full" style={{ background: accent }} /><div className="flex-1" style={{ borderTop: `1px solid ${borderColor}` }} /></div>
-            <ItemsTable />
-            <div className="flex items-center gap-1.5 my-2"><div className="flex-1" style={{ borderTop: `1px solid ${borderColor}` }} /><div className="w-1.5 h-1.5 rounded-full" style={{ background: accent }} /><div className="flex-1" style={{ borderTop: `1px solid ${borderColor}` }} /></div>
-            <Totals bold />
-            {cfg.show_payment_details && <><SolidLine /><PaymentInfo /></>}
-            {cfg.show_referrer_details && <><SolidLine /><ReferrerInfo /></>}
-            <div className="mt-2" />
-            <FooterBlock />
-            <BarcodeBlock />
-            <QRBlock />
-        </div>
-    );
-
-    // ── Template 8: Corporate (Formal Blue/Dark Header) ──
-    if (tid === 8) return (
-        <div style={{ color: textColor, fontWeight }}>
-            <div className="p-3 text-white relative" style={{ background: isDark ? 'rgba(255,255,255,0.12)' : '#2c3e50' }}>
-                <div className="flex items-center gap-2">
-                    <Logo />
-                    <div>
-                        <CompanyName className="text-sm" style={{ color: '#fff' }} />
-                        {cfg.show_company_details && <div className="text-[7px]" style={{ color: 'rgba(255,255,255,0.7)' }}>{cfg.company_address && <span>{cfg.company_address}</span>}{cfg.company_phone && <span> &bull; {cfg.company_phone}</span>}</div>}
-                    </div>
-                </div>
-                <TaxNumber className="mt-1" />
-            </div>
-            <div className="h-1" style={{ background: accent }} />
-            <div className="p-3">
-                <div className="flex justify-between text-[8px] mb-2">
-                    <div>
-                        {cfg.show_customer_details && <><p className="text-[6px] uppercase font-bold" style={{ color: mutedSolid }}>Customer</p><p className="font-medium">{sale.customer_name}</p></>}
-                    </div>
-                    <div className="text-right">
-                        <p className="font-bold" style={{ color: accent }}>{sale.receipt_number}</p>
-                        <p style={{ color: mutedSolid }}>{sale.date}</p>
-                        <p style={{ color: mutedSolid }}>Cashier: {sale.cashier}</p>
-                    </div>
-                </div>
-                <ItemsTable showCode headerBg={isDark ? 'rgba(255,255,255,0.12)' : '#2c3e50'} />
-                <div className="mt-2" />
-                <Totals bold />
-                {cfg.show_payment_details && <><SolidLine /><PaymentInfo /></>}
-                {cfg.show_referrer_details && <><SolidLine /><ReferrerInfo /></>}
-                <div className="mt-2" />
-                <FooterBlock />
-                <BarcodeBlock />
-                <QRBlock />
-            </div>
-        </div>
-    );
-
-    // Fallback to template 1
-    return null;
 };
 
 const ReceiptToggle = ({ field, label, checked, onChange }) => (
