@@ -577,15 +577,19 @@ const ReceiptLivePreview = ({ cfg, template, cs }) => {
     const SolidLine = ({ color }) => <div className="my-1.5" style={{ borderTop: `1px solid ${color || borderColor}` }} />;
     const AccentLine = () => <div className="my-1.5" style={{ borderTop: `2px solid ${accent}` }} />;
 
-    const ItemsTable = ({ showCode = false, headerBg = '', headerText = '' }) => (
+    const ItemsTable = ({ showCode = false, headerBg = '', headerText = '' }) => {
+        const thStyle = headerBg
+            ? { background: headerBg, color: headerText || getContrastTextColor(headerBg) }
+            : { color: headingColor, borderBottom: `1px solid ${borderColor}` };
+        return (
         <table className="w-full text-[8px]" style={{ color: textColor, fontWeight }}>
             <thead>
-                <tr style={headerBg ? { background: headerBg, color: headerText || '#fff' } : {}}>
-                    <th className="text-left py-0.5 px-0.5" style={!headerBg ? { borderBottom: `1px solid ${borderColor}` } : {}}>Item</th>
-                    {showCode && <th className="text-left py-0.5 px-0.5" style={!headerBg ? { borderBottom: `1px solid ${borderColor}` } : {}}>Code</th>}
-                    <th className="text-center py-0.5 px-0.5" style={!headerBg ? { borderBottom: `1px solid ${borderColor}` } : {}}>Qty</th>
-                    <th className="text-right py-0.5 px-0.5" style={!headerBg ? { borderBottom: `1px solid ${borderColor}` } : {}}>Price</th>
-                    <th className="text-right py-0.5 px-0.5" style={!headerBg ? { borderBottom: `1px solid ${borderColor}` } : {}}>Total</th>
+                <tr style={headerBg ? { background: headerBg, color: thStyle.color } : {}}>
+                    <th className="text-left py-0.5 px-0.5" style={!headerBg ? thStyle : {}}>Item</th>
+                    {showCode && <th className="text-left py-0.5 px-0.5" style={!headerBg ? thStyle : {}}>Code</th>}
+                    <th className="text-center py-0.5 px-0.5" style={!headerBg ? thStyle : {}}>Qty</th>
+                    <th className="text-right py-0.5 px-0.5" style={!headerBg ? thStyle : {}}>Price</th>
+                    <th className="text-right py-0.5 px-0.5" style={!headerBg ? thStyle : {}}>Total</th>
                 </tr>
             </thead>
             <tbody>
@@ -600,7 +604,7 @@ const ReceiptLivePreview = ({ cfg, template, cs }) => {
                 ))}
             </tbody>
         </table>
-    );
+    );};
 
     const Totals = ({ bold = false }) => (
         <div className="text-[8px] space-y-0.5" style={{ color: textColor, fontWeight }}>
