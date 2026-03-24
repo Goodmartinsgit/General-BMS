@@ -218,71 +218,97 @@ const ReceiptPreviewModal = ({
                             </div>
                         )}
 
-                        {!loading && !error && receiptData && (
-                            <div className="bg-white rounded-xl shadow-lg max-w-xs mx-auto" ref={receiptRef}>
-                                <div className="p-5 text-gray-900">
+                        {!loading && !error && receiptData && (() => {
+                            // Template styling from config
+                            const bgColor = config.receipt_bg_color || '#ffffff';
+                            const textColor = config.receipt_text_color || '#111827';
+                            const accentColor = config.receipt_accent_color || '';
+                            const headingColor = config.receipt_heading_color || textColor;
+                            const labelColor = config.receipt_label_color || '#6b7280';
+                            const fontWeight = config.receipt_font_weight || 'normal';
+                            const dividerColor = accentColor || '#d1d5db';
+
+                            return (
+                            <div
+                                className="rounded-xl shadow-lg max-w-xs mx-auto overflow-hidden"
+                                ref={receiptRef}
+                                style={{ backgroundColor: bgColor }}
+                            >
+                                <div className="p-5" style={{ color: textColor, fontWeight }}>
                                     {/* Company Header */}
                                     {config.show_logo && config.company_logo_url && (
                                         <img src={config.company_logo_url} alt="Logo" className="w-14 h-14 mx-auto mb-2 object-contain rounded-lg" />
                                     )}
                                     {config.show_company_details && (
                                         <div className="text-center mb-3">
-                                            <p className="font-bold text-base">{config.company_name || 'Business'}</p>
-                                            {config.company_address && <p className="text-[10px] text-gray-500 mt-0.5">{config.company_address}</p>}
-                                            {config.company_phone && <p className="text-[10px] text-gray-500">{config.company_phone}</p>}
-                                            {config.company_email && <p className="text-[10px] text-gray-500">{config.company_email}</p>}
-                                            {config.company_website && <p className="text-[10px] text-gray-500">{config.company_website}</p>}
+                                            <p className="font-bold text-base" style={{ color: headingColor }}>{config.company_name || 'Business'}</p>
+                                            {config.company_address && <p className="text-[10px] mt-0.5" style={{ color: labelColor }}>{config.company_address}</p>}
+                                            {config.company_phone && <p className="text-[10px]" style={{ color: labelColor }}>{config.company_phone}</p>}
+                                            {config.company_email && <p className="text-[10px]" style={{ color: labelColor }}>{config.company_email}</p>}
+                                            {config.company_website && <p className="text-[10px]" style={{ color: labelColor }}>{config.company_website}</p>}
                                         </div>
                                     )}
                                     {config.show_tax_number && config.tax_number && (
-                                        <p className="text-[10px] text-gray-500 text-center mb-2">{config.tax_label || 'TIN'}: {config.tax_number}</p>
+                                        <p className="text-[10px] text-center mb-2" style={{ color: labelColor }}>{config.tax_label || 'TIN'}: {config.tax_number}</p>
                                     )}
 
-                                    <Divider />
+                                    <StyledDivider color={dividerColor} />
 
                                     {/* Receipt Info */}
                                     <div className="text-[10px] space-y-0.5 mb-2">
-                                        <InfoRow label="Receipt #" value={sale?.sale_number || receiptNumber} />
-                                        <InfoRow label="Date" value={new Date(sale?.created_at || saleDate).toLocaleString()} />
+                                        <StyledInfoRow label="Receipt #" value={sale?.sale_number || receiptNumber} labelColor={labelColor} valueColor={textColor} />
+                                        <StyledInfoRow label="Date" value={new Date(sale?.sale_date || sale?.created_at || saleDate).toLocaleString()} labelColor={labelColor} valueColor={textColor} />
                                         {config.show_customer_details && sale?.customer_name && (
-                                            <InfoRow label="Customer" value={sale.customer_name} />
+                                            <StyledInfoRow label="Customer" value={sale.customer_name} labelColor={labelColor} valueColor={textColor} />
                                         )}
                                         {sale?.salesperson_name && (
-                                            <InfoRow label="Cashier" value={sale.salesperson_name} />
+                                            <StyledInfoRow label="Cashier" value={sale.salesperson_name} labelColor={labelColor} valueColor={textColor} />
                                         )}
                                         {sale?.branch_name && (
-                                            <InfoRow label="Branch" value={sale.branch_name} />
+                                            <StyledInfoRow label="Branch" value={sale.branch_name} labelColor={labelColor} valueColor={textColor} />
                                         )}
                                     </div>
 
-                                    <Divider />
+                                    <StyledDivider color={dividerColor} />
 
                                     {/* Items */}
-                                    <div className="text-[10px] space-y-1 mb-2">
-                                        {items.map((item, i) => (
-                                            <div key={i} className="flex justify-between">
-                                                <span className="flex-1 pr-2 truncate">
-                                                    {item.product_name}
-                                                    {item.variant_sku ? ` (${item.variant_sku})` : ''}
-                                                    {' '}x{item.quantity}
-                                                </span>
-                                                <span className="font-medium whitespace-nowrap">{formatPrice(item.subtotal)}</span>
-                                            </div>
-                                        ))}
+                                    <div className="text-[10px] space-y-1.5 mb-2">
+                                        {items.map((item, i) => {
+                                            const variantLabel = item.variant_name || item.variant_sku;
+                                            return (
+                                                <div key={i}>
+                                                    <div className="flex justify-between">
+                                                        <span className="flex-1 pr-2 font-medium" style={{ color: textColor }}>
+                                                            {item.product_name}
+                                                            {variantLabel ? ` (${variantLabel})` : ''}
+                                                        </span>
+                                                        <span className="font-semibold whitespace-nowrap" style={{ color: headingColor }}>
+                                                            {formatPrice(item.line_total)}
+                                                        </span>
+                                                    </div>
+                                                    <div className="text-[9px]" style={{ color: labelColor }}>
+                                                        {formatPrice(item.unit_price)} x {item.quantity}
+                                                        {Number(item.discount_amount) > 0 && (
+                                                            <span className="ml-1 text-red-500">(-{formatPrice(item.discount_amount)})</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
                                     </div>
 
-                                    <Divider />
+                                    <StyledDivider color={dividerColor} />
 
                                     {/* Totals */}
                                     <div className="text-[10px] space-y-0.5">
-                                        <InfoRow label="Subtotal" value={formatPrice(sale?.subtotal)} />
+                                        <StyledInfoRow label="Subtotal" value={formatPrice(sale?.subtotal)} labelColor={labelColor} valueColor={textColor} />
                                         {sale?.discount_amount > 0 && (
-                                            <InfoRow label="Discount" value={`-${formatPrice(sale.discount_amount)}`} className="text-red-500" />
+                                            <StyledInfoRow label="Discount" value={`-${formatPrice(sale.discount_amount)}`} labelColor={labelColor} valueColor="#ef4444" />
                                         )}
                                         {config.show_tax_breakdown && (
-                                            <InfoRow label={config.tax_label || 'VAT'} value={formatPrice(sale?.tax_amount || 0)} />
+                                            <StyledInfoRow label={config.tax_label || 'VAT'} value={formatPrice(sale?.tax_amount || 0)} labelColor={labelColor} valueColor={textColor} />
                                         )}
-                                        <div className="flex justify-between font-bold text-xs pt-1 border-t border-gray-200 mt-1">
+                                        <div className="flex justify-between font-bold text-xs pt-1 mt-1" style={{ borderTop: `1px solid ${dividerColor}`, color: headingColor }}>
                                             <span>Total</span>
                                             <span>{formatPrice(sale?.total_amount)}</span>
                                         </div>
@@ -291,10 +317,10 @@ const ReceiptPreviewModal = ({
                                     {/* Payment Details */}
                                     {config.show_payment_details && (
                                         <>
-                                            <Divider />
+                                            <StyledDivider color={dividerColor} />
                                             <div className="text-[10px] space-y-0.5">
-                                                <InfoRow label="Payment" value={sale?.payment_method} className="capitalize" />
-                                                <InfoRow label="Paid" value={formatPrice(sale?.amount_paid)} />
+                                                <StyledInfoRow label="Payment" value={sale?.payment_method} labelColor={labelColor} valueColor={textColor} className="capitalize" />
+                                                <StyledInfoRow label="Paid" value={formatPrice(sale?.amount_paid)} labelColor={labelColor} valueColor={textColor} />
                                                 {(Number(sale?.amount_paid) || 0) > (Number(sale?.total_amount) || 0) && (
                                                     <div className="flex justify-between font-semibold text-green-600">
                                                         <span>Change</span>
@@ -308,21 +334,21 @@ const ReceiptPreviewModal = ({
                                     {/* Referrer */}
                                     {config.show_referrer_details && sale?.referrer_name && (
                                         <>
-                                            <Divider />
+                                            <StyledDivider color={dividerColor} />
                                             <div className="text-[10px]">
-                                                <InfoRow label="Referred by" value={sale.referrer_name} />
+                                                <StyledInfoRow label="Referred by" value={sale.referrer_name} labelColor={labelColor} valueColor={textColor} />
                                             </div>
                                         </>
                                     )}
 
-                                    <Divider />
+                                    <StyledDivider color={dividerColor} />
 
                                     {/* Footer */}
                                     {config.footer_text && (
-                                        <p className="text-[10px] text-gray-500 text-center italic">{config.footer_text}</p>
+                                        <p className="text-[10px] text-center italic" style={{ color: labelColor }}>{config.footer_text}</p>
                                     )}
                                     {config.terms_and_conditions && (
-                                        <p className="text-[8px] text-gray-400 text-center mt-1">{config.terms_and_conditions}</p>
+                                        <p className="text-[8px] text-center mt-1" style={{ color: labelColor, opacity: 0.7 }}>{config.terms_and_conditions}</p>
                                     )}
 
                                     {/* Barcode placeholder */}
@@ -330,14 +356,15 @@ const ReceiptPreviewModal = ({
                                         <div className="mt-2 flex justify-center">
                                             <div className="flex gap-px">
                                                 {Array(30).fill(0).map((_, i) => (
-                                                    <div key={i} className="bg-gray-900" style={{ width: i % 3 === 0 ? 2 : 1, height: 24 }} />
+                                                    <div key={i} style={{ backgroundColor: textColor, width: i % 3 === 0 ? 2 : 1, height: 24 }} />
                                                 ))}
                                             </div>
                                         </div>
                                     )}
                                 </div>
                             </div>
-                        )}
+                            );
+                        })()}
                     </div>
                 </div>
             </div>
@@ -420,12 +447,14 @@ const ReceiptPreviewModal = ({
 };
 
 // ── Small helpers ──
-const Divider = () => <div className="border-t border-dashed border-gray-300 my-2" />;
+const StyledDivider = ({ color = '#d1d5db' }) => (
+    <div className="my-2" style={{ borderTop: `1px dashed ${color}` }} />
+);
 
-const InfoRow = ({ label, value, className = '' }) => (
+const StyledInfoRow = ({ label, value, labelColor, valueColor, className = '' }) => (
     <div className={`flex justify-between ${className}`}>
-        <span className="text-gray-500">{label}</span>
-        <span className="font-medium">{value || '—'}</span>
+        <span style={{ color: labelColor }}>{label}</span>
+        <span className="font-medium" style={{ color: valueColor }}>{value || '—'}</span>
     </div>
 );
 

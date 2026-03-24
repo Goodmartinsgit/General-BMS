@@ -345,65 +345,92 @@ Thank you for your business!
 
                         {/* Preview body */}
                         <div className="flex-1 p-4 bg-theme-primary overflow-auto">
-                            <div className="bg-white rounded-lg border border-gray-200 p-5 max-w-xs mx-auto text-gray-900 shadow-lg">
+                            {(() => {
+                                const bgColor = config.receipt_bg_color || '#ffffff';
+                                const textColor = config.receipt_text_color || '#111827';
+                                const accentColor = config.receipt_accent_color || '';
+                                const headingColor = config.receipt_heading_color || textColor;
+                                const labelColor = config.receipt_label_color || '#6b7280';
+                                const fontWeight = config.receipt_font_weight || 'normal';
+                                const dividerColor = accentColor || '#d1d5db';
+                                const cs = config.currency_symbol || symbol;
+
+                                const PvDivider = () => <div className="my-2" style={{ borderTop: `1px dashed ${dividerColor}` }} />;
+                                const PvRow = ({ label, value, vColor }) => (
+                                    <div className="flex justify-between">
+                                        <span style={{ color: labelColor }}>{label}</span>
+                                        <span className="font-medium" style={{ color: vColor || textColor }}>{value}</span>
+                                    </div>
+                                );
+
+                                return (
+                                <div className="rounded-lg border shadow-lg p-5 max-w-xs mx-auto" style={{ backgroundColor: bgColor, borderColor: dividerColor, color: textColor, fontWeight }}>
                                 {/* Company header */}
                                 {config.show_logo && config.company_logo_url && (
                                     <img src={config.company_logo_url} alt="Logo" className="w-14 h-14 mx-auto mb-2 object-contain rounded-lg" />
                                 )}
                                 {config.show_company_details && (
                                     <div className="text-center mb-3">
-                                        <p className="font-bold text-base">{config.company_name || 'Your Business'}</p>
-                                        {config.company_address && <p className="text-[10px] text-gray-500 mt-0.5">{config.company_address}</p>}
-                                        {config.company_phone && <p className="text-[10px] text-gray-500">{config.company_phone}</p>}
-                                        {config.company_email && <p className="text-[10px] text-gray-500">{config.company_email}</p>}
-                                        {config.company_website && <p className="text-[10px] text-gray-500">{config.company_website}</p>}
+                                        <p className="font-bold text-base" style={{ color: headingColor }}>{config.company_name || 'Your Business'}</p>
+                                        {config.company_address && <p className="text-[10px] mt-0.5" style={{ color: labelColor }}>{config.company_address}</p>}
+                                        {config.company_phone && <p className="text-[10px]" style={{ color: labelColor }}>{config.company_phone}</p>}
+                                        {config.company_email && <p className="text-[10px]" style={{ color: labelColor }}>{config.company_email}</p>}
+                                        {config.company_website && <p className="text-[10px]" style={{ color: labelColor }}>{config.company_website}</p>}
                                     </div>
                                 )}
                                 {config.show_tax_number && config.tax_number && (
-                                    <p className="text-[10px] text-gray-500 text-center mb-2">TIN: {config.tax_number}</p>
+                                    <p className="text-[10px] text-center mb-2" style={{ color: labelColor }}>TIN: {config.tax_number}</p>
                                 )}
 
-                                <div className="border-t border-dashed border-gray-300 my-2" />
+                                <PvDivider />
 
                                 {/* Receipt info */}
                                 <div className="text-[10px] space-y-0.5 mb-2">
-                                    <div className="flex justify-between"><span className="text-gray-500">Receipt #</span><span className="font-medium">INV-0001</span></div>
-                                    <div className="flex justify-between"><span className="text-gray-500">Date</span><span className="font-medium">{new Date().toLocaleDateString()}</span></div>
-                                    {config.show_customer_details && (
-                                        <div className="flex justify-between"><span className="text-gray-500">Customer</span><span className="font-medium">John Doe</span></div>
-                                    )}
-                                    <div className="flex justify-between"><span className="text-gray-500">Cashier</span><span className="font-medium">Staff User</span></div>
+                                    <PvRow label="Receipt #" value="INV-0001" />
+                                    <PvRow label="Date" value={new Date().toLocaleDateString()} />
+                                    {config.show_customer_details && <PvRow label="Customer" value="John Doe" />}
+                                    <PvRow label="Cashier" value="Staff User" />
                                 </div>
 
-                                <div className="border-t border-dashed border-gray-300 my-2" />
+                                <PvDivider />
 
                                 {/* Items */}
-                                <div className="text-[10px] space-y-1 mb-2">
-                                    <div className="flex justify-between"><span>Sample Product x2</span><span className="font-medium">{config.currency_symbol || symbol}5,000</span></div>
-                                    <div className="flex justify-between"><span>Another Item x1</span><span className="font-medium">{config.currency_symbol || symbol}2,500</span></div>
+                                <div className="text-[10px] space-y-1.5 mb-2">
+                                    <div>
+                                        <div className="flex justify-between">
+                                            <span className="font-medium" style={{ color: textColor }}>Sample Product</span>
+                                            <span className="font-semibold" style={{ color: headingColor }}>{cs}5,000</span>
+                                        </div>
+                                        <div className="text-[9px]" style={{ color: labelColor }}>{cs}2,500 x 2</div>
+                                    </div>
+                                    <div>
+                                        <div className="flex justify-between">
+                                            <span className="font-medium" style={{ color: textColor }}>Another Item</span>
+                                            <span className="font-semibold" style={{ color: headingColor }}>{cs}2,500</span>
+                                        </div>
+                                        <div className="text-[9px]" style={{ color: labelColor }}>{cs}2,500 x 1</div>
+                                    </div>
                                 </div>
 
-                                <div className="border-t border-dashed border-gray-300 my-2" />
+                                <PvDivider />
 
                                 {/* Totals */}
                                 <div className="text-[10px] space-y-0.5">
-                                    <div className="flex justify-between"><span className="text-gray-500">Subtotal</span><span>{config.currency_symbol || symbol}7,500</span></div>
-                                    {config.show_tax_breakdown && (
-                                        <div className="flex justify-between"><span className="text-gray-500">{config.tax_label || 'VAT'}</span><span>{config.currency_symbol || symbol}0</span></div>
-                                    )}
-                                    <div className="flex justify-between font-bold text-xs pt-1 border-t border-gray-200 mt-1">
-                                        <span>Total</span><span>{config.currency_symbol || symbol}7,500</span>
+                                    <PvRow label="Subtotal" value={`${cs}7,500`} />
+                                    {config.show_tax_breakdown && <PvRow label={config.tax_label || 'VAT'} value={`${cs}0`} />}
+                                    <div className="flex justify-between font-bold text-xs pt-1 mt-1" style={{ borderTop: `1px solid ${dividerColor}`, color: headingColor }}>
+                                        <span>Total</span><span>{cs}7,500</span>
                                     </div>
                                 </div>
 
                                 {/* Payment details */}
                                 {config.show_payment_details && (
                                     <>
-                                        <div className="border-t border-dashed border-gray-300 my-2" />
+                                        <PvDivider />
                                         <div className="text-[10px] space-y-0.5">
-                                            <div className="flex justify-between"><span className="text-gray-500">Payment</span><span>Cash</span></div>
-                                            <div className="flex justify-between"><span className="text-gray-500">Paid</span><span>{config.currency_symbol || symbol}10,000</span></div>
-                                            <div className="flex justify-between font-semibold text-green-600"><span>Change</span><span>{config.currency_symbol || symbol}2,500</span></div>
+                                            <PvRow label="Payment" value="Cash" />
+                                            <PvRow label="Paid" value={`${cs}10,000`} />
+                                            <div className="flex justify-between font-semibold text-green-600"><span>Change</span><span>{cs}2,500</span></div>
                                         </div>
                                     </>
                                 )}
@@ -411,25 +438,25 @@ Thank you for your business!
                                 {/* Referrer */}
                                 {config.show_referrer_details && (
                                     <>
-                                        <div className="border-t border-dashed border-gray-300 my-2" />
+                                        <PvDivider />
                                         <div className="text-[10px]">
-                                            <div className="flex justify-between"><span className="text-gray-500">Referred by</span><span>Jane Smith</span></div>
+                                            <PvRow label="Referred by" value="Jane Smith" />
                                         </div>
                                     </>
                                 )}
 
-                                <div className="border-t border-dashed border-gray-300 my-2" />
+                                <PvDivider />
 
                                 {/* Footer */}
                                 {config.footer_text && (
-                                    <p className="text-[10px] text-gray-500 text-center italic">{config.footer_text}</p>
+                                    <p className="text-[10px] text-center italic" style={{ color: labelColor }}>{config.footer_text}</p>
                                 )}
 
                                 {config.show_barcode && (
                                     <div className="mt-2 flex justify-center">
                                         <div className="flex gap-px">
                                             {Array(30).fill(0).map((_, i) => (
-                                                <div key={i} className="bg-gray-900" style={{ width: i % 3 === 0 ? 2 : 1, height: 24 }} />
+                                                <div key={i} style={{ backgroundColor: textColor, width: i % 3 === 0 ? 2 : 1, height: 24 }} />
                                             ))}
                                         </div>
                                     </div>
@@ -437,12 +464,14 @@ Thank you for your business!
 
                                 {config.show_qr_code && (
                                     <div className="mt-2 flex justify-center">
-                                        <div className="w-14 h-14 bg-gray-100 rounded flex items-center justify-center border border-gray-200">
-                                            <QrCode size={28} className="text-gray-400" />
+                                        <div className="w-14 h-14 rounded flex items-center justify-center" style={{ backgroundColor: `${labelColor}20`, border: `1px solid ${dividerColor}` }}>
+                                            <QrCode size={28} style={{ color: labelColor }} />
                                         </div>
                                     </div>
                                 )}
-                            </div>
+                                </div>
+                                );
+                            })()}
                         </div>
 
                         <div className="px-4 py-2 border-t border-theme text-[10px] text-center text-theme-muted bg-theme-secondary">
