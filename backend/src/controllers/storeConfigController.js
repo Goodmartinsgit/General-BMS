@@ -149,6 +149,9 @@ const updateConfig = async (req, res) => {
       customer_channel, require_registration, min_order_amount_for_guest,
       whatsapp_phone_number_id, whatsapp_business_account_id, whatsapp_access_token, whatsapp_verify_token,
       logo_type,
+      // Branding color/display fields
+      hover_color, active_text_color, sidebar_bg_color, navbar_bg_color, button_color,
+      sidebar_name_size,
     } = req.body;
 
     // Check if config exists
@@ -172,11 +175,14 @@ const updateConfig = async (req, res) => {
           use_company_settings, store_settings,
           customer_channel, require_registration, min_order_amount_for_guest,
           whatsapp_phone_number_id, whatsapp_business_account_id, whatsapp_access_token, whatsapp_verify_token,
-          logo_type
+          logo_type,
+          hover_color, active_text_color, sidebar_bg_color, navbar_bg_color, button_color,
+          sidebar_name_size
         ) VALUES (
           $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,
           $17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,
-          $39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50,$51,$52
+          $39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50,$51,$52,
+          $53,$54,$55,$56,$57,$58
         ) RETURNING *`,
         [
           store_slug, store_name, tagline, description,
@@ -203,6 +209,8 @@ const updateConfig = async (req, res) => {
           customer_channel || 'email', require_registration ?? false, min_order_amount_for_guest || null,
           whatsapp_phone_number_id || null, whatsapp_business_account_id || null, whatsapp_access_token || null, whatsapp_verify_token || null,
           logo_type || 'icon_text',
+          hover_color || null, active_text_color || null, sidebar_bg_color || null, navbar_bg_color || null, button_color || null,
+          sidebar_name_size || 'medium',
         ]
       );
       return res.json(result.rows[0]);
@@ -255,8 +263,14 @@ const updateConfig = async (req, res) => {
         whatsapp_access_token = $50,
         whatsapp_verify_token = $51,
         logo_type = COALESCE($52, logo_type),
+        hover_color = COALESCE($53, hover_color),
+        active_text_color = COALESCE($54, active_text_color),
+        sidebar_bg_color = COALESCE($55, sidebar_bg_color),
+        navbar_bg_color = COALESCE($56, navbar_bg_color),
+        button_color = COALESCE($57, button_color),
+        sidebar_name_size = COALESCE($58, sidebar_name_size),
         updated_at = NOW()
-      WHERE id = $53 RETURNING *`,
+      WHERE id = $59 RETURNING *`,
       [
         store_slug, store_name, tagline, description,
         logo_primary, logo_icon, logo_dark,
@@ -283,6 +297,8 @@ const updateConfig = async (req, res) => {
         customer_channel || null, require_registration ?? null, min_order_amount_for_guest || null,
         whatsapp_phone_number_id || null, whatsapp_business_account_id || null, whatsapp_access_token || null, whatsapp_verify_token || null,
         logo_type || null,
+        hover_color || null, active_text_color || null, sidebar_bg_color || null, navbar_bg_color || null, button_color || null,
+        sidebar_name_size || null,
         id,
       ]
     );
