@@ -548,6 +548,7 @@ const ReceiptLivePreview = ({ cfg, template, cs }) => {
     const isDark = autoText === '#f9fafb';
     const headingColor = cfg.receipt_heading_color || textColor;
     const labelColor = cfg.receipt_label_color || (isDark ? '#9ca3af' : '#6b7280');
+    const mutedSolid = labelColor;
     const mutedColor = isDark ? 'rgba(209,213,219,0.6)' : 'rgba(107,114,128,0.6)';
     const borderColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)';
     const borderStrong = isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)';
