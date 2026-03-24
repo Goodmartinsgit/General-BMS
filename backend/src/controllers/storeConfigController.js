@@ -148,6 +148,7 @@ const updateConfig = async (req, res) => {
       // Communication & registration
       customer_channel, require_registration, min_order_amount_for_guest,
       whatsapp_phone_number_id, whatsapp_business_account_id, whatsapp_access_token, whatsapp_verify_token,
+      logo_type,
     } = req.body;
 
     // Check if config exists
@@ -170,11 +171,12 @@ const updateConfig = async (req, res) => {
           delivery_config,
           use_company_settings, store_settings,
           customer_channel, require_registration, min_order_amount_for_guest,
-          whatsapp_phone_number_id, whatsapp_business_account_id, whatsapp_access_token, whatsapp_verify_token
+          whatsapp_phone_number_id, whatsapp_business_account_id, whatsapp_access_token, whatsapp_verify_token,
+          logo_type
         ) VALUES (
           $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,
           $17,$18,$19,$20,$21,$22,$23,$24,$25,$26,$27,$28,$29,$30,$31,$32,$33,$34,$35,$36,$37,$38,
-          $39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50,$51
+          $39,$40,$41,$42,$43,$44,$45,$46,$47,$48,$49,$50,$51,$52
         ) RETURNING *`,
         [
           store_slug, store_name, tagline, description,
@@ -200,6 +202,7 @@ const updateConfig = async (req, res) => {
           store_settings ? JSON.stringify(store_settings) : '{}',
           customer_channel || 'email', require_registration ?? false, min_order_amount_for_guest || null,
           whatsapp_phone_number_id || null, whatsapp_business_account_id || null, whatsapp_access_token || null, whatsapp_verify_token || null,
+          logo_type || 'icon_text',
         ]
       );
       return res.json(result.rows[0]);
@@ -251,8 +254,9 @@ const updateConfig = async (req, res) => {
         whatsapp_business_account_id = $49,
         whatsapp_access_token = $50,
         whatsapp_verify_token = $51,
+        logo_type = COALESCE($52, logo_type),
         updated_at = NOW()
-      WHERE id = $52 RETURNING *`,
+      WHERE id = $53 RETURNING *`,
       [
         store_slug, store_name, tagline, description,
         logo_primary, logo_icon, logo_dark,
@@ -278,6 +282,7 @@ const updateConfig = async (req, res) => {
         store_settings ? JSON.stringify(store_settings) : null,
         customer_channel || null, require_registration ?? null, min_order_amount_for_guest || null,
         whatsapp_phone_number_id || null, whatsapp_business_account_id || null, whatsapp_access_token || null, whatsapp_verify_token || null,
+        logo_type || null,
         id,
       ]
     );
