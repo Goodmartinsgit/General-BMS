@@ -7,6 +7,10 @@ const usersAPI = {
   // Roles
   getRoles: () => api.get('/users/roles'),
   getManageableRoles: () => api.get('/users/manageable-roles'),
+  getRoleById: (id) => api.get(`/users/roles/${id}`),
+  createRole: (data) => api.post('/users/roles', data),
+  updateRole: (id, data) => api.put(`/users/roles/${id}`, data),
+  deleteRole: (id) => api.delete(`/users/roles/${id}`),
 
   // CRUD
   create: (data) => api.post('/users', data),

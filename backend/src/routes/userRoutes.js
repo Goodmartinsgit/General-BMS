@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const {
-  getAllUsers, createUser, updateUser, deleteUser, getRoles,
+  getAllUsers, createUser, updateUser, deleteUser, getRoles, getRoleById,
+  createRole, updateRole, deleteRole,
   lockUser, unlockUser, resetUserPassword, changeUserRole, getManageableRoles
 } = require('../controllers/userController');
 const authenticateToken = require('../middleware/authMiddleware');
@@ -14,6 +15,12 @@ router.use(authenticateToken);
 router.get('/',                 authorize('view_users'),   getAllUsers);
 router.get('/roles',            authorize('view_users'),   getRoles);
 router.get('/manageable-roles', authorize('view_users'),   getManageableRoles);
+router.get('/roles/:id',        authorize('view_users'),   getRoleById);
+
+// ── Role CRUD ────────────────────────────────────────────────────────────────
+router.post('/roles',           authorize('manage_users'), createRole);
+router.put('/roles/:id',        authorize('manage_users'), updateRole);
+router.delete('/roles/:id',     authorize('manage_users'), deleteRole);
 
 // ── Create ────────────────────────────────────────────────────────────────────
 router.post('/', authorize('manage_users'), createUser);

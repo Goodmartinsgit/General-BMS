@@ -394,9 +394,224 @@ const getManageableRoles = async (req, res) => {
 const getRoles = async (req, res) => {
   try {
     const result = await query(
-      'SELECT id, role_name, role_level, description FROM roles ORDER BY role_level ASC NULLS LAST, id'
+      `SELECT r.id, r.role_name, r.role_level, r.description, r.permissions,
+              r.is_system_role, r.created_at, r.updated_at,
+              COUNT(u.id)::int AS user_count
+       FROM roles r
+       LEFT JOIN users u ON u.role_id = r.id AND u.deleted_at IS NULL
+       GROUP BY r.id
+       ORDER BY r.role_level ASC NULLS LAST, r.id`
     );
     res.json(result.rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ── GET /users/roles/:id ─────────────────────────────────────────────────────
+
+const getRoleById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await query(
+      `SELECT r.id, r.role_name, r.role_level, r.description, r.permissions,
+              r.is_system_role, r.created_at, r.updated_at,
+              COUNT(u.id)::int AS user_count
+       FROM roles r
+       LEFT JOIN users u ON u.role_id = r.id AND u.deleted_at IS NULL
+       WHERE r.id = $1
+       GROUP BY r.id`,
+      [id]
+    );
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Role not found' });
+    }
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ── POST /users/roles ────────────────────────────────────────────────────────
+
+const createRole = async (req, res) => {
+  try {
+    const { role_name, description, role_level, permissions } = req.body;
+
+    if (!role_name || !role_name.trim()) {
+      return res.status(400).json({ message: 'Role name is required' });
+    }
+
+    if (role_level != null && role_level <= 1) {
+      return res.status(403).json({ message: 'Cannot create a role at Super Admin level' });
+    }
+
+    // Actor hierarchy check: cannot create a role at or above own level
+    const actorLevel = await getActorLevel(req.user.id);
+    const targetLevel = role_level ?? 99;
+    if (actorLevel >= targetLevel) {
+      return res.status(403).json({
+        message: 'Cannot create a role at or above your own privilege level'
+      });
+    }
+
+    // Duplicate name check
+    const dup = await query(
+      'SELECT id FROM roles WHERE LOWER(role_name) = LOWER($1)',
+      [role_name.trim()]
+    );
+    if (dup.rows.length > 0) {
+      return res.status(409).json({ message: 'A role with this name already exists' });
+    }
+
+    const result = await query(
+      `INSERT INTO roles (role_name, description, role_level, permissions)
+       VALUES ($1, $2, $3, $4)
+       RETURNING id, role_name, role_level, description, permissions, is_system_role, created_at`,
+      [role_name.trim(), description || null, targetLevel, JSON.stringify(permissions || {})]
+    );
+
+    res.status(201).json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ── PUT /users/roles/:id ─────────────────────────────────────────────────────
+
+const updateRole = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { role_name, description, role_level, permissions } = req.body;
+
+    // Fetch existing role
+    const existing = await query('SELECT * FROM roles WHERE id = $1', [id]);
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ message: 'Role not found' });
+    }
+
+    const role = existing.rows[0];
+
+    // Cannot edit Super Admin role (level 1)
+    if (role.role_level <= 1) {
+      return res.status(403).json({ message: 'Cannot modify the Super Admin role' });
+    }
+
+    // Actor hierarchy check
+    const actorLevel = await getActorLevel(req.user.id);
+    if (actorLevel >= role.role_level) {
+      return res.status(403).json({
+        message: 'Cannot modify a role at or above your own privilege level'
+      });
+    }
+
+    // If changing role_level, verify new level is still below actor
+    const newLevel = role_level ?? role.role_level;
+    if (newLevel <= 1) {
+      return res.status(403).json({ message: 'Cannot set role to Super Admin level' });
+    }
+    if (actorLevel >= newLevel) {
+      return res.status(403).json({
+        message: 'Cannot set a role level at or above your own privilege level'
+      });
+    }
+
+    // Duplicate name check (excluding self)
+    if (role_name && role_name.trim().toLowerCase() !== role.role_name.toLowerCase()) {
+      const dup = await query(
+        'SELECT id FROM roles WHERE LOWER(role_name) = LOWER($1) AND id != $2',
+        [role_name.trim(), id]
+      );
+      if (dup.rows.length > 0) {
+        return res.status(409).json({ message: 'A role with this name already exists' });
+      }
+    }
+
+    const result = await query(
+      `UPDATE roles
+       SET role_name   = COALESCE($1, role_name),
+           description = COALESCE($2, description),
+           role_level  = COALESCE($3, role_level),
+           permissions = COALESCE($4, permissions),
+           updated_at  = NOW()
+       WHERE id = $5
+       RETURNING id, role_name, role_level, description, permissions, is_system_role, updated_at`,
+      [
+        role_name?.trim() || null,
+        description !== undefined ? description : null,
+        role_level || null,
+        permissions ? JSON.stringify(permissions) : null,
+        id
+      ]
+    );
+
+    // Revoke tokens for all users of this role so new permissions take effect
+    await query(
+      `UPDATE refresh_tokens SET revoked_at = NOW()
+       WHERE user_id IN (SELECT id FROM users WHERE role_id = $1 AND deleted_at IS NULL)
+         AND revoked_at IS NULL`,
+      [id]
+    );
+
+    res.json(result.rows[0]);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// ── DELETE /users/roles/:id ──────────────────────────────────────────────────
+
+const deleteRole = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const existing = await query(
+      `SELECT r.*, COUNT(u.id)::int AS user_count
+       FROM roles r
+       LEFT JOIN users u ON u.role_id = r.id AND u.deleted_at IS NULL
+       WHERE r.id = $1
+       GROUP BY r.id`,
+      [id]
+    );
+
+    if (existing.rows.length === 0) {
+      return res.status(404).json({ message: 'Role not found' });
+    }
+
+    const role = existing.rows[0];
+
+    // Cannot delete Super Admin role
+    if (role.role_level <= 1) {
+      return res.status(403).json({ message: 'Cannot delete the Super Admin role' });
+    }
+
+    // Cannot delete system roles
+    if (role.is_system_role) {
+      return res.status(403).json({ message: 'Cannot delete a system role' });
+    }
+
+    // Actor hierarchy check
+    const actorLevel = await getActorLevel(req.user.id);
+    if (actorLevel >= role.role_level) {
+      return res.status(403).json({
+        message: 'Cannot delete a role at or above your own privilege level'
+      });
+    }
+
+    // Cannot delete role with assigned users
+    if (role.user_count > 0) {
+      return res.status(409).json({
+        message: `Cannot delete this role — ${role.user_count} user(s) are still assigned to it. Reassign them first.`
+      });
+    }
+
+    await query('DELETE FROM roles WHERE id = $1', [id]);
+
+    res.json({ message: `Role "${role.role_name}" deleted successfully` });
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: 'Server error' });
@@ -409,6 +624,10 @@ module.exports = {
   updateUser,
   deleteUser,
   getRoles,
+  getRoleById,
+  createRole,
+  updateRole,
+  deleteRole,
   lockUser,
   unlockUser,
   resetUserPassword,
