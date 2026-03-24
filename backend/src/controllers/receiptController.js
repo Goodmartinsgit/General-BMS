@@ -36,6 +36,9 @@ const DEFAULT_CONFIG = {
     receipt_accent_color: '',
     use_company_branding: false,
     use_company_info: false,
+    receipt_font_weight: 'normal',
+    receipt_heading_color: '',
+    receipt_label_color: '',
     email_enabled: false,
     email_subject_template: '',
     email_body_template: '',
@@ -125,6 +128,9 @@ const updateReceiptConfig = async (req, res) => {
             receipt_accent_color: req.body.receipt_accent_color,
             use_company_branding: req.body.use_company_branding,
             use_company_info: req.body.use_company_info,
+            receipt_font_weight: req.body.receipt_font_weight,
+            receipt_heading_color: req.body.receipt_heading_color,
+            receipt_label_color: req.body.receipt_label_color,
         };
 
         // Only include fields that are defined AND whose column exists in the DB

@@ -543,13 +543,16 @@ const ReceiptLivePreview = ({ cfg, template, cs }) => {
     const tid = cfg.template_id || 1;
     const accent = cfg.receipt_accent_color || template.accent;
     const bgColor = cfg.receipt_bg_color || '#ffffff';
-    const textColor = getContrastTextColor(bgColor);
-    const isDark = textColor === '#f9fafb';
+    const autoText = getContrastTextColor(bgColor);
+    const textColor = cfg.receipt_text_color || autoText;
+    const isDark = autoText === '#f9fafb';
+    const headingColor = cfg.receipt_heading_color || textColor;
+    const labelColor = cfg.receipt_label_color || (isDark ? '#9ca3af' : '#6b7280');
     const mutedColor = isDark ? 'rgba(209,213,219,0.6)' : 'rgba(107,114,128,0.6)';
-    const mutedSolid = isDark ? '#9ca3af' : '#6b7280';
     const borderColor = isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.1)';
     const borderStrong = isDark ? 'rgba(255,255,255,0.3)' : 'rgba(0,0,0,0.2)';
     const subtleBg = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.03)';
+    const fontWeight = cfg.receipt_font_weight || 'normal';
     const fmt = (v) => `${cs}${Number(v).toLocaleString('en-NG')}`;
 
     if (cfg.show_tax_breakdown && cfg.tax_rate > 0) {
@@ -560,22 +563,22 @@ const ReceiptLivePreview = ({ cfg, template, cs }) => {
 
     // Shared pieces — use dynamic colors throughout
     const Logo = () => cfg.show_logo && cfg.company_logo_url ? <img src={cfg.company_logo_url} alt="Logo" className="w-10 h-10 object-contain" /> : null;
-    const CompanyName = ({ className = '', style: s = {} }) => <p className={`font-bold ${className}`} style={{ color: textColor, ...s }}>{cfg.company_name || 'Your Business'}</p>;
+    const CompanyName = ({ className = '', style: s = {} }) => <p className={`font-bold ${className}`} style={{ color: headingColor, ...s }}>{cfg.company_name || 'Your Business'}</p>;
     const CompanyDetails = ({ className = '', size = 'text-[8px]' }) => cfg.show_company_details ? (
-        <div className={`${size} ${className}`} style={{ color: mutedSolid }}>
+        <div className={`${size} ${className}`} style={{ color: labelColor }}>
             {cfg.company_address && <p>{cfg.company_address}</p>}
             {cfg.company_phone && <p>Tel: {cfg.company_phone}</p>}
             {cfg.company_email && <p>{cfg.company_email}</p>}
             {cfg.company_website && <p>{cfg.company_website}</p>}
         </div>
     ) : null;
-    const TaxNumber = ({ className = '' }) => cfg.show_tax_number && cfg.tax_number ? <p className={`text-[8px] ${className}`} style={{ color: mutedSolid }}>{cfg.tax_label || 'TIN'}: {cfg.tax_number}</p> : null;
+    const TaxNumber = ({ className = '' }) => cfg.show_tax_number && cfg.tax_number ? <p className={`text-[8px] ${className}`} style={{ color: labelColor }}>{cfg.tax_label || 'TIN'}: {cfg.tax_number}</p> : null;
     const Dash = () => <div className="my-1.5" style={{ borderTop: `1px dashed ${borderColor}` }} />;
     const SolidLine = ({ color }) => <div className="my-1.5" style={{ borderTop: `1px solid ${color || borderColor}` }} />;
     const AccentLine = () => <div className="my-1.5" style={{ borderTop: `2px solid ${accent}` }} />;
 
     const ItemsTable = ({ showCode = false, headerBg = '', headerText = '' }) => (
-        <table className="w-full text-[8px]" style={{ color: textColor }}>
+        <table className="w-full text-[8px]" style={{ color: textColor, fontWeight }}>
             <thead>
                 <tr style={headerBg ? { background: headerBg, color: headerText || '#fff' } : {}}>
                     <th className="text-left py-0.5 px-0.5" style={!headerBg ? { borderBottom: `1px solid ${borderColor}` } : {}}>Item</th>
@@ -589,7 +592,7 @@ const ReceiptLivePreview = ({ cfg, template, cs }) => {
                 {sale.items.map((item, i) => (
                     <tr key={i} style={{ borderBottom: `1px solid ${borderColor}` }}>
                         <td className="py-0.5 px-0.5">{item.name}</td>
-                        {showCode && <td className="py-0.5 px-0.5" style={{ color: mutedSolid }}>{item.code}</td>}
+                        {showCode && <td className="py-0.5 px-0.5" style={{ color: labelColor }}>{item.code}</td>}
                         <td className="text-center py-0.5 px-0.5">{item.qty}</td>
                         <td className="text-right py-0.5 px-0.5">{fmt(item.price)}</td>
                         <td className="text-right py-0.5 px-0.5 font-medium">{fmt(item.total)}</td>
@@ -600,10 +603,10 @@ const ReceiptLivePreview = ({ cfg, template, cs }) => {
     );
 
     const Totals = ({ bold = false }) => (
-        <div className="text-[8px] space-y-0.5" style={{ color: textColor }}>
-            <div className="flex justify-between"><span style={{ color: mutedSolid }}>Subtotal</span><span>{fmt(sale.subtotal)}</span></div>
+        <div className="text-[8px] space-y-0.5" style={{ color: textColor, fontWeight }}>
+            <div className="flex justify-between"><span style={{ color: labelColor }}>Subtotal</span><span>{fmt(sale.subtotal)}</span></div>
             {sale.discount > 0 && <div className="flex justify-between" style={{ color: '#ef4444' }}><span>Discount</span><span>-{fmt(sale.discount)}</span></div>}
-            {cfg.show_tax_breakdown && <div className="flex justify-between"><span style={{ color: mutedSolid }}>{cfg.tax_label || 'VAT'} {cfg.tax_rate > 0 ? `(${cfg.tax_rate}%)` : ''}</span><span>{fmt(sale.tax)}</span></div>}
+            {cfg.show_tax_breakdown && <div className="flex justify-between"><span style={{ color: labelColor }}>{cfg.tax_label || 'VAT'} {cfg.tax_rate > 0 ? `(${cfg.tax_rate}%)` : ''}</span><span>{fmt(sale.tax)}</span></div>}
             <div className={`flex justify-between pt-0.5 mt-0.5 ${bold ? 'font-bold text-[10px]' : 'font-bold text-[9px]'}`} style={{ borderTop: `1px solid ${borderColor}` }}>
                 <span>Total</span><span>{fmt(sale.total)}</span>
             </div>
@@ -611,20 +614,20 @@ const ReceiptLivePreview = ({ cfg, template, cs }) => {
     );
 
     const PaymentInfo = () => cfg.show_payment_details ? (
-        <div className="text-[8px] space-y-0.5" style={{ color: textColor }}>
-            <div className="flex justify-between"><span style={{ color: mutedSolid }}>Payment</span><span>{sale.payment_method}</span></div>
-            <div className="flex justify-between"><span style={{ color: mutedSolid }}>Paid</span><span>{fmt(sale.paid)}</span></div>
+        <div className="text-[8px] space-y-0.5" style={{ color: textColor, fontWeight }}>
+            <div className="flex justify-between"><span style={{ color: labelColor }}>Payment</span><span>{sale.payment_method}</span></div>
+            <div className="flex justify-between"><span style={{ color: labelColor }}>Paid</span><span>{fmt(sale.paid)}</span></div>
             {sale.change > 0 && <div className="flex justify-between font-semibold" style={{ color: '#16a34a' }}><span>Change</span><span>{fmt(sale.change)}</span></div>}
         </div>
     ) : null;
 
     const ReferrerInfo = () => cfg.show_referrer_details ? (
-        <div className="text-[8px]" style={{ color: textColor }}><div className="flex justify-between"><span style={{ color: mutedSolid }}>Referred by</span><span>{sale.referrer}</span></div></div>
+        <div className="text-[8px]" style={{ color: textColor, fontWeight }}><div className="flex justify-between"><span style={{ color: labelColor }}>Referred by</span><span>{sale.referrer}</span></div></div>
     ) : null;
 
     const FooterBlock = () => (
         <>
-            {cfg.footer_text && <p className="text-[8px] text-center italic" style={{ color: mutedSolid }}>{cfg.footer_text}</p>}
+            {cfg.footer_text && <p className="text-[8px] text-center italic" style={{ color: labelColor }}>{cfg.footer_text}</p>}
             {cfg.terms_and_conditions && <p className="text-[7px] text-center mt-0.5" style={{ color: mutedColor }}>{cfg.terms_and_conditions}</p>}
         </>
     );
@@ -634,14 +637,14 @@ const ReceiptLivePreview = ({ cfg, template, cs }) => {
     ) : null;
 
     const QRBlock = () => cfg.show_qr_code ? (
-        <div className="mt-1.5 flex justify-center"><div className="w-10 h-10 rounded flex items-center justify-center" style={{ border: `1px solid ${borderColor}`, background: subtleBg }}><QrCode size={20} style={{ color: mutedSolid }} /></div></div>
+        <div className="mt-1.5 flex justify-center"><div className="w-10 h-10 rounded flex items-center justify-center" style={{ border: `1px solid ${borderColor}`, background: subtleBg }}><QrCode size={20} style={{ color: labelColor }} /></div></div>
     ) : null;
 
-    const InfoRow = ({ label, value }) => <div className="flex justify-between text-[8px]" style={{ color: textColor }}><span style={{ color: mutedSolid }}>{label}</span><span className="font-medium">{value}</span></div>;
+    const InfoRow = ({ label, value }) => <div className="flex justify-between text-[8px]" style={{ color: textColor, fontWeight }}><span style={{ color: labelColor }}>{label}</span><span className="font-medium">{value}</span></div>;
 
     // ── Template 1: Standard (Classic) ──
     if (tid === 1) return (
-        <div className="p-4" style={{ color: textColor }}>
+        <div className="p-4" style={{ color: textColor, fontWeight }}>
             <div className="text-center mb-2">
                 <div className="flex justify-center mb-1"><Logo /></div>
                 <CompanyName className="text-sm" />
@@ -670,7 +673,7 @@ const ReceiptLivePreview = ({ cfg, template, cs }) => {
 
     // ── Template 2: Modern (Clean & Bold) ──
     if (tid === 2) return (
-        <div style={{ color: textColor }}>
+        <div style={{ color: textColor, fontWeight }}>
             <div className="p-3">
                 <div className="flex items-center gap-2 mb-2">
                     <Logo />
@@ -702,7 +705,7 @@ const ReceiptLivePreview = ({ cfg, template, cs }) => {
 
     // ── Template 3: Bold (High Contrast) ──
     if (tid === 3) return (
-        <div className="p-4" style={{ color: textColor }}>
+        <div className="p-4" style={{ color: textColor, fontWeight }}>
             <div className="text-center mb-2">
                 <div className="flex justify-center mb-1"><Logo /></div>
                 <CompanyName className="text-base uppercase tracking-wide" />
@@ -731,7 +734,7 @@ const ReceiptLivePreview = ({ cfg, template, cs }) => {
 
     // ── Template 4: Invoice Pro ──
     if (tid === 4) return (
-        <div style={{ color: textColor }}>
+        <div style={{ color: textColor, fontWeight }}>
             <div className="px-3 py-2 text-[7px] text-right" style={{ color: mutedSolid, borderBottom: `1px solid ${borderColor}` }}>{sale.date}</div>
             <div className="p-3">
                 <div className="flex items-start justify-between mb-2">
@@ -769,7 +772,7 @@ const ReceiptLivePreview = ({ cfg, template, cs }) => {
 
     // ── Template 5: Invoice Classic (Professional) ──
     if (tid === 5) return (
-        <div style={{ color: textColor }}>
+        <div style={{ color: textColor, fontWeight }}>
             <div className="p-3 border-b-2" style={{ borderColor: accent }}>
                 <div className="flex items-start justify-between">
                     <div><div className="flex items-center gap-1.5"><Logo /><CompanyName className="text-xs" /></div><CompanyDetails size="text-[7px]" className="mt-0.5" /></div>
@@ -797,7 +800,7 @@ const ReceiptLivePreview = ({ cfg, template, cs }) => {
 
     // ── Template 6: Detailed (Boxed Grid) ──
     if (tid === 6) return (
-        <div style={{ color: textColor }}>
+        <div style={{ color: textColor, fontWeight }}>
             <div className="p-2.5 m-2 rounded text-center" style={{ border: `2px solid ${borderStrong}` }}>
                 <div className="flex justify-center mb-1"><Logo /></div>
                 <CompanyName className="text-sm" />
@@ -834,7 +837,7 @@ const ReceiptLivePreview = ({ cfg, template, cs }) => {
 
     // ── Template 7: Elegant (Serif Luxury) ──
     if (tid === 7) return (
-        <div className="p-4" style={{ color: textColor, fontFamily: 'Georgia, "Times New Roman", serif' }}>
+        <div className="p-4" style={{ color: textColor, fontWeight, fontFamily: 'Georgia, "Times New Roman", serif' }}>
             <div className="text-center mb-2">
                 <div className="flex justify-center mb-1"><Logo /></div>
                 <CompanyName className="text-sm tracking-wider" />
@@ -864,7 +867,7 @@ const ReceiptLivePreview = ({ cfg, template, cs }) => {
 
     // ── Template 8: Corporate (Formal Blue/Dark Header) ──
     if (tid === 8) return (
-        <div style={{ color: textColor }}>
+        <div style={{ color: textColor, fontWeight }}>
             <div className="p-3 text-white relative" style={{ background: isDark ? 'rgba(255,255,255,0.12)' : '#2c3e50' }}>
                 <div className="flex items-center gap-2">
                     <Logo />
@@ -924,7 +927,8 @@ const ReceiptSection = () => {
         tax_number: '', tax_rate: 0, tax_label: 'VAT', template_id: 1, template_style: 'modern',
         show_company_details: true, show_tax_breakdown: false, show_payment_details: true,
         show_customer_details: true, show_referrer_details: true, show_barcode: true, show_qr_code: false,
-        receipt_bg_color: '#ffffff', receipt_text_color: '#111827', receipt_accent_color: '',
+        receipt_bg_color: '#ffffff', receipt_text_color: '', receipt_accent_color: '',
+        receipt_font_weight: 'normal', receipt_heading_color: '', receipt_label_color: '',
         use_company_branding: false, use_company_info: false,
         footer_text: 'Thank you for your business!', terms_and_conditions: '',
         currency_symbol: '₦', currency_code: 'NGN', paper_size: 'A5', delivery_format: 'auto',
@@ -956,9 +960,11 @@ const ReceiptSection = () => {
     const set = (field, value) => {
         setCfg(p => {
             const next = { ...p, [field]: value };
-            // Auto-adjust text color when background changes to maintain readability
+            // Clear manual color overrides when background changes so auto-contrast kicks in
             if (field === 'receipt_bg_color') {
-                next.receipt_text_color = getContrastTextColor(value);
+                next.receipt_text_color = '';
+                next.receipt_heading_color = '';
+                next.receipt_label_color = '';
             }
             return next;
         });
@@ -991,8 +997,9 @@ const ReceiptSection = () => {
         eff.receipt_accent_color = brandingConfig?.accent_color || brandingConfig?.primary_color || cfg.receipt_accent_color;
         eff.receipt_bg_color = brandingConfig?.background_color || cfg.receipt_bg_color || '#ffffff';
     }
-    // Auto-contrast: always compute text color from effective background for readability
-    eff.receipt_text_color = getContrastTextColor(eff.receipt_bg_color || '#ffffff');
+    // Text color: use manual override if set, otherwise auto-contrast from background
+    const autoTextColor = getContrastTextColor(eff.receipt_bg_color || '#ffffff');
+    eff.receipt_text_color = cfg.receipt_text_color || autoTextColor;
 
     const selectedTemplate = RECEIPT_TEMPLATES.find(t => t.id === (cfg.template_id || 1)) || RECEIPT_TEMPLATES[0];
     const cs = cfg.currency_symbol || symbol || '₦';
@@ -1192,32 +1199,63 @@ const ReceiptSection = () => {
                                 </div>
                             )}
 
-                            <div className={`grid grid-cols-2 gap-3 ${cfg.use_company_branding ? 'opacity-50 pointer-events-none' : ''}`}>
-                                {[
-                                    { field: 'receipt_bg_color', label: 'Background', fallback: '#ffffff' },
-                                    { field: 'receipt_accent_color', label: 'Accent', fallback: '' },
-                                ].map(({ field, label, fallback }) => (
-                                    <div key={field}>
-                                        <label className={labelClass}>{label}</label>
-                                        <div className="flex items-center gap-2">
-                                            <input
-                                                type="color"
-                                                value={(cfg.use_company_branding ? eff[field] : cfg[field]) || fallback || '#000000'}
-                                                onChange={e => set(field, e.target.value)}
-                                                className="w-8 h-8 rounded-lg border border-theme cursor-pointer bg-transparent p-0.5"
-                                            />
-                                            <input
-                                                type="text"
-                                                value={(cfg.use_company_branding ? eff[field] : cfg[field]) || ''}
-                                                onChange={e => set(field, e.target.value)}
-                                                className={`${inputClass} flex-1 font-mono text-[10px] sm:text-xs`}
-                                                placeholder={fallback || 'auto'}
-                                            />
+                            <div className={`space-y-3 ${cfg.use_company_branding ? 'opacity-50 pointer-events-none' : ''}`}>
+                                <div className="grid grid-cols-2 gap-3">
+                                    {[
+                                        { field: 'receipt_bg_color', label: 'Background', fallback: '#ffffff' },
+                                        { field: 'receipt_accent_color', label: 'Accent', fallback: '' },
+                                        { field: 'receipt_text_color', label: 'Text', fallback: '' },
+                                        { field: 'receipt_heading_color', label: 'Headings', fallback: '' },
+                                        { field: 'receipt_label_color', label: 'Labels', fallback: '' },
+                                    ].map(({ field, label, fallback }) => (
+                                        <div key={field}>
+                                            <label className={labelClass}>{label}</label>
+                                            <div className="flex items-center gap-2">
+                                                <input
+                                                    type="color"
+                                                    value={cfg[field] || fallback || getContrastTextColor(cfg.receipt_bg_color || '#ffffff')}
+                                                    onChange={e => set(field, e.target.value)}
+                                                    className="w-8 h-8 rounded-lg border border-theme cursor-pointer bg-transparent p-0.5"
+                                                />
+                                                <input
+                                                    type="text"
+                                                    value={cfg[field] || ''}
+                                                    onChange={e => set(field, e.target.value)}
+                                                    className={`${inputClass} flex-1 font-mono text-[10px] sm:text-xs`}
+                                                    placeholder={fallback || 'auto'}
+                                                />
+                                                {field !== 'receipt_bg_color' && cfg[field] && (
+                                                    <button type="button" onClick={() => set(field, '')}
+                                                        className="text-[9px] text-theme-muted hover:text-red-400 transition-colors whitespace-nowrap">
+                                                        Reset
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
+                                    ))}
+                                </div>
+
+                                {/* Font Weight */}
+                                <div>
+                                    <label className={labelClass}>Font Weight</label>
+                                    <div className="flex gap-1.5 flex-wrap">
+                                        {[
+                                            { val: '300', label: 'Light' },
+                                            { val: 'normal', label: 'Normal' },
+                                            { val: '500', label: 'Medium' },
+                                            { val: '600', label: 'Semi-Bold' },
+                                            { val: 'bold', label: 'Bold' },
+                                        ].map(fw => (
+                                            <button key={fw.val} type="button"
+                                                onClick={() => set('receipt_font_weight', fw.val)}
+                                                className={`px-2.5 py-1 text-[10px] sm:text-xs rounded-md border transition-all ${(cfg.receipt_font_weight || 'normal') === fw.val ? 'bg-accent-gold text-white border-accent-gold shadow-sm' : 'border-theme text-theme-muted hover:text-theme-primary hover:border-accent-gold/30'}`}>
+                                                <span style={{ fontWeight: fw.val }}>{fw.label}</span>
+                                            </button>
+                                        ))}
                                     </div>
-                                ))}
+                                </div>
                             </div>
-                            <p className="text-[9px] text-theme-muted mt-2">{cfg.use_company_branding ? 'Colors are synced from Branding settings.' : 'Text color adjusts automatically for readability. Leave accent empty to use template default.'}</p>
+                            <p className="text-[9px] text-theme-muted mt-2">{cfg.use_company_branding ? 'Colors are synced from Branding settings.' : 'Leave color fields empty for auto-contrast defaults. Leave accent empty for template default.'}</p>
                         </div>
                     </div>
                     <div className="bg-theme-secondary rounded-xl border border-theme shadow-theme-sm p-4 sm:p-5">
