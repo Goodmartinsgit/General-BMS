@@ -90,50 +90,51 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
 
     // ── Shared building blocks ──
     const Logo = () => cfg.show_logo && cfg.company_logo_url
-        ? <img src={cfg.company_logo_url} alt="Logo" crossOrigin="anonymous" className="w-10 h-10 object-contain rounded-lg" />
+        ? <img src={cfg.company_logo_url} alt="Logo" crossOrigin="anonymous" style={{ width: 40, height: 40, objectFit: 'contain', borderRadius: 8 }} />
         : null;
-    const CompanyName = ({ className = '', style: s = {} }) =>
-        <p className={`font-bold ${className}`} style={{ color: textColor, ...s }}>{cfg.company_name || 'Your Business'}</p>;
-    const CompanyDetails = ({ className = '', size = 'text-[8px]' }) => cfg.show_company_details ? (
-        <div className={`${size} ${className}`} style={{ color: labelColor }}>
+    const CompanyName = ({ style: s = {} }) =>
+        <p style={{ fontWeight: 'bold', color: textColor, fontSize: 14, ...s }}>{cfg.company_name || 'Your Business'}</p>;
+    const CompanyDetails = ({ style: s = {} }) => cfg.show_company_details ? (
+        <div style={{ fontSize: 8, color: labelColor, ...s }}>
             {cfg.company_address && <p>{cfg.company_address}</p>}
             {cfg.company_phone && <p>Tel: {cfg.company_phone}</p>}
             {cfg.company_email && <p>{cfg.company_email}</p>}
             {cfg.company_website && <p>{cfg.company_website}</p>}
         </div>
     ) : null;
-    const TaxNumber = ({ className = '' }) => cfg.show_tax_number && cfg.tax_number
-        ? <p className={`text-[8px] ${className}`} style={{ color: labelColor }}>{cfg.tax_label || 'TIN'}: {cfg.tax_number}</p>
+    const TaxNumber = ({ style: s = {} }) => cfg.show_tax_number && cfg.tax_number
+        ? <p style={{ fontSize: 8, color: labelColor, ...s }}>{cfg.tax_label || 'TIN'}: {cfg.tax_number}</p>
         : null;
-    const Dash = () => <div className="my-1.5" style={{ borderTop: `1px dashed ${borderColor}` }} />;
-    const SolidLine = ({ color }) => <div className="my-1.5" style={{ borderTop: `1px solid ${color || borderColor}` }} />;
+    const Dash = () => <div style={{ marginTop: 6, marginBottom: 6, borderTop: `1px dashed ${borderColor}` }} />;
+    const SolidLine = ({ color }) => <div style={{ marginTop: 6, marginBottom: 6, borderTop: `1px solid ${color || borderColor}` }} />;
 
+    const cellPad = { padding: '2px 2px' };
     const ItemsTable = ({ showCode = false, headerBg = '' }) => {
-        const thStyle = headerBg
-            ? { background: headerBg, color: getContrastTextColor(headerBg) }
-            : { color: headingColor, borderBottom: `1px solid ${borderColor}` };
+        const thBase = headerBg
+            ? { background: headerBg, color: getContrastTextColor(headerBg), ...cellPad }
+            : { color: headingColor, borderBottom: `1px solid ${borderColor}`, ...cellPad };
         return (
-            <table className="w-full text-[8px]" style={{ color: textColor, fontWeight }}>
+            <table style={{ width: '100%', fontSize: 8, color: textColor, fontWeight, borderCollapse: 'collapse', borderSpacing: 0 }}>
                 <thead>
-                    <tr style={headerBg ? { background: headerBg, color: thStyle.color } : {}}>
-                        <th className="text-left py-0.5 px-0.5" style={!headerBg ? thStyle : {}}>Item</th>
-                        {showCode && <th className="text-left py-0.5 px-0.5" style={!headerBg ? thStyle : {}}>Code</th>}
-                        <th className="text-center py-0.5 px-0.5" style={!headerBg ? thStyle : {}}>Qty</th>
-                        <th className="text-right py-0.5 px-0.5" style={!headerBg ? thStyle : {}}>Price</th>
-                        <th className="text-right py-0.5 px-0.5" style={!headerBg ? thStyle : {}}>Total</th>
+                    <tr style={headerBg ? { background: headerBg, color: thBase.color } : {}}>
+                        <th style={{ ...thBase, textAlign: 'left' }}>Item</th>
+                        {showCode && <th style={{ ...thBase, textAlign: 'left' }}>Code</th>}
+                        <th style={{ ...thBase, textAlign: 'center' }}>Qty</th>
+                        <th style={{ ...thBase, textAlign: 'right' }}>Price</th>
+                        <th style={{ ...thBase, textAlign: 'right' }}>Total</th>
                     </tr>
                 </thead>
                 <tbody>
                     {normalizedItems.map((item, i) => (
                         <tr key={i} style={{ borderBottom: `1px solid ${borderColor}` }}>
-                            <td className="py-0.5 px-0.5">
+                            <td style={{ ...cellPad, textAlign: 'left' }}>
                                 {item.name}
-                                {item.variant && <span className="block text-[7px]" style={{ color: labelColor }}>({item.variant})</span>}
+                                {item.variant && <span style={{ display: 'block', fontSize: 7, color: labelColor }}>({item.variant})</span>}
                             </td>
-                            {showCode && <td className="py-0.5 px-0.5" style={{ color: labelColor }}>{item.code}</td>}
-                            <td className="text-center py-0.5 px-0.5">{item.qty}</td>
-                            <td className="text-right py-0.5 px-0.5">{fmt(item.price)}</td>
-                            <td className="text-right py-0.5 px-0.5 font-medium">{fmt(item.total)}</td>
+                            {showCode && <td style={{ ...cellPad, textAlign: 'left', color: labelColor }}>{item.code}</td>}
+                            <td style={{ ...cellPad, textAlign: 'center' }}>{item.qty}</td>
+                            <td style={{ ...cellPad, textAlign: 'right' }}>{fmt(item.price)}</td>
+                            <td style={{ ...cellPad, textAlign: 'right', fontWeight: 500 }}>{fmt(item.total)}</td>
                         </tr>
                     ))}
                 </tbody>
@@ -141,66 +142,95 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
         );
     };
 
+    const rowFlex = { display: 'flex', justifyContent: 'space-between', fontSize: 8 };
+
     const Totals = ({ bold = false }) => (
-        <div className="text-[8px] space-y-0.5" style={{ color: textColor, fontWeight }}>
-            <div className="flex justify-between"><span style={{ color: labelColor }}>Subtotal</span><span>{fmt(subtotal)}</span></div>
-            {discount > 0 && <div className="flex justify-between" style={{ color: '#ef4444' }}><span>Discount</span><span>-{fmt(discount)}</span></div>}
-            {cfg.show_tax_breakdown && <div className="flex justify-between"><span style={{ color: labelColor }}>{cfg.tax_label || 'VAT'} {cfg.tax_rate > 0 ? `(${cfg.tax_rate}%)` : ''}</span><span>{fmt(taxAmount)}</span></div>}
-            <div className={`flex justify-between pt-0.5 mt-0.5 ${bold ? 'font-bold text-[10px]' : 'font-bold text-[9px]'}`} style={{ borderTop: `1px solid ${borderColor}` }}>
+        <div style={{ fontSize: 8, color: textColor, fontWeight }}>
+            <div style={{ ...rowFlex, marginBottom: 2 }}><span style={{ color: labelColor }}>Subtotal</span><span>{fmt(subtotal)}</span></div>
+            {discount > 0 && <div style={{ ...rowFlex, color: '#ef4444', marginBottom: 2 }}><span>Discount</span><span>-{fmt(discount)}</span></div>}
+            {cfg.show_tax_breakdown && <div style={{ ...rowFlex, marginBottom: 2 }}><span style={{ color: labelColor }}>{cfg.tax_label || 'VAT'} {cfg.tax_rate > 0 ? `(${cfg.tax_rate}%)` : ''}</span><span>{fmt(taxAmount)}</span></div>}
+            <div style={{ ...rowFlex, paddingTop: 2, marginTop: 2, borderTop: `1px solid ${borderColor}`, fontWeight: 'bold', fontSize: bold ? 10 : 9 }}>
                 <span>Total</span><span>{fmt(total)}</span>
             </div>
         </div>
     );
 
     const PaymentInfo = () => cfg.show_payment_details ? (
-        <div className="text-[8px] space-y-0.5" style={{ color: textColor, fontWeight }}>
-            <div className="flex justify-between"><span style={{ color: labelColor }}>Payment</span><span className="capitalize">{paymentMethod}</span></div>
-            <div className="flex justify-between"><span style={{ color: labelColor }}>Paid</span><span>{fmt(paid)}</span></div>
-            {change > 0 && <div className="flex justify-between font-semibold" style={{ color: '#16a34a' }}><span>Change</span><span>{fmt(change)}</span></div>}
+        <div style={{ fontSize: 8, color: textColor, fontWeight }}>
+            <div style={{ ...rowFlex, marginBottom: 2 }}><span style={{ color: labelColor }}>Payment</span><span style={{ textTransform: 'capitalize' }}>{paymentMethod}</span></div>
+            <div style={{ ...rowFlex, marginBottom: 2 }}><span style={{ color: labelColor }}>Paid</span><span>{fmt(paid)}</span></div>
+            {change > 0 && <div style={{ ...rowFlex, fontWeight: 600, color: '#16a34a' }}><span>Change</span><span>{fmt(change)}</span></div>}
         </div>
     ) : null;
 
     const ReferrerInfo = () => cfg.show_referrer_details && referrer ? (
-        <div className="text-[8px]" style={{ color: textColor, fontWeight }}><div className="flex justify-between"><span style={{ color: labelColor }}>Referred by</span><span>{referrer}</span></div></div>
+        <div style={{ fontSize: 8, color: textColor, fontWeight }}><div style={rowFlex}><span style={{ color: labelColor }}>Referred by</span><span>{referrer}</span></div></div>
     ) : null;
 
     const FooterBlock = () => (
         <>
-            {cfg.footer_text && <p className="text-[8px] text-center italic" style={{ color: labelColor }}>{cfg.footer_text}</p>}
-            {cfg.terms_and_conditions && <p className="text-[7px] text-center mt-0.5" style={{ color: mutedColor }}>{cfg.terms_and_conditions}</p>}
+            {cfg.footer_text && <p style={{ fontSize: 8, textAlign: 'center', fontStyle: 'italic', color: labelColor }}>{cfg.footer_text}</p>}
+            {cfg.terms_and_conditions && <p style={{ fontSize: 7, textAlign: 'center', marginTop: 2, color: mutedColor }}>{cfg.terms_and_conditions}</p>}
         </>
     );
 
     const BarcodeBlock = () => cfg.show_barcode ? (
-        <div className="mt-1.5 flex justify-center gap-px">{Array(25).fill(0).map((_, i) => <div key={i} style={{ background: textColor, width: i % 3 === 0 ? 2 : 1, height: 18 }} />)}</div>
+        <div style={{ marginTop: 6, display: 'flex', justifyContent: 'center', gap: 1 }}>{Array(25).fill(0).map((_, i) => <div key={i} style={{ background: textColor, width: i % 3 === 0 ? 2 : 1, height: 18 }} />)}</div>
     ) : null;
 
     const QRBlock = () => cfg.show_qr_code ? (
-        <div className="mt-1.5 flex justify-center"><div className="w-10 h-10 rounded flex items-center justify-center" style={{ border: `1px solid ${borderColor}`, background: subtleBg }}><QrCode size={20} style={{ color: labelColor }} /></div></div>
+        <div style={{ marginTop: 6, display: 'flex', justifyContent: 'center' }}><div style={{ width: 40, height: 40, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${borderColor}`, background: subtleBg }}><QrCode size={20} style={{ color: labelColor }} /></div></div>
     ) : null;
 
     const InfoRow = ({ label, value }) => (
-        <div className="flex justify-between text-[8px]" style={{ color: textColor, fontWeight }}>
+        <div style={{ ...rowFlex, color: textColor, fontWeight }}>
             <span style={{ color: labelColor }}>{label}</span>
-            <span className="font-medium">{value}</span>
+            <span style={{ fontWeight: 500 }}>{value}</span>
         </div>
     );
 
     const outerStyle = { backgroundColor: bgColor };
     const outerProps = { ref, style: outerStyle, 'data-receipt-root': true };
 
+    // Shared inline style helpers (px-based for html2canvas consistency)
+    const pad16 = { padding: 16 };
+    const pad12 = { padding: 12 };
+    const center = { textAlign: 'center' };
+    const right = { textAlign: 'right' };
+    const flexCenter = { display: 'flex', justifyContent: 'center' };
+    const flexBetween = { display: 'flex', justifyContent: 'space-between' };
+    const flexItems = { display: 'flex', alignItems: 'center' };
+    const mb8 = { marginBottom: 8 };
+    const mb6 = { marginBottom: 6 };
+    const mb4 = { marginBottom: 4 };
+    const mb2 = { marginBottom: 2 };
+    const mt8 = { marginTop: 8 };
+    const mt4 = { marginTop: 4 };
+    const mt6 = { marginTop: 6 };
+    const mt2 = { marginTop: 2 };
+    const spacer8 = { height: 8 };
+    const spacer6 = { height: 6 };
+    const boldLine = (c) => ({ marginTop: 8, marginBottom: 8, borderBottom: `2px solid ${c || borderStrong}` });
+    const thinLine = (c) => ({ marginTop: 6, marginBottom: 6, borderBottom: `1px solid ${c || borderColor}` });
+    const infoGroup = { marginBottom: 6 };
+    const gridBox = (bg) => ({ borderRadius: 4, padding: 6, background: bg || 'transparent' });
+    const gridBoxBorder = { borderRadius: 4, padding: 6, border: `1px solid ${borderColor}` };
+    const elegantDivider = { display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, marginBottom: 8 };
+    const elegantLine = { flex: 1, borderTop: `1px solid ${borderColor}` };
+    const elegantDot = { width: 6, height: 6, borderRadius: '50%', background: accent };
+
     // ── Template 1: Standard ──
     if (tid === 1) return (
         <div {...outerProps}>
-            <div className="p-4" style={{ color: textColor, fontWeight }}>
-                <div className="text-center mb-2">
-                    <div className="flex justify-center mb-1"><Logo /></div>
-                    <CompanyName className="text-sm" />
-                    <CompanyDetails className="mt-0.5" />
-                    <TaxNumber className="mt-0.5" />
+            <div style={{ ...pad16, color: textColor, fontWeight }}>
+                <div style={{ ...center, ...mb8 }}>
+                    <div style={{ ...flexCenter, ...mb4 }}><Logo /></div>
+                    <CompanyName style={{ fontSize: 14 }} />
+                    <CompanyDetails style={{ ...mt2 }} />
+                    <TaxNumber style={{ ...mt2 }} />
                 </div>
                 <Dash />
-                <div className="space-y-0.5 mb-1.5">
+                <div style={infoGroup}>
                     <InfoRow label="Receipt #" value={receiptNumber} />
                     <InfoRow label="Date" value={dateStr} />
                     {cfg.show_customer_details && customerName && <InfoRow label="Customer" value={customerName} />}
@@ -225,28 +255,28 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
     if (tid === 2) return (
         <div {...outerProps}>
             <div style={{ color: textColor, fontWeight }}>
-                <div className="p-3">
-                    <div className="flex items-center gap-2 mb-2">
+                <div style={pad12}>
+                    <div style={{ ...flexItems, gap: 8, ...mb8 }}>
                         <Logo />
                         <div>
-                            <CompanyName className="text-sm" />
-                            <CompanyDetails size="text-[7px]" />
+                            <CompanyName style={{ fontSize: 14 }} />
+                            <CompanyDetails style={{ fontSize: 7 }} />
                         </div>
                     </div>
                     <TaxNumber />
                 </div>
-                <div className="px-3 py-1.5 text-white text-[8px] flex justify-between" style={{ background: accent }}>
-                    <span className="font-bold">{receiptNumber}</span>
+                <div style={{ padding: '6px 12px', color: '#fff', fontSize: 8, ...flexBetween, background: accent }}>
+                    <span style={{ fontWeight: 'bold' }}>{receiptNumber}</span>
                     <span>{dateStr}</span>
                 </div>
-                <div className="p-3">
-                    {cfg.show_customer_details && customerName && <div className="text-[8px] mb-2"><span style={{ color: mutedSolid }}>Customer: </span><span className="font-medium">{customerName}</span></div>}
+                <div style={pad12}>
+                    {cfg.show_customer_details && customerName && <div style={{ fontSize: 8, ...mb8 }}><span style={{ color: mutedSolid }}>Customer: </span><span style={{ fontWeight: 500 }}>{customerName}</span></div>}
                     <ItemsTable headerBg={accent} />
-                    <div className="mt-2" />
+                    <div style={spacer8} />
                     <Totals bold />
                     {cfg.show_payment_details && <><SolidLine color={accent} /><PaymentInfo /></>}
                     {cfg.show_referrer_details && referrer && <><SolidLine /><ReferrerInfo /></>}
-                    <div className="mt-2" />
+                    <div style={spacer8} />
                     <FooterBlock />
                     <BarcodeBlock />
                     <QRBlock />
@@ -258,27 +288,27 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
     // ── Template 3: Bold ──
     if (tid === 3) return (
         <div {...outerProps}>
-            <div className="p-4" style={{ color: textColor, fontWeight }}>
-                <div className="text-center mb-2">
-                    <div className="flex justify-center mb-1"><Logo /></div>
-                    <CompanyName className="text-base uppercase tracking-wide" />
-                    <CompanyDetails className="mt-0.5" />
-                    <TaxNumber className="mt-0.5" />
+            <div style={{ ...pad16, color: textColor, fontWeight }}>
+                <div style={{ ...center, ...mb8 }}>
+                    <div style={{ ...flexCenter, ...mb4 }}><Logo /></div>
+                    <CompanyName style={{ fontSize: 16, textTransform: 'uppercase', letterSpacing: '0.05em' }} />
+                    <CompanyDetails style={mt2} />
+                    <TaxNumber style={mt2} />
                 </div>
-                <div className="my-2" style={{ borderBottom: `2px solid ${borderStrong}` }} />
-                <p className="text-center font-mono font-bold text-[10px] tracking-widest mb-1" style={{ color: accent }}>{receiptNumber}</p>
-                <p className="text-center text-[8px] mb-1.5" style={{ color: mutedSolid }}>{dateStr}</p>
-                <div className="space-y-0.5 mb-1.5">
+                <div style={boldLine()} />
+                <p style={{ ...center, fontFamily: 'monospace', fontWeight: 'bold', fontSize: 10, letterSpacing: '0.1em', ...mb4, color: accent }}>{receiptNumber}</p>
+                <p style={{ ...center, fontSize: 8, ...mb6, color: mutedSolid }}>{dateStr}</p>
+                <div style={infoGroup}>
                     {cfg.show_customer_details && customerName && <InfoRow label="Customer" value={customerName} />}
                     {cashier && <InfoRow label="Cashier" value={cashier} />}
                 </div>
-                <div className="my-2" style={{ borderBottom: `2px solid ${borderStrong}` }} />
+                <div style={boldLine()} />
                 <ItemsTable />
-                <div className="my-2" style={{ borderBottom: `2px solid ${borderStrong}` }} />
+                <div style={boldLine()} />
                 <Totals bold />
-                {cfg.show_payment_details && <><div className="my-1.5" style={{ borderBottom: `1px solid ${borderColor}` }} /><PaymentInfo /></>}
-                {cfg.show_referrer_details && referrer && <><div className="my-1.5" style={{ borderBottom: `1px solid ${borderColor}` }} /><ReferrerInfo /></>}
-                <div className="my-2" style={{ borderBottom: `2px solid ${borderStrong}` }} />
+                {cfg.show_payment_details && <><div style={thinLine()} /><PaymentInfo /></>}
+                {cfg.show_referrer_details && referrer && <><div style={thinLine()} /><ReferrerInfo /></>}
+                <div style={boldLine()} />
                 <FooterBlock />
                 <BarcodeBlock />
                 <QRBlock />
@@ -290,34 +320,34 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
     if (tid === 4) return (
         <div {...outerProps}>
             <div style={{ color: textColor, fontWeight }}>
-                <div className="px-3 py-2 text-[7px] text-right" style={{ color: mutedSolid, borderBottom: `1px solid ${borderColor}` }}>{dateStr}</div>
-                <div className="p-3">
-                    <div className="flex items-start justify-between mb-2">
-                        <div className="flex items-center gap-1.5"><Logo /><CompanyName className="text-xs" /></div>
-                        <div className="text-right text-[8px]"><span className="font-bold" style={{ color: accent }}>INVOICE</span><br /><span style={{ color: mutedSolid }}>{receiptNumber}</span></div>
+                <div style={{ padding: '8px 12px', fontSize: 7, textAlign: 'right', color: mutedSolid, borderBottom: `1px solid ${borderColor}` }}>{dateStr}</div>
+                <div style={pad12}>
+                    <div style={{ ...flexBetween, alignItems: 'flex-start', ...mb8 }}>
+                        <div style={{ ...flexItems, gap: 6 }}><Logo /><CompanyName style={{ fontSize: 12 }} /></div>
+                        <div style={{ ...right, fontSize: 8 }}><span style={{ fontWeight: 'bold', color: accent }}>INVOICE</span><br /><span style={{ color: mutedSolid }}>{receiptNumber}</span></div>
                     </div>
-                    <CompanyDetails size="text-[7px]" />
-                    <TaxNumber className="mt-0.5" />
-                    <div className="grid grid-cols-3 gap-1.5 my-2 text-[7px]">
-                        <div className="rounded p-1.5" style={{ background: subtleBg }}>
-                            <p className="uppercase text-[6px] font-bold" style={{ color: mutedSolid }}>Bill To</p>
-                            {cfg.show_customer_details && customerName && <p className="font-medium">{customerName}</p>}
+                    <CompanyDetails style={{ fontSize: 7 }} />
+                    <TaxNumber style={mt2} />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 8, marginBottom: 8, fontSize: 7 }}>
+                        <div style={gridBox(subtleBg)}>
+                            <p style={{ textTransform: 'uppercase', fontSize: 6, fontWeight: 'bold', color: mutedSolid }}>Bill To</p>
+                            {cfg.show_customer_details && customerName && <p style={{ fontWeight: 500 }}>{customerName}</p>}
                         </div>
-                        <div className="rounded p-1.5" style={{ background: subtleBg }}>
-                            <p className="uppercase text-[6px] font-bold" style={{ color: mutedSolid }}>Date</p>
-                            <p className="font-medium">{dateStr}</p>
+                        <div style={gridBox(subtleBg)}>
+                            <p style={{ textTransform: 'uppercase', fontSize: 6, fontWeight: 'bold', color: mutedSolid }}>Date</p>
+                            <p style={{ fontWeight: 500 }}>{dateStr}</p>
                         </div>
-                        <div className="rounded p-1.5" style={{ background: subtleBg }}>
-                            <p className="uppercase text-[6px] font-bold" style={{ color: mutedSolid }}>Cashier</p>
-                            <p className="font-medium">{cashier}</p>
+                        <div style={gridBox(subtleBg)}>
+                            <p style={{ textTransform: 'uppercase', fontSize: 6, fontWeight: 'bold', color: mutedSolid }}>Cashier</p>
+                            <p style={{ fontWeight: 500 }}>{cashier}</p>
                         </div>
                     </div>
                     <ItemsTable showCode headerBg={accent} />
-                    <div className="mt-2" />
+                    <div style={spacer8} />
                     <Totals bold />
                     {cfg.show_payment_details && <><SolidLine /><PaymentInfo /></>}
                     {cfg.show_referrer_details && referrer && <><SolidLine /><ReferrerInfo /></>}
-                    <div className="mt-2" />
+                    <div style={spacer8} />
                     <FooterBlock />
                     <BarcodeBlock />
                     <QRBlock />
@@ -330,24 +360,24 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
     if (tid === 5) return (
         <div {...outerProps}>
             <div style={{ color: textColor, fontWeight }}>
-                <div className="p-3 border-b-2" style={{ borderColor: accent }}>
-                    <div className="flex items-start justify-between">
-                        <div><div className="flex items-center gap-1.5"><Logo /><CompanyName className="text-xs" /></div><CompanyDetails size="text-[7px]" className="mt-0.5" /></div>
-                        <div className="text-right"><p className="text-[10px] font-bold" style={{ color: accent }}>RECEIPT</p><p className="text-[7px]" style={{ color: mutedSolid }}>{receiptNumber}</p></div>
+                <div style={{ ...pad12, borderBottom: `2px solid ${accent}` }}>
+                    <div style={{ ...flexBetween, alignItems: 'flex-start' }}>
+                        <div><div style={{ ...flexItems, gap: 6 }}><Logo /><CompanyName style={{ fontSize: 12 }} /></div><CompanyDetails style={{ fontSize: 7, ...mt2 }} /></div>
+                        <div style={right}><p style={{ fontSize: 10, fontWeight: 'bold', color: accent }}>RECEIPT</p><p style={{ fontSize: 7, color: mutedSolid }}>{receiptNumber}</p></div>
                     </div>
                 </div>
-                <div className="p-3">
-                    <TaxNumber className="mb-1" />
-                    <div className="grid grid-cols-2 gap-2 my-2 text-[7px]">
-                        <div>{cfg.show_customer_details && customerName && <><p className="uppercase text-[6px] font-bold mb-0.5" style={{ color: mutedSolid }}>Customer</p><p className="font-medium">{customerName}</p>{customerPhone && <p style={{ color: mutedSolid }}>{customerPhone}</p>}</>}</div>
-                        <div className="text-right"><p className="uppercase text-[6px] font-bold mb-0.5" style={{ color: mutedSolid }}>Details</p><p>{dateStr}</p>{cashier && <p>Cashier: {cashier}</p>}</div>
+                <div style={pad12}>
+                    <TaxNumber style={mb4} />
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8, marginBottom: 8, fontSize: 7 }}>
+                        <div>{cfg.show_customer_details && customerName && <><p style={{ textTransform: 'uppercase', fontSize: 6, fontWeight: 'bold', ...mb2, color: mutedSolid }}>Customer</p><p style={{ fontWeight: 500 }}>{customerName}</p>{customerPhone && <p style={{ color: mutedSolid }}>{customerPhone}</p>}</>}</div>
+                        <div style={right}><p style={{ textTransform: 'uppercase', fontSize: 6, fontWeight: 'bold', ...mb2, color: mutedSolid }}>Details</p><p>{dateStr}</p>{cashier && <p>Cashier: {cashier}</p>}</div>
                     </div>
                     <ItemsTable showCode />
-                    <div className="mt-2" />
+                    <div style={spacer8} />
                     <Totals bold />
                     {cfg.show_payment_details && <><SolidLine /><PaymentInfo /></>}
                     {cfg.show_referrer_details && referrer && <><SolidLine /><ReferrerInfo /></>}
-                    <div className="mt-2" />
+                    <div style={spacer8} />
                     <FooterBlock />
                     <BarcodeBlock />
                     <QRBlock />
@@ -360,33 +390,33 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
     if (tid === 6) return (
         <div {...outerProps}>
             <div style={{ color: textColor, fontWeight }}>
-                <div className="p-2.5 m-2 rounded text-center" style={{ border: `2px solid ${borderStrong}` }}>
-                    <div className="flex justify-center mb-1"><Logo /></div>
-                    <CompanyName className="text-sm" />
-                    <CompanyDetails className="mt-0.5" />
-                    <TaxNumber className="mt-0.5" />
+                <div style={{ padding: 10, margin: 8, borderRadius: 4, ...center, border: `2px solid ${borderStrong}` }}>
+                    <div style={{ ...flexCenter, ...mb4 }}><Logo /></div>
+                    <CompanyName style={{ fontSize: 14 }} />
+                    <CompanyDetails style={mt2} />
+                    <TaxNumber style={mt2} />
                 </div>
-                <div className="px-3 pb-3">
-                    <div className="grid grid-cols-2 gap-1.5 mb-2">
-                        <div className="rounded p-1.5" style={{ border: `1px solid ${borderColor}` }}>
-                            <p className="text-[6px] font-bold uppercase mb-0.5" style={{ color: mutedSolid }}>Bill To</p>
-                            {cfg.show_customer_details && customerName && <p className="text-[8px] font-medium">{customerName}</p>}
-                            {cfg.show_customer_details && customerPhone && <p className="text-[7px]" style={{ color: mutedSolid }}>{customerPhone}</p>}
+                <div style={{ padding: '0 12px 12px' }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, ...mb8 }}>
+                        <div style={gridBoxBorder}>
+                            <p style={{ fontSize: 6, fontWeight: 'bold', textTransform: 'uppercase', ...mb2, color: mutedSolid }}>Bill To</p>
+                            {cfg.show_customer_details && customerName && <p style={{ fontSize: 8, fontWeight: 500 }}>{customerName}</p>}
+                            {cfg.show_customer_details && customerPhone && <p style={{ fontSize: 7, color: mutedSolid }}>{customerPhone}</p>}
                         </div>
-                        <div className="rounded p-1.5" style={{ border: `1px solid ${borderColor}` }}>
-                            <p className="text-[6px] font-bold uppercase mb-0.5" style={{ color: mutedSolid }}>Receipt Info</p>
-                            <p className="text-[8px] font-medium">{receiptNumber}</p>
-                            <p className="text-[7px]" style={{ color: mutedSolid }}>{dateStr}</p>
-                            {cashier && <p className="text-[7px]" style={{ color: mutedSolid }}>Cashier: {cashier}</p>}
+                        <div style={gridBoxBorder}>
+                            <p style={{ fontSize: 6, fontWeight: 'bold', textTransform: 'uppercase', ...mb2, color: mutedSolid }}>Receipt Info</p>
+                            <p style={{ fontSize: 8, fontWeight: 500 }}>{receiptNumber}</p>
+                            <p style={{ fontSize: 7, color: mutedSolid }}>{dateStr}</p>
+                            {cashier && <p style={{ fontSize: 7, color: mutedSolid }}>Cashier: {cashier}</p>}
                         </div>
                     </div>
                     <ItemsTable showCode headerBg={isDark ? '#374151' : '#212529'} />
-                    <div className="mt-2 rounded p-1.5" style={{ border: `1px solid ${borderColor}` }}>
+                    <div style={{ marginTop: 8, borderRadius: 4, padding: 6, border: `1px solid ${borderColor}` }}>
                         <Totals bold />
                     </div>
-                    {cfg.show_payment_details && <div className="mt-1.5"><PaymentInfo /></div>}
-                    {cfg.show_referrer_details && referrer && <div className="mt-1.5"><ReferrerInfo /></div>}
-                    <div className="mt-2" />
+                    {cfg.show_payment_details && <div style={mt6}><PaymentInfo /></div>}
+                    {cfg.show_referrer_details && referrer && <div style={mt6}><ReferrerInfo /></div>}
+                    <div style={spacer8} />
                     <FooterBlock />
                     <BarcodeBlock />
                     <QRBlock />
@@ -398,28 +428,28 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
     // ── Template 7: Elegant (Serif Luxury) ──
     if (tid === 7) return (
         <div {...outerProps}>
-            <div className="p-4" style={{ color: textColor, fontWeight, fontFamily: 'Georgia, "Times New Roman", serif' }}>
-                <div className="text-center mb-2">
-                    <div className="flex justify-center mb-1"><Logo /></div>
-                    <CompanyName className="text-sm tracking-wider" />
-                    <CompanyDetails className="mt-0.5" />
-                    <TaxNumber className="mt-0.5" />
+            <div style={{ ...pad16, color: textColor, fontWeight, fontFamily: 'Georgia, "Times New Roman", serif' }}>
+                <div style={{ ...center, ...mb8 }}>
+                    <div style={{ ...flexCenter, ...mb4 }}><Logo /></div>
+                    <CompanyName style={{ fontSize: 14, letterSpacing: '0.05em' }} />
+                    <CompanyDetails style={mt2} />
+                    <TaxNumber style={mt2} />
                 </div>
-                <p className="text-center text-[9px] font-bold tracking-[0.2em] uppercase mb-1" style={{ color: accent }}>Official Receipt</p>
-                <div className="flex items-center gap-1.5 my-2"><div className="flex-1" style={{ borderTop: `1px solid ${borderColor}` }} /><div className="w-1.5 h-1.5 rounded-full" style={{ background: accent }} /><div className="flex-1" style={{ borderTop: `1px solid ${borderColor}` }} /></div>
-                <div className="space-y-0.5 mb-2">
+                <p style={{ ...center, fontSize: 9, fontWeight: 'bold', letterSpacing: '0.2em', textTransform: 'uppercase', ...mb4, color: accent }}>Official Receipt</p>
+                <div style={elegantDivider}><div style={elegantLine} /><div style={elegantDot} /><div style={elegantLine} /></div>
+                <div style={{ ...mb8 }}>
                     <InfoRow label="Receipt #" value={receiptNumber} />
                     <InfoRow label="Date" value={dateStr} />
                     {cfg.show_customer_details && customerName && <InfoRow label="Customer" value={customerName} />}
                     {cashier && <InfoRow label="Cashier" value={cashier} />}
                 </div>
-                <div className="flex items-center gap-1.5 my-2"><div className="flex-1" style={{ borderTop: `1px solid ${borderColor}` }} /><div className="w-1.5 h-1.5 rounded-full" style={{ background: accent }} /><div className="flex-1" style={{ borderTop: `1px solid ${borderColor}` }} /></div>
+                <div style={elegantDivider}><div style={elegantLine} /><div style={elegantDot} /><div style={elegantLine} /></div>
                 <ItemsTable />
-                <div className="flex items-center gap-1.5 my-2"><div className="flex-1" style={{ borderTop: `1px solid ${borderColor}` }} /><div className="w-1.5 h-1.5 rounded-full" style={{ background: accent }} /><div className="flex-1" style={{ borderTop: `1px solid ${borderColor}` }} /></div>
+                <div style={elegantDivider}><div style={elegantLine} /><div style={elegantDot} /><div style={elegantLine} /></div>
                 <Totals bold />
                 {cfg.show_payment_details && <><SolidLine /><PaymentInfo /></>}
                 {cfg.show_referrer_details && referrer && <><SolidLine /><ReferrerInfo /></>}
-                <div className="mt-2" />
+                <div style={spacer8} />
                 <FooterBlock />
                 <BarcodeBlock />
                 <QRBlock />
@@ -431,34 +461,34 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
     if (tid === 8) return (
         <div {...outerProps}>
             <div style={{ color: textColor, fontWeight }}>
-                <div className="p-3 text-white relative" style={{ background: isDark ? 'rgba(255,255,255,0.12)' : '#2c3e50' }}>
-                    <div className="flex items-center gap-2">
+                <div style={{ ...pad12, color: '#fff', background: isDark ? 'rgba(255,255,255,0.12)' : '#2c3e50' }}>
+                    <div style={{ ...flexItems, gap: 8 }}>
                         <Logo />
                         <div>
-                            <CompanyName className="text-sm" style={{ color: '#fff' }} />
-                            {cfg.show_company_details && <div className="text-[7px]" style={{ color: 'rgba(255,255,255,0.7)' }}>{cfg.company_address && <span>{cfg.company_address}</span>}{cfg.company_phone && <span> &bull; {cfg.company_phone}</span>}</div>}
+                            <CompanyName style={{ fontSize: 14, color: '#fff' }} />
+                            {cfg.show_company_details && <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.7)' }}>{cfg.company_address && <span>{cfg.company_address}</span>}{cfg.company_phone && <span> &bull; {cfg.company_phone}</span>}</div>}
                         </div>
                     </div>
-                    <TaxNumber className="mt-1" />
+                    <TaxNumber style={mt4} />
                 </div>
-                <div className="h-1" style={{ background: accent }} />
-                <div className="p-3">
-                    <div className="flex justify-between text-[8px] mb-2">
+                <div style={{ height: 4, background: accent }} />
+                <div style={pad12}>
+                    <div style={{ ...flexBetween, fontSize: 8, ...mb8 }}>
                         <div>
-                            {cfg.show_customer_details && customerName && <><p className="text-[6px] uppercase font-bold" style={{ color: mutedSolid }}>Customer</p><p className="font-medium">{customerName}</p></>}
+                            {cfg.show_customer_details && customerName && <><p style={{ fontSize: 6, textTransform: 'uppercase', fontWeight: 'bold', color: mutedSolid }}>Customer</p><p style={{ fontWeight: 500 }}>{customerName}</p></>}
                         </div>
-                        <div className="text-right">
-                            <p className="font-bold" style={{ color: accent }}>{receiptNumber}</p>
+                        <div style={right}>
+                            <p style={{ fontWeight: 'bold', color: accent }}>{receiptNumber}</p>
                             <p style={{ color: mutedSolid }}>{dateStr}</p>
                             {cashier && <p style={{ color: mutedSolid }}>Cashier: {cashier}</p>}
                         </div>
                     </div>
                     <ItemsTable showCode headerBg={isDark ? 'rgba(255,255,255,0.12)' : '#2c3e50'} />
-                    <div className="mt-2" />
+                    <div style={spacer8} />
                     <Totals bold />
                     {cfg.show_payment_details && <><SolidLine /><PaymentInfo /></>}
                     {cfg.show_referrer_details && referrer && <><SolidLine /><ReferrerInfo /></>}
-                    <div className="mt-2" />
+                    <div style={spacer8} />
                     <FooterBlock />
                     <BarcodeBlock />
                     <QRBlock />
