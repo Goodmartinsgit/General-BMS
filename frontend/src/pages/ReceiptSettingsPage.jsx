@@ -395,20 +395,28 @@ Thank you for your business!
                                 <PvDivider />
 
                                 {/* Items */}
-                                <div className="text-[10px] space-y-1.5 mb-2">
-                                    <div>
-                                        <div className="flex justify-between">
-                                            <span className="font-medium" style={{ color: textColor }}>Sample Product</span>
-                                            <span className="font-semibold" style={{ color: headingColor }}>{cs}5,000</span>
-                                        </div>
-                                        <div className="text-[9px]" style={{ color: labelColor }}>{cs}2,500 x 2</div>
+                                <div className="text-[10px] mb-2">
+                                    {/* Table header */}
+                                    <div className="flex justify-between px-1.5 py-1 rounded-sm mb-1" style={{ background: '#334155', color: '#ffffff' }}>
+                                        <span className="font-semibold flex-1">Item</span>
+                                        <span className="font-semibold w-8 text-center">Qty</span>
+                                        <span className="font-semibold w-14 text-right">Price</span>
+                                        <span className="font-semibold w-14 text-right">Total</span>
                                     </div>
-                                    <div>
-                                        <div className="flex justify-between">
-                                            <span className="font-medium" style={{ color: textColor }}>Another Item</span>
-                                            <span className="font-semibold" style={{ color: headingColor }}>{cs}2,500</span>
+                                    {/* Item rows */}
+                                    <div className="space-y-1 px-0.5">
+                                        <div className="flex justify-between items-baseline pb-1" style={{ borderBottom: `1px dashed ${dividerColor}` }}>
+                                            <span className="font-medium flex-1" style={{ color: textColor }}>Sample Product</span>
+                                            <span className="w-8 text-center" style={{ color: textColor }}>2</span>
+                                            <span className="w-14 text-right" style={{ color: textColor }}>{cs}2,500</span>
+                                            <span className="w-14 text-right font-semibold" style={{ color: headingColor }}>{cs}5,000</span>
                                         </div>
-                                        <div className="text-[9px]" style={{ color: labelColor }}>{cs}2,500 x 1</div>
+                                        <div className="flex justify-between items-baseline pb-1" style={{ borderBottom: `1px dashed ${dividerColor}` }}>
+                                            <span className="font-medium flex-1" style={{ color: textColor }}>Another Item</span>
+                                            <span className="w-8 text-center" style={{ color: textColor }}>1</span>
+                                            <span className="w-14 text-right" style={{ color: textColor }}>{cs}2,500</span>
+                                            <span className="w-14 text-right font-semibold" style={{ color: headingColor }}>{cs}2,500</span>
+                                        </div>
                                     </div>
                                 </div>
 

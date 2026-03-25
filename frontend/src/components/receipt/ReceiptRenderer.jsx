@@ -127,7 +127,7 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
                 </thead>
                 <tbody>
                     {normalizedItems.map((item, i) => (
-                        <tr key={i} style={{ borderBottom: `1px solid ${borderColor}` }}>
+                        <tr key={i} style={{ borderBottom: `1px dashed ${borderColor}` }}>
                             <td style={{ ...cellPad, textAlign: 'left' }}>
                                 {item.name}
                                 {item.variant && <span style={{ display: 'block', fontSize: 7, color: labelColor }}>({item.variant})</span>}
@@ -190,7 +190,7 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
         </div>
     );
 
-    const outerStyle = { backgroundColor: bgColor };
+    const outerStyle = { backgroundColor: bgColor, borderRadius: 12, overflow: 'hidden' };
     const outerProps = { ref, style: outerStyle, 'data-receipt-root': true };
 
     // Shared inline style helpers (px-based for html2canvas consistency)
@@ -221,6 +221,7 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
     const elegantDot = { width: 6, height: 6, borderRadius: '50%', background: accent };
 
     // ── Template 1: Standard ──
+    const stdHeaderBg = isDark ? '#374151' : '#334155';
     if (tid === 1) return (
         <div {...outerProps}>
             <div style={{ ...pad16, color: textColor, fontWeight }}>
@@ -239,7 +240,7 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
                     {branchName && <InfoRow label="Branch" value={branchName} />}
                 </div>
                 <Dash />
-                <ItemsTable />
+                <ItemsTable headerBg={stdHeaderBg} />
                 <Dash />
                 <Totals />
                 {cfg.show_payment_details && <><Dash /><PaymentInfo /></>}

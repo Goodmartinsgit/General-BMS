@@ -180,14 +180,23 @@ const ReceiptPreviewModal = ({
         printWindow.document.write(`<!DOCTYPE html><html><head>
             <title>Receipt - ${fileName}</title>
             <style>${cssText}
-            * { margin:0; padding:0; box-sizing:border-box; }
-            body { padding:10px; background:#fff; display:flex; justify-content:center; }
-            .receipt-print-wrapper { width:${paper.width}; margin:0 auto; background:${bgColor}; }
+            * { margin:0; padding:0; box-sizing:border-box;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+                color-adjust: exact !important;
+            }
+            body { padding:20px; background:#f3f4f6; display:flex; justify-content:center; align-items:flex-start; min-height:100vh; }
+            .receipt-print-wrapper {
+                width:${paper.width}; margin:0 auto; background:${bgColor};
+                border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+                overflow: hidden;
+            }
             table { width:100%; border-collapse:collapse; }
+            th, td { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
             @media print {
-                body { padding:0; }
+                body { padding:${paper.margin}; background:#fff; }
                 @page { size:${paper.pageSize}; margin:${paper.margin}; }
-                .receipt-print-wrapper { width:100%; }
+                .receipt-print-wrapper { width:100%; border-radius: 0; box-shadow: none; }
             }
             </style>
         </head><body>
