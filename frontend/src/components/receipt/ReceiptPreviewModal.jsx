@@ -148,12 +148,27 @@ const ReceiptPreviewModal = ({
     // ── Paper-size helpers ──
     const getPaperConfig = (paperSize) => {
         switch (paperSize) {
-            case 'A4': return { width: '190mm', widthPx: 719, pageSize: 'A4', margin: '10mm', pdfW: 190 };
-            case 'A5': return { width: '128mm', widthPx: 484, pageSize: 'A5', margin: '10mm', pdfW: 128 };
-            case 'A6': return { width: '85mm', widthPx: 321, pageSize: 'A6', margin: '10mm', pdfW: 85 };
-            case '80mm': return { width: '80mm', widthPx: 302, pageSize: '80mm 297mm', margin: '0', pdfW: 80 };
-            default: return { width: '128mm', widthPx: 484, pageSize: 'A5', margin: '10mm', pdfW: 128 };
+            case 'A4': return { width: '190mm', widthPx: 719, heightPx: 1123, pageSize: 'A4', margin: '10mm', pdfW: 190, pdfH: 277 };
+            case 'A5': return { width: '128mm', widthPx: 484, heightPx: 794, pageSize: 'A5', margin: '10mm', pdfW: 128, pdfH: 190 };
+            case 'A6': return { width: '85mm', widthPx: 321, heightPx: 559, pageSize: 'A6', margin: '10mm', pdfW: 85, pdfH: 128 };
+            case '80mm': return { width: '80mm', widthPx: 302, heightPx: 0, pageSize: '80mm 297mm', margin: '0', pdfW: 80, pdfH: 0 };
+            default: return { width: '128mm', widthPx: 484, heightPx: 794, pageSize: 'A5', margin: '10mm', pdfW: 128, pdfH: 190 };
         }
+    };
+
+    // ── Helper: draw rounded-rect clipping path on a canvas context ──
+    const roundedRect = (ctx, x, y, w, h, r) => {
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.lineTo(x + w - r, y);
+        ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+        ctx.lineTo(x + w, y + h - r);
+        ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+        ctx.lineTo(x + r, y + h);
+        ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+        ctx.lineTo(x, y + r);
+        ctx.quadraticCurveTo(x, y, x + r, y);
+        ctx.closePath();
     };
 
     // ── Print ──
@@ -213,42 +228,91 @@ const ReceiptPreviewModal = ({
     };
 
     // ── Capture receipt to canvas (shared by image + PDF downloads) ──
+    // Returns a canvas with rounded corners, padding, and minimum page height.
     const captureToCanvas = async () => {
         if (!receiptRef.current) return null;
         const bgColor = receiptData?.config?.receipt_bg_color || '#ffffff';
         const paperSize = receiptData?.config?.paper_size || 'A5';
         const paper = getPaperConfig(paperSize);
+        const scale = 3;
         const html2canvas = (await import('html2canvas')).default;
 
-        // Temporarily expand receipt to paper-size width for higher quality capture
-        const wrapper = receiptRef.current.parentElement;
+        // Temporarily expand receipt to paper-size width and enforce min height
+        const el = receiptRef.current;
+        const wrapper = el.parentElement;
         const origMaxWidth = wrapper ? wrapper.style.maxWidth : '';
         const origWidth = wrapper ? wrapper.style.width : '';
+        const origMinHeight = el.style.minHeight;
         if (wrapper) {
             wrapper.style.maxWidth = paper.width;
             wrapper.style.width = paper.width;
         }
+        // Enforce minimum one-page height (only for standard paper sizes)
+        if (paper.heightPx > 0) {
+            el.style.minHeight = `${paper.heightPx}px`;
+        }
 
         try {
-            const canvas = await html2canvas(receiptRef.current, {
-                scale: 3,
-                backgroundColor: bgColor,
+            // Capture the raw receipt content (no bg — we draw our own)
+            const rawCanvas = await html2canvas(el, {
+                scale,
+                backgroundColor: null, // transparent — we composite ourselves
                 useCORS: true,
                 allowTaint: false,
                 logging: false,
                 imageTimeout: 15000,
                 onclone: async (clonedDoc) => {
                     const clonedEl = clonedDoc.body.querySelector('[data-receipt-root]') || clonedDoc.body;
+                    // Enforce min-height in clone too
+                    if (paper.heightPx > 0 && clonedEl.hasAttribute('data-receipt-root')) {
+                        clonedEl.style.minHeight = `${paper.heightPx}px`;
+                    }
                     await inlineExternalImages(clonedEl);
                 },
             });
-            return canvas;
+
+            // Build final canvas: padding + rounded receipt + subtle shadow
+            const pad = Math.round(24 * scale);        // padding around receipt
+            const radius = Math.round(14 * scale);     // matches CSS border-radius
+            const rw = rawCanvas.width;
+            const rh = rawCanvas.height;
+            const finalW = rw + pad * 2;
+            const finalH = rh + pad * 2;
+
+            const final = document.createElement('canvas');
+            final.width = finalW;
+            final.height = finalH;
+            const ctx = final.getContext('2d');
+
+            // Light-gray page background
+            ctx.fillStyle = '#f0f1f3';
+            ctx.fillRect(0, 0, finalW, finalH);
+
+            // Drop shadow behind the receipt card
+            ctx.save();
+            ctx.shadowColor = 'rgba(0,0,0,0.18)';
+            ctx.shadowBlur = 18 * scale;
+            ctx.shadowOffsetX = 0;
+            ctx.shadowOffsetY = 4 * scale;
+            roundedRect(ctx, pad, pad, rw, rh, radius);
+            ctx.fillStyle = bgColor;
+            ctx.fill();
+            ctx.restore();
+
+            // Clip to rounded rect, then draw the receipt image
+            ctx.save();
+            roundedRect(ctx, pad, pad, rw, rh, radius);
+            ctx.clip();
+            ctx.drawImage(rawCanvas, pad, pad);
+            ctx.restore();
+
+            return final;
         } finally {
-            // Restore original preview width
             if (wrapper) {
                 wrapper.style.maxWidth = origMaxWidth;
                 wrapper.style.width = origWidth;
             }
+            el.style.minHeight = origMinHeight;
         }
     };
 
@@ -279,7 +343,7 @@ const ReceiptPreviewModal = ({
         }
     };
 
-    // ── Download as PDF ──
+    // ── Download as PDF (multi-page aware) ──
     const handleDownloadPDF = async () => {
         setDownloading(true);
         setShowDownloadMenu(false);
@@ -289,26 +353,42 @@ const ReceiptPreviewModal = ({
             const { default: jsPDF } = await import('jspdf');
 
             const imgData = canvas.toDataURL('image/png');
-            const imgWidth = canvas.width;
-            const imgHeight = canvas.height;
+            const canvasW = canvas.width;
+            const canvasH = canvas.height;
 
-            // Use paper_size setting for PDF dimensions
             const paperSize = receiptData?.config?.paper_size || 'A5';
             const paper = getPaperConfig(paperSize);
-            const pdfWidth = paper.pdfW;
-            const pdfHeight = (imgHeight * pdfWidth) / imgWidth;
+            const pageW = paper.pdfW + 20; // include margins
+            const imgOnPageW = paper.pdfW;
+            const imgOnPageH = (canvasH * imgOnPageW) / canvasW;
 
-            const pdf = new jsPDF({
-                orientation: pdfHeight > pdfWidth ? 'portrait' : 'landscape',
-                unit: 'mm',
-                format: [pdfWidth + 20, pdfHeight + 20], // +20mm padding
-            });
+            // Standard page height (use paper pdfH, or auto-fit for thermal/small)
+            const pageH = paper.pdfH > 0 ? paper.pdfH + 20 : imgOnPageH + 20;
 
-            pdf.addImage(imgData, 'PNG', 10, 10, pdfWidth, pdfHeight);
-            pdf.save(`receipt-${fileName}.pdf`);
+            // If the receipt image fits in one page, single page PDF
+            if (imgOnPageH + 20 <= pageH) {
+                const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [pageW, pageH] });
+                pdf.addImage(imgData, 'PNG', 10, 10, imgOnPageW, imgOnPageH);
+                pdf.save(`receipt-${fileName}.pdf`);
+            } else {
+                // Multi-page: slice the canvas image across pages
+                const usableH = pageH - 20; // 10mm top + 10mm bottom margin
+                const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [pageW, pageH] });
+                let yOffset = 0;
+                let page = 0;
+
+                while (yOffset < imgOnPageH) {
+                    if (page > 0) pdf.addPage([pageW, pageH]);
+                    const sliceH = Math.min(usableH, imgOnPageH - yOffset);
+                    // Draw the full image shifted up so the current slice is visible
+                    pdf.addImage(imgData, 'PNG', 10, 10 - yOffset, imgOnPageW, imgOnPageH);
+                    yOffset += usableH;
+                    page++;
+                }
+                pdf.save(`receipt-${fileName}.pdf`);
+            }
         } catch (err) {
             console.error('PDF download failed:', err);
-            // Fallback to image download
             handleDownloadImage();
         } finally {
             setDownloading(false);
