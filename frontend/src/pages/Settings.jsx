@@ -560,7 +560,7 @@ const ReceiptSection = () => {
         show_company_details: true, show_tax_breakdown: false, show_payment_details: true,
         show_customer_details: true, show_referrer_details: true, show_barcode: true, show_qr_code: false,
         receipt_bg_color: '#ffffff', receipt_text_color: '', receipt_accent_color: '',
-        receipt_font_weight: 'normal', receipt_font_size: 'small', receipt_heading_color: '', receipt_label_color: '',
+        receipt_font_weight: 'normal', receipt_font_size: 'small', receipt_font_sizes: {}, receipt_heading_color: '', receipt_label_color: '',
         use_company_branding: false, use_company_info: false,
         footer_text: 'Thank you for your business!', terms_and_conditions: '',
         currency_symbol: '₦', currency_code: 'NGN', paper_size: 'A5', delivery_format: 'auto',
@@ -890,27 +890,59 @@ const ReceiptSection = () => {
                                     </div>
                                 </div>
 
-                                {/* Font Size */}
+                                {/* Font Sizes per Category */}
                                 <div>
-                                    <label className={labelClass}>Font Size</label>
-                                    <div className="flex gap-1.5 flex-wrap">
-                                        {[
-                                            { val: 'small', label: 'Small', desc: 'Best for 80mm' },
-                                            { val: 'medium', label: 'Medium', desc: 'Good for A6' },
-                                            { val: 'large', label: 'Large', desc: 'Good for A5' },
-                                            { val: 'xlarge', label: 'X-Large', desc: 'Good for A4' },
-                                        ].map(fs => (
-                                            <button key={fs.val} type="button"
-                                                onClick={() => set('receipt_font_size', fs.val)}
-                                                title={fs.desc}
-                                                className={`px-2.5 py-1 text-[10px] sm:text-xs rounded-md border transition-all ${(cfg.receipt_font_size || 'small') === fs.val ? 'bg-accent-gold text-white border-accent-gold shadow-sm' : 'border-theme text-theme-muted hover:text-theme-primary hover:border-accent-gold/30'}`}>
-                                                {fs.label}
-                                            </button>
-                                        ))}
+                                    <div className="flex items-center justify-between mb-2">
+                                        <label className={labelClass}>Font Sizes</label>
+                                        <button type="button"
+                                            onClick={() => set('receipt_font_sizes', {})}
+                                            className="text-[9px] text-theme-muted hover:text-red-400 transition-colors">
+                                            Reset All
+                                        </button>
                                     </div>
-                                    <p className="text-[9px] text-theme-muted mt-1">
-                                        {({ small: 'Best for 80mm thermal receipts', medium: 'Good for A6 paper', large: 'Good for A5 paper', xlarge: 'Good for A4 paper' })[cfg.receipt_font_size || 'small']}
-                                    </p>
+                                    <div className="space-y-1.5">
+                                        {[
+                                            { key: 'company_name',    label: 'Company Name',      def: 14, min: 8,  max: 32 },
+                                            { key: 'company_details', label: 'Address / Details', def: 8,  min: 6,  max: 20 },
+                                            { key: 'receipt_info',    label: 'Receipt Info',       def: 8,  min: 6,  max: 20 },
+                                            { key: 'items',           label: 'Item Rows',          def: 8,  min: 6,  max: 20 },
+                                            { key: 'totals',          label: 'Subtotals',          def: 8,  min: 6,  max: 20 },
+                                            { key: 'total_highlight', label: 'Grand Total',        def: 10, min: 8,  max: 24 },
+                                            { key: 'payment',         label: 'Payment Info',       def: 8,  min: 6,  max: 20 },
+                                            { key: 'footer',          label: 'Footer',             def: 8,  min: 6,  max: 20 },
+                                        ].map(({ key, label, def, min, max }) => {
+                                            const sizes = cfg.receipt_font_sizes || {};
+                                            const val = sizes[key] ?? def;
+                                            const isCustom = key in sizes;
+                                            const update = (v) => set('receipt_font_sizes', { ...sizes, [key]: Math.min(max, Math.max(min, v)) });
+                                            const reset = () => { const s = { ...sizes }; delete s[key]; set('receipt_font_sizes', s); };
+                                            return (
+                                                <div key={key} className="flex items-center gap-2 py-0.5">
+                                                    <span className="text-[10px] text-theme-muted w-28 shrink-0">{label}</span>
+                                                    <div className="flex items-center gap-1 bg-theme-primary border border-theme rounded-md overflow-hidden">
+                                                        <button type="button" onClick={() => update(val - 1)}
+                                                            className="w-6 h-6 flex items-center justify-center text-theme-muted hover:text-theme-primary hover:bg-theme-tertiary transition-colors text-sm leading-none">
+                                                            −
+                                                        </button>
+                                                        <input type="number" min={min} max={max} value={val}
+                                                            onChange={e => update(Number(e.target.value))}
+                                                            className="w-8 text-center text-[10px] font-mono text-theme-primary bg-transparent border-none outline-none [-moz-appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none" />
+                                                        <button type="button" onClick={() => update(val + 1)}
+                                                            className="w-6 h-6 flex items-center justify-center text-theme-muted hover:text-theme-primary hover:bg-theme-tertiary transition-colors text-sm leading-none">
+                                                            +
+                                                        </button>
+                                                    </div>
+                                                    <span className="text-[9px] text-theme-muted">px</span>
+                                                    {isCustom && (
+                                                        <button type="button" onClick={reset}
+                                                            className="text-[9px] text-theme-muted hover:text-red-400 transition-colors ml-auto">
+                                                            ↺
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
                                 </div>
                             </div>
                             <p className="text-[9px] text-theme-muted mt-2">{cfg.use_company_branding ? 'Colors are synced from Branding settings.' : 'Leave color fields empty for auto-contrast defaults. Leave accent empty for template default.'}</p>
