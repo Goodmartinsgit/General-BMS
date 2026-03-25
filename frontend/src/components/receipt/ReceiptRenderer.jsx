@@ -56,6 +56,11 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
     const subtleBg = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.03)';
     const fontWeight = cfg.receipt_font_weight || 'normal';
 
+    // Font size scaling — 'small' is base (for 80mm), scale up for larger paper
+    const fontSizeScale = { small: 1, medium: 1.35, large: 1.7, xlarge: 2 };
+    const scale = fontSizeScale[cfg.receipt_font_size] || fontSizeScale.small;
+    const fs = (base) => Math.round(base * scale);  // scale a base px font size
+
     const fmt = (v) => `${currencySymbol}${Number(v || 0).toLocaleString('en-NG', { minimumFractionDigits: 0 })}`;
 
     // Normalize sale data

@@ -37,6 +37,7 @@ const DEFAULT_CONFIG = {
     use_company_branding: false,
     use_company_info: false,
     receipt_font_weight: 'normal',
+    receipt_font_size: 'small',
     receipt_heading_color: '',
     receipt_label_color: '',
     email_enabled: false,
@@ -144,6 +145,7 @@ const updateReceiptConfig = async (req, res) => {
             use_company_branding: req.body.use_company_branding,
             use_company_info: req.body.use_company_info,
             receipt_font_weight: req.body.receipt_font_weight,
+            receipt_font_size: req.body.receipt_font_size,
             receipt_heading_color: req.body.receipt_heading_color,
             receipt_label_color: req.body.receipt_label_color,
         };

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
     Receipt, Save, RefreshCw, Eye, Building2, Phone, Mail, MapPin,
     FileText, QrCode, Barcode, Image, Hash, Layout, Settings,
-    Loader2, Globe, MessageCircle, ChevronDown, ChevronUp
+    Loader2, Globe, MessageCircle, ChevronDown, ChevronUp, Type
 } from 'lucide-react';
 import PageHeader from '../components/common/PageHeader';
 import { getReceiptConfig, updateReceiptConfig } from '../api/receipts';
@@ -25,6 +25,16 @@ const TEMPLATES = [
 ];
 
 const PAPER_SIZES = ['A4', 'A5', 'A6', '80mm'];
+const FONT_SIZES = [
+    { val: 'small', label: 'Small', desc: 'Best for 80mm' },
+    { val: 'medium', label: 'Medium', desc: 'Good for A6' },
+    { val: 'large', label: 'Large', desc: 'Good for A5' },
+    { val: 'xlarge', label: 'X-Large', desc: 'Good for A4' },
+];
+const FONT_WEIGHTS = [
+    { val: 'normal', label: 'Normal' },
+    { val: 'bold', label: 'Bold' },
+];
 const DELIVERY_FORMATS = [
     { val: 'auto', label: 'Auto', icon: Settings },
     { val: 'pdf', label: 'PDF', icon: FileText },
@@ -116,6 +126,8 @@ const ReceiptSettingsPage = () => {
         currency_code: 'NGN',
         paper_size: 'A5',
         delivery_format: 'auto',
+        receipt_font_size: 'small',
+        receipt_font_weight: 'normal',
         email_enabled: false,
         email_subject_template: '',
         email_body_template: '',
@@ -323,6 +335,62 @@ Thank you for your business!
                                             {fmt.label}
                                         </button>
                                     ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Font Size & Weight */}
+                        <div className="mt-5 pt-5 border-t border-theme">
+                            <h4 className="text-sm font-semibold text-theme-primary mb-4 flex items-center gap-2">
+                                <Type size={15} className="text-accent-gold" />
+                                Typography
+                            </h4>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                                <div>
+                                    <label className="block text-xs font-medium text-theme-muted uppercase tracking-wider mb-2">Font Size</label>
+                                    <div className="flex bg-theme-primary p-1 rounded-lg border border-theme">
+                                        {FONT_SIZES.map((size) => (
+                                            <button
+                                                key={size.val}
+                                                type="button"
+                                                onClick={() => handleChange('receipt_font_size', size.val)}
+                                                className={`flex-1 py-2 text-xs font-medium rounded-md transition-all ${
+                                                    (config.receipt_font_size || 'small') === size.val
+                                                        ? 'bg-accent-gold text-white shadow-sm'
+                                                        : 'text-theme-muted hover:text-theme-primary'
+                                                }`}
+                                                title={size.desc}
+                                            >
+                                                {size.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <p className="text-[10px] text-theme-muted mt-1.5">
+                                        {FONT_SIZES.find(s => s.val === (config.receipt_font_size || 'small'))?.desc}
+                                    </p>
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-theme-muted uppercase tracking-wider mb-2">Font Weight</label>
+                                    <div className="flex bg-theme-primary p-1 rounded-lg border border-theme">
+                                        {FONT_WEIGHTS.map((w) => (
+                                            <button
+                                                key={w.val}
+                                                type="button"
+                                                onClick={() => handleChange('receipt_font_weight', w.val)}
+                                                className={`flex-1 py-2 text-xs rounded-md transition-all ${
+                                                    (config.receipt_font_weight || 'normal') === w.val
+                                                        ? 'bg-accent-gold text-white shadow-sm'
+                                                        : 'text-theme-muted hover:text-theme-primary'
+                                                }`}
+                                                style={{ fontWeight: w.val }}
+                                            >
+                                                {w.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <p className="text-[10px] text-theme-muted mt-1.5">
+                                        Applies to general receipt text
+                                    </p>
                                 </div>
                             </div>
                         </div>
