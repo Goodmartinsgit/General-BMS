@@ -417,7 +417,7 @@ const ReceiptPreviewModal = ({
 
             {/* Modal */}
             <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-                <div className="bg-theme-secondary rounded-2xl shadow-2xl border border-theme w-full max-w-lg max-h-[90vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                <div className="bg-theme-secondary rounded-2xl shadow-2xl border border-theme w-full max-w-2xl max-h-[95vh] flex flex-col overflow-hidden animate-in fade-in zoom-in-95 duration-200">
 
                     {/* Header */}
                     <div className="flex items-center justify-between px-5 py-3.5 border-b border-theme bg-theme-primary">
@@ -512,7 +512,7 @@ const ReceiptPreviewModal = ({
                         )}
 
                         {!loading && !error && receiptData && (
-                            <div style={{ maxWidth: 320, margin: '0 auto', borderRadius: 14, overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,0.15)' }}>
+                            <div style={{ width: getPaperConfig(receiptData?.config?.paper_size || 'A5').widthPx, maxWidth: '100%', margin: '0 auto', borderRadius: 14, overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,0.15)' }}>
                                 <ReceiptRenderer
                                     ref={receiptRef}
                                     config={effectiveConfig}
