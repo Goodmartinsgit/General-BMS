@@ -59,7 +59,7 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
     // Font size scaling — 'small' is base (for 80mm), scale up for larger paper
     const fontSizeScale = { small: 1, medium: 1.35, large: 1.7, xlarge: 2 };
     const scale = fontSizeScale[cfg.receipt_font_size] || fontSizeScale.small;
-    const fs = (base) => Math.round(base * scale);  // scale a base px font size
+    const fs = (base) => Math.round(base * scale);
 
     const fmt = (v) => `${currencySymbol}${Number(v || 0).toLocaleString('en-NG', { minimumFractionDigits: 0 })}`;
 
@@ -101,9 +101,9 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
         ? cfg.company_primary_color
         : accent;
     const CompanyName = ({ style: s = {} }) =>
-        <p style={{ fontWeight: 'bold', color: companyNameColor, fontSize: 14, ...s }}>{cfg.company_name || 'Your Business'}</p>;
+        <p style={{ fontWeight: 'bold', color: companyNameColor, fontSize: fs(14), ...s }}>{cfg.company_name || 'Your Business'}</p>;
     const CompanyDetails = ({ style: s = {} }) => cfg.show_company_details ? (
-        <div style={{ fontSize: 8, color: labelColor, lineHeight: 1.6, ...s }}>
+        <div style={{ fontSize: fs(8), color: labelColor, lineHeight: 1.6, ...s }}>
             {cfg.company_address && <p>{cfg.company_address}</p>}
             {cfg.company_phone && <p>Tel: {cfg.company_phone}</p>}
             {cfg.company_email && <p>{cfg.company_email}</p>}
@@ -111,7 +111,7 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
         </div>
     ) : null;
     const TaxNumber = ({ style: s = {} }) => cfg.show_tax_number && cfg.tax_number
-        ? <p style={{ fontSize: 8, color: labelColor, ...s }}>{cfg.tax_label || 'TIN'}: {cfg.tax_number}</p>
+        ? <p style={{ fontSize: fs(8), color: labelColor, ...s }}>{cfg.tax_label || 'TIN'}: {cfg.tax_number}</p>
         : null;
     const Dash = () => <div style={{ marginTop: 10, marginBottom: 10, borderTop: `1px dashed ${borderColor}` }} />;
     const SolidLine = ({ color }) => <div style={{ marginTop: 10, marginBottom: 10, borderTop: `1px solid ${color || borderColor}` }} />;
@@ -123,7 +123,7 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
             : { color: headingColor, borderBottom: `1px solid ${borderColor}`, ...cellPad, padding: '6px 6px' };
         return (
             <div style={{ borderRadius: 6, overflow: 'hidden' }}>
-                <table style={{ width: '100%', fontSize: 8, color: textColor, fontWeight, borderCollapse: 'collapse', borderSpacing: 0 }}>
+                <table style={{ width: '100%', fontSize: fs(8), color: textColor, fontWeight, borderCollapse: 'collapse', borderSpacing: 0 }}>
                     <thead>
                         <tr style={headerBg ? { background: headerBg, color: thBase.color } : {}}>
                             <th style={{ ...thBase, textAlign: 'left' }}>Item</th>
@@ -138,7 +138,7 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
                             <tr key={i} style={{ borderBottom: `1px dashed ${borderColor}` }}>
                                 <td style={{ ...cellPad, textAlign: 'left' }}>
                                     {item.name}
-                                    {item.variant && <span style={{ display: 'block', fontSize: 7, color: labelColor }}>({item.variant})</span>}
+                                    {item.variant && <span style={{ display: 'block', fontSize: fs(7), color: labelColor }}>({item.variant})</span>}
                                 </td>
                                 {showCode && <td style={{ ...cellPad, textAlign: 'left', color: labelColor }}>{item.code}</td>}
                                 <td style={{ ...cellPad, textAlign: 'center' }}>{item.qty}</td>
@@ -152,21 +152,21 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
         );
     };
 
-    const rowFlex = { display: 'flex', justifyContent: 'space-between', fontSize: 8 };
+    const rowFlex = { display: 'flex', justifyContent: 'space-between', fontSize: fs(8) };
 
     const Totals = ({ bold = false }) => (
-        <div style={{ fontSize: 8, color: textColor, fontWeight }}>
+        <div style={{ fontSize: fs(8), color: textColor, fontWeight }}>
             <div style={{ ...rowFlex, marginBottom: 5 }}><span style={{ color: labelColor }}>Subtotal</span><span>{fmt(subtotal)}</span></div>
             {discount > 0 && <div style={{ ...rowFlex, color: '#dc2626', marginBottom: 5, fontWeight: 600 }}><span>Discount</span><span>-{fmt(discount)}</span></div>}
             {cfg.show_tax_breakdown && <div style={{ ...rowFlex, marginBottom: 5 }}><span style={{ color: labelColor }}>{cfg.tax_label || 'VAT'} {cfg.tax_rate > 0 ? `(${cfg.tax_rate}%)` : ''}</span><span>{fmt(taxAmount)}</span></div>}
-            <div style={{ ...rowFlex, paddingTop: 6, marginTop: 6, borderTop: `1px solid ${borderColor}`, fontWeight: 'bold', fontSize: bold ? 11 : 10 }}>
+            <div style={{ ...rowFlex, paddingTop: 6, marginTop: 6, borderTop: `1px solid ${borderColor}`, fontWeight: 'bold', fontSize: bold ? fs(11) : fs(10) }}>
                 <span>Total</span><span>{fmt(total)}</span>
             </div>
         </div>
     );
 
     const PaymentInfo = () => cfg.show_payment_details ? (
-        <div style={{ fontSize: 8, color: textColor, fontWeight }}>
+        <div style={{ fontSize: fs(8), color: textColor, fontWeight }}>
             <div style={{ ...rowFlex, marginBottom: 5 }}><span style={{ color: labelColor }}>Payment</span><span style={{ textTransform: 'capitalize' }}>{paymentMethod}</span></div>
             <div style={{ ...rowFlex, marginBottom: 5 }}><span style={{ color: labelColor }}>Paid</span><span style={{ color: '#16a34a', fontWeight: 600 }}>{fmt(paid)}</span></div>
             {change > 0 && <div style={{ ...rowFlex, fontWeight: 600 }}><span style={{ color: labelColor }}>Change</span><span>{fmt(change)}</span></div>}
@@ -174,13 +174,13 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
     ) : null;
 
     const ReferrerInfo = () => cfg.show_referrer_details && referrer ? (
-        <div style={{ fontSize: 8, color: textColor, fontWeight }}><div style={rowFlex}><span style={{ color: labelColor }}>Referred by</span><span>{referrer}</span></div></div>
+        <div style={{ fontSize: fs(8), color: textColor, fontWeight }}><div style={rowFlex}><span style={{ color: labelColor }}>Referred by</span><span>{referrer}</span></div></div>
     ) : null;
 
     const FooterBlock = () => (
         <>
-            {cfg.footer_text && <p style={{ fontSize: 8, textAlign: 'center', fontStyle: 'italic', color: labelColor, marginTop: 4 }}>{cfg.footer_text}</p>}
-            {cfg.terms_and_conditions && <p style={{ fontSize: 7, textAlign: 'center', marginTop: 4, color: mutedColor }}>{cfg.terms_and_conditions}</p>}
+            {cfg.footer_text && <p style={{ fontSize: fs(8), textAlign: 'center', fontStyle: 'italic', color: labelColor, marginTop: 4 }}>{cfg.footer_text}</p>}
+            {cfg.terms_and_conditions && <p style={{ fontSize: fs(7), textAlign: 'center', marginTop: 4, color: mutedColor }}>{cfg.terms_and_conditions}</p>}
         </>
     );
 
@@ -244,7 +244,7 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
             <div style={{ ...pad16, color: textColor, fontWeight }}>
                 <div style={{ ...center, ...mb8 }}>
                     <div style={{ ...flexCenter, ...mb4 }}><Logo /></div>
-                    <CompanyName style={{ fontSize: 15 }} />
+                    <CompanyName style={{ fontSize: fs(15) }} />
                     <CompanyDetails style={{ ...mt2 }} />
                     <TaxNumber style={{ ...mt2 }} />
                 </div>
@@ -280,18 +280,18 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
                     <div style={{ ...flexItems, gap: 8, ...mb8 }}>
                         <Logo />
                         <div>
-                            <CompanyName style={{ fontSize: 14 }} />
-                            <CompanyDetails style={{ fontSize: 7 }} />
+                            <CompanyName style={{ fontSize: fs(14) }} />
+                            <CompanyDetails style={{ fontSize: fs(7) }} />
                         </div>
                     </div>
                     <TaxNumber />
                 </div>
-                <div style={{ padding: '6px 12px', color: '#fff', fontSize: 8, ...flexBetween, background: accent }}>
+                <div style={{ padding: '6px 12px', color: '#fff', fontSize: fs(8), ...flexBetween, background: accent }}>
                     <span style={{ fontWeight: 'bold' }}>{receiptNumber}</span>
                     <span>{dateStr}</span>
                 </div>
                 <div style={pad12}>
-                    {cfg.show_customer_details && customerName && <div style={{ fontSize: 8, ...mb8 }}><span style={{ color: mutedSolid }}>Customer: </span><span style={{ fontWeight: 500 }}>{customerName}</span></div>}
+                    {cfg.show_customer_details && customerName && <div style={{ fontSize: fs(8), ...mb8 }}><span style={{ color: mutedSolid }}>Customer: </span><span style={{ fontWeight: 500 }}>{customerName}</span></div>}
                     <ItemsTable headerBg={accent} />
                     <div style={spacer8} />
                     <Totals bold />
@@ -312,13 +312,13 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
             <div style={{ ...pad16, color: textColor, fontWeight }}>
                 <div style={{ ...center, ...mb8 }}>
                     <div style={{ ...flexCenter, ...mb4 }}><Logo /></div>
-                    <CompanyName style={{ fontSize: 16, textTransform: 'uppercase', letterSpacing: '0.05em' }} />
+                    <CompanyName style={{ fontSize: fs(16), textTransform: 'uppercase', letterSpacing: '0.05em' }} />
                     <CompanyDetails style={mt2} />
                     <TaxNumber style={mt2} />
                 </div>
                 <div style={boldLine()} />
-                <p style={{ ...center, fontFamily: 'monospace', fontWeight: 'bold', fontSize: 10, letterSpacing: '0.1em', ...mb4, color: accent }}>{receiptNumber}</p>
-                <p style={{ ...center, fontSize: 8, ...mb6, color: mutedSolid }}>{dateStr}</p>
+                <p style={{ ...center, fontFamily: 'monospace', fontWeight: 'bold', fontSize: fs(10), letterSpacing: '0.1em', ...mb4, color: accent }}>{receiptNumber}</p>
+                <p style={{ ...center, fontSize: fs(8), ...mb6, color: mutedSolid }}>{dateStr}</p>
                 <div style={infoGroup}>
                     {cfg.show_customer_details && customerName && <InfoRow label="Customer" value={customerName} />}
                     {cashier && <InfoRow label="Cashier" value={cashier} />}
@@ -341,25 +341,25 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
     if (tid === 4) return (
         <div {...outerProps}>
             <div style={{ color: textColor, fontWeight }}>
-                <div style={{ padding: '8px 12px', fontSize: 7, textAlign: 'right', color: mutedSolid, borderBottom: `1px solid ${borderColor}` }}>{dateStr}</div>
+                <div style={{ padding: '8px 12px', fontSize: fs(7), textAlign: 'right', color: mutedSolid, borderBottom: `1px solid ${borderColor}` }}>{dateStr}</div>
                 <div style={pad12}>
                     <div style={{ ...flexBetween, alignItems: 'flex-start', ...mb8 }}>
-                        <div style={{ ...flexItems, gap: 6 }}><Logo /><CompanyName style={{ fontSize: 12 }} /></div>
-                        <div style={{ ...right, fontSize: 8 }}><span style={{ fontWeight: 'bold', color: accent }}>INVOICE</span><br /><span style={{ color: mutedSolid }}>{receiptNumber}</span></div>
+                        <div style={{ ...flexItems, gap: 6 }}><Logo /><CompanyName style={{ fontSize: fs(12) }} /></div>
+                        <div style={{ ...right, fontSize: fs(8) }}><span style={{ fontWeight: 'bold', color: accent }}>INVOICE</span><br /><span style={{ color: mutedSolid }}>{receiptNumber}</span></div>
                     </div>
-                    <CompanyDetails style={{ fontSize: 7 }} />
+                    <CompanyDetails style={{ fontSize: fs(7) }} />
                     <TaxNumber style={mt2} />
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 8, marginBottom: 8, fontSize: 7 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 6, marginTop: 8, marginBottom: 8, fontSize: fs(7) }}>
                         <div style={gridBox(subtleBg)}>
-                            <p style={{ textTransform: 'uppercase', fontSize: 6, fontWeight: 'bold', color: mutedSolid }}>Bill To</p>
+                            <p style={{ textTransform: 'uppercase', fontSize: fs(6), fontWeight: 'bold', color: mutedSolid }}>Bill To</p>
                             {cfg.show_customer_details && customerName && <p style={{ fontWeight: 500 }}>{customerName}</p>}
                         </div>
                         <div style={gridBox(subtleBg)}>
-                            <p style={{ textTransform: 'uppercase', fontSize: 6, fontWeight: 'bold', color: mutedSolid }}>Date</p>
+                            <p style={{ textTransform: 'uppercase', fontSize: fs(6), fontWeight: 'bold', color: mutedSolid }}>Date</p>
                             <p style={{ fontWeight: 500 }}>{dateStr}</p>
                         </div>
                         <div style={gridBox(subtleBg)}>
-                            <p style={{ textTransform: 'uppercase', fontSize: 6, fontWeight: 'bold', color: mutedSolid }}>Cashier</p>
+                            <p style={{ textTransform: 'uppercase', fontSize: fs(6), fontWeight: 'bold', color: mutedSolid }}>Cashier</p>
                             <p style={{ fontWeight: 500 }}>{cashier}</p>
                         </div>
                     </div>
@@ -383,15 +383,15 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
             <div style={{ color: textColor, fontWeight }}>
                 <div style={{ ...pad12, borderBottom: `2px solid ${accent}` }}>
                     <div style={{ ...flexBetween, alignItems: 'flex-start' }}>
-                        <div><div style={{ ...flexItems, gap: 6 }}><Logo /><CompanyName style={{ fontSize: 12 }} /></div><CompanyDetails style={{ fontSize: 7, ...mt2 }} /></div>
-                        <div style={right}><p style={{ fontSize: 10, fontWeight: 'bold', color: accent }}>RECEIPT</p><p style={{ fontSize: 7, color: mutedSolid }}>{receiptNumber}</p></div>
+                        <div><div style={{ ...flexItems, gap: 6 }}><Logo /><CompanyName style={{ fontSize: fs(12) }} /></div><CompanyDetails style={{ fontSize: fs(7), ...mt2 }} /></div>
+                        <div style={right}><p style={{ fontSize: fs(10), fontWeight: 'bold', color: accent }}>RECEIPT</p><p style={{ fontSize: fs(7), color: mutedSolid }}>{receiptNumber}</p></div>
                     </div>
                 </div>
                 <div style={pad12}>
                     <TaxNumber style={mb4} />
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8, marginBottom: 8, fontSize: 7 }}>
-                        <div>{cfg.show_customer_details && customerName && <><p style={{ textTransform: 'uppercase', fontSize: 6, fontWeight: 'bold', ...mb2, color: mutedSolid }}>Customer</p><p style={{ fontWeight: 500 }}>{customerName}</p>{customerPhone && <p style={{ color: mutedSolid }}>{customerPhone}</p>}</>}</div>
-                        <div style={right}><p style={{ textTransform: 'uppercase', fontSize: 6, fontWeight: 'bold', ...mb2, color: mutedSolid }}>Details</p><p>{dateStr}</p>{cashier && <p>Cashier: {cashier}</p>}</div>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, marginTop: 8, marginBottom: 8, fontSize: fs(7) }}>
+                        <div>{cfg.show_customer_details && customerName && <><p style={{ textTransform: 'uppercase', fontSize: fs(6), fontWeight: 'bold', ...mb2, color: mutedSolid }}>Customer</p><p style={{ fontWeight: 500 }}>{customerName}</p>{customerPhone && <p style={{ color: mutedSolid }}>{customerPhone}</p>}</>}</div>
+                        <div style={right}><p style={{ textTransform: 'uppercase', fontSize: fs(6), fontWeight: 'bold', ...mb2, color: mutedSolid }}>Details</p><p>{dateStr}</p>{cashier && <p>Cashier: {cashier}</p>}</div>
                     </div>
                     <ItemsTable showCode />
                     <div style={spacer8} />
@@ -413,22 +413,22 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
             <div style={{ color: textColor, fontWeight }}>
                 <div style={{ padding: 10, margin: 8, borderRadius: 4, ...center, border: `2px solid ${borderStrong}` }}>
                     <div style={{ ...flexCenter, ...mb4 }}><Logo /></div>
-                    <CompanyName style={{ fontSize: 14 }} />
+                    <CompanyName style={{ fontSize: fs(14) }} />
                     <CompanyDetails style={mt2} />
                     <TaxNumber style={mt2} />
                 </div>
                 <div style={{ padding: '0 12px 12px' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, ...mb8 }}>
                         <div style={gridBoxBorder}>
-                            <p style={{ fontSize: 6, fontWeight: 'bold', textTransform: 'uppercase', ...mb2, color: mutedSolid }}>Bill To</p>
-                            {cfg.show_customer_details && customerName && <p style={{ fontSize: 8, fontWeight: 500 }}>{customerName}</p>}
-                            {cfg.show_customer_details && customerPhone && <p style={{ fontSize: 7, color: mutedSolid }}>{customerPhone}</p>}
+                            <p style={{ fontSize: fs(6), fontWeight: 'bold', textTransform: 'uppercase', ...mb2, color: mutedSolid }}>Bill To</p>
+                            {cfg.show_customer_details && customerName && <p style={{ fontSize: fs(8), fontWeight: 500 }}>{customerName}</p>}
+                            {cfg.show_customer_details && customerPhone && <p style={{ fontSize: fs(7), color: mutedSolid }}>{customerPhone}</p>}
                         </div>
                         <div style={gridBoxBorder}>
-                            <p style={{ fontSize: 6, fontWeight: 'bold', textTransform: 'uppercase', ...mb2, color: mutedSolid }}>Receipt Info</p>
-                            <p style={{ fontSize: 8, fontWeight: 500 }}>{receiptNumber}</p>
-                            <p style={{ fontSize: 7, color: mutedSolid }}>{dateStr}</p>
-                            {cashier && <p style={{ fontSize: 7, color: mutedSolid }}>Cashier: {cashier}</p>}
+                            <p style={{ fontSize: fs(6), fontWeight: 'bold', textTransform: 'uppercase', ...mb2, color: mutedSolid }}>Receipt Info</p>
+                            <p style={{ fontSize: fs(8), fontWeight: 500 }}>{receiptNumber}</p>
+                            <p style={{ fontSize: fs(7), color: mutedSolid }}>{dateStr}</p>
+                            {cashier && <p style={{ fontSize: fs(7), color: mutedSolid }}>Cashier: {cashier}</p>}
                         </div>
                     </div>
                     <ItemsTable showCode headerBg={isDark ? '#374151' : '#212529'} />
@@ -452,11 +452,11 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
             <div style={{ ...pad16, color: textColor, fontWeight, fontFamily: 'Georgia, "Times New Roman", serif' }}>
                 <div style={{ ...center, ...mb8 }}>
                     <div style={{ ...flexCenter, ...mb4 }}><Logo /></div>
-                    <CompanyName style={{ fontSize: 14, letterSpacing: '0.05em' }} />
+                    <CompanyName style={{ fontSize: fs(14), letterSpacing: '0.05em' }} />
                     <CompanyDetails style={mt2} />
                     <TaxNumber style={mt2} />
                 </div>
-                <p style={{ ...center, fontSize: 9, fontWeight: 'bold', letterSpacing: '0.2em', textTransform: 'uppercase', ...mb4, color: accent }}>Official Receipt</p>
+                <p style={{ ...center, fontSize: fs(9), fontWeight: 'bold', letterSpacing: '0.2em', textTransform: 'uppercase', ...mb4, color: accent }}>Official Receipt</p>
                 <div style={elegantDivider}><div style={elegantLine} /><div style={elegantDot} /><div style={elegantLine} /></div>
                 <div style={{ ...mb8 }}>
                     <InfoRow label="Receipt #" value={receiptNumber} />
@@ -486,17 +486,17 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
                     <div style={{ ...flexItems, gap: 8 }}>
                         <Logo />
                         <div>
-                            <CompanyName style={{ fontSize: 14, color: '#fff' }} />
-                            {cfg.show_company_details && <div style={{ fontSize: 7, color: 'rgba(255,255,255,0.7)' }}>{cfg.company_address && <span>{cfg.company_address}</span>}{cfg.company_phone && <span> &bull; {cfg.company_phone}</span>}</div>}
+                            <CompanyName style={{ fontSize: fs(14), color: '#fff' }} />
+                            {cfg.show_company_details && <div style={{ fontSize: fs(7), color: 'rgba(255,255,255,0.7)' }}>{cfg.company_address && <span>{cfg.company_address}</span>}{cfg.company_phone && <span> &bull; {cfg.company_phone}</span>}</div>}
                         </div>
                     </div>
                     <TaxNumber style={mt4} />
                 </div>
                 <div style={{ height: 4, background: accent }} />
                 <div style={pad12}>
-                    <div style={{ ...flexBetween, fontSize: 8, ...mb8 }}>
+                    <div style={{ ...flexBetween, fontSize: fs(8), ...mb8 }}>
                         <div>
-                            {cfg.show_customer_details && customerName && <><p style={{ fontSize: 6, textTransform: 'uppercase', fontWeight: 'bold', color: mutedSolid }}>Customer</p><p style={{ fontWeight: 500 }}>{customerName}</p></>}
+                            {cfg.show_customer_details && customerName && <><p style={{ fontSize: fs(6), textTransform: 'uppercase', fontWeight: 'bold', color: mutedSolid }}>Customer</p><p style={{ fontWeight: 500 }}>{customerName}</p></>}
                         </div>
                         <div style={right}>
                             <p style={{ fontWeight: 'bold', color: accent }}>{receiptNumber}</p>
