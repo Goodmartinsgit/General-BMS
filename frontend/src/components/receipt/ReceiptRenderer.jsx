@@ -1,5 +1,5 @@
 import React, { forwardRef } from 'react';
-import { QrCode } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 
 // ── Auto-contrast helper ──
 export const getContrastTextColor = (bgColor) => {
@@ -96,7 +96,7 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
     const CompanyName = ({ style: s = {} }) =>
         <p style={{ fontWeight: 'bold', color: companyNameColor, fontSize: 14, ...s }}>{cfg.company_name || 'Your Business'}</p>;
     const CompanyDetails = ({ style: s = {} }) => cfg.show_company_details ? (
-        <div style={{ fontSize: 8, color: labelColor, ...s }}>
+        <div style={{ fontSize: 8, color: labelColor, lineHeight: 1.6, ...s }}>
             {cfg.company_address && <p>{cfg.company_address}</p>}
             {cfg.company_phone && <p>Tel: {cfg.company_phone}</p>}
             {cfg.company_email && <p>{cfg.company_email}</p>}
@@ -106,40 +106,42 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
     const TaxNumber = ({ style: s = {} }) => cfg.show_tax_number && cfg.tax_number
         ? <p style={{ fontSize: 8, color: labelColor, ...s }}>{cfg.tax_label || 'TIN'}: {cfg.tax_number}</p>
         : null;
-    const Dash = () => <div style={{ marginTop: 6, marginBottom: 6, borderTop: `1px dashed ${borderColor}` }} />;
-    const SolidLine = ({ color }) => <div style={{ marginTop: 6, marginBottom: 6, borderTop: `1px solid ${color || borderColor}` }} />;
+    const Dash = () => <div style={{ marginTop: 10, marginBottom: 10, borderTop: `1px dashed ${borderColor}` }} />;
+    const SolidLine = ({ color }) => <div style={{ marginTop: 10, marginBottom: 10, borderTop: `1px solid ${color || borderColor}` }} />;
 
-    const cellPad = { padding: '2px 2px' };
+    const cellPad = { padding: '4px 4px' };
     const ItemsTable = ({ showCode = false, headerBg = '' }) => {
         const thBase = headerBg
-            ? { background: headerBg, color: getContrastTextColor(headerBg), ...cellPad }
-            : { color: headingColor, borderBottom: `1px solid ${borderColor}`, ...cellPad };
+            ? { background: headerBg, color: getContrastTextColor(headerBg), ...cellPad, padding: '6px 6px' }
+            : { color: headingColor, borderBottom: `1px solid ${borderColor}`, ...cellPad, padding: '6px 6px' };
         return (
-            <table style={{ width: '100%', fontSize: 8, color: textColor, fontWeight, borderCollapse: 'collapse', borderSpacing: 0 }}>
-                <thead>
-                    <tr style={headerBg ? { background: headerBg, color: thBase.color } : {}}>
-                        <th style={{ ...thBase, textAlign: 'left' }}>Item</th>
-                        {showCode && <th style={{ ...thBase, textAlign: 'left' }}>Code</th>}
-                        <th style={{ ...thBase, textAlign: 'center' }}>Qty</th>
-                        <th style={{ ...thBase, textAlign: 'right' }}>Price</th>
-                        <th style={{ ...thBase, textAlign: 'right' }}>Total</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {normalizedItems.map((item, i) => (
-                        <tr key={i} style={{ borderBottom: `1px dashed ${borderColor}` }}>
-                            <td style={{ ...cellPad, textAlign: 'left' }}>
-                                {item.name}
-                                {item.variant && <span style={{ display: 'block', fontSize: 7, color: labelColor }}>({item.variant})</span>}
-                            </td>
-                            {showCode && <td style={{ ...cellPad, textAlign: 'left', color: labelColor }}>{item.code}</td>}
-                            <td style={{ ...cellPad, textAlign: 'center' }}>{item.qty}</td>
-                            <td style={{ ...cellPad, textAlign: 'right' }}>{fmt(item.price)}</td>
-                            <td style={{ ...cellPad, textAlign: 'right', fontWeight: 500 }}>{fmt(item.total)}</td>
+            <div style={{ borderRadius: 6, overflow: 'hidden' }}>
+                <table style={{ width: '100%', fontSize: 8, color: textColor, fontWeight, borderCollapse: 'collapse', borderSpacing: 0 }}>
+                    <thead>
+                        <tr style={headerBg ? { background: headerBg, color: thBase.color } : {}}>
+                            <th style={{ ...thBase, textAlign: 'left' }}>Item</th>
+                            {showCode && <th style={{ ...thBase, textAlign: 'left' }}>Code</th>}
+                            <th style={{ ...thBase, textAlign: 'center' }}>Qty</th>
+                            <th style={{ ...thBase, textAlign: 'right' }}>Price</th>
+                            <th style={{ ...thBase, textAlign: 'right' }}>Total</th>
                         </tr>
-                    ))}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {normalizedItems.map((item, i) => (
+                            <tr key={i} style={{ borderBottom: `1px dashed ${borderColor}` }}>
+                                <td style={{ ...cellPad, textAlign: 'left' }}>
+                                    {item.name}
+                                    {item.variant && <span style={{ display: 'block', fontSize: 7, color: labelColor }}>({item.variant})</span>}
+                                </td>
+                                {showCode && <td style={{ ...cellPad, textAlign: 'left', color: labelColor }}>{item.code}</td>}
+                                <td style={{ ...cellPad, textAlign: 'center' }}>{item.qty}</td>
+                                <td style={{ ...cellPad, textAlign: 'right' }}>{fmt(item.price)}</td>
+                                <td style={{ ...cellPad, textAlign: 'right', fontWeight: 500 }}>{fmt(item.total)}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </div>
         );
     };
 
@@ -147,10 +149,10 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
 
     const Totals = ({ bold = false }) => (
         <div style={{ fontSize: 8, color: textColor, fontWeight }}>
-            <div style={{ ...rowFlex, marginBottom: 2 }}><span style={{ color: labelColor }}>Subtotal</span><span>{fmt(subtotal)}</span></div>
-            {discount > 0 && <div style={{ ...rowFlex, color: '#ef4444', marginBottom: 2 }}><span>Discount</span><span>-{fmt(discount)}</span></div>}
-            {cfg.show_tax_breakdown && <div style={{ ...rowFlex, marginBottom: 2 }}><span style={{ color: labelColor }}>{cfg.tax_label || 'VAT'} {cfg.tax_rate > 0 ? `(${cfg.tax_rate}%)` : ''}</span><span>{fmt(taxAmount)}</span></div>}
-            <div style={{ ...rowFlex, paddingTop: 2, marginTop: 2, borderTop: `1px solid ${borderColor}`, fontWeight: 'bold', fontSize: bold ? 10 : 9 }}>
+            <div style={{ ...rowFlex, marginBottom: 5 }}><span style={{ color: labelColor }}>Subtotal</span><span>{fmt(subtotal)}</span></div>
+            {discount > 0 && <div style={{ ...rowFlex, color: '#dc2626', marginBottom: 5, fontWeight: 600 }}><span>Discount</span><span>-{fmt(discount)}</span></div>}
+            {cfg.show_tax_breakdown && <div style={{ ...rowFlex, marginBottom: 5 }}><span style={{ color: labelColor }}>{cfg.tax_label || 'VAT'} {cfg.tax_rate > 0 ? `(${cfg.tax_rate}%)` : ''}</span><span>{fmt(taxAmount)}</span></div>}
+            <div style={{ ...rowFlex, paddingTop: 6, marginTop: 6, borderTop: `1px solid ${borderColor}`, fontWeight: 'bold', fontSize: bold ? 11 : 10 }}>
                 <span>Total</span><span>{fmt(total)}</span>
             </div>
         </div>
@@ -158,9 +160,9 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
 
     const PaymentInfo = () => cfg.show_payment_details ? (
         <div style={{ fontSize: 8, color: textColor, fontWeight }}>
-            <div style={{ ...rowFlex, marginBottom: 2 }}><span style={{ color: labelColor }}>Payment</span><span style={{ textTransform: 'capitalize' }}>{paymentMethod}</span></div>
-            <div style={{ ...rowFlex, marginBottom: 2 }}><span style={{ color: labelColor }}>Paid</span><span>{fmt(paid)}</span></div>
-            {change > 0 && <div style={{ ...rowFlex, fontWeight: 600, color: '#16a34a' }}><span>Change</span><span>{fmt(change)}</span></div>}
+            <div style={{ ...rowFlex, marginBottom: 5 }}><span style={{ color: labelColor }}>Payment</span><span style={{ textTransform: 'capitalize' }}>{paymentMethod}</span></div>
+            <div style={{ ...rowFlex, marginBottom: 5 }}><span style={{ color: labelColor }}>Paid</span><span style={{ color: '#16a34a', fontWeight: 600 }}>{fmt(paid)}</span></div>
+            {change > 0 && <div style={{ ...rowFlex, fontWeight: 600 }}><span style={{ color: labelColor }}>Change</span><span>{fmt(change)}</span></div>}
         </div>
     ) : null;
 
@@ -170,53 +172,61 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
 
     const FooterBlock = () => (
         <>
-            {cfg.footer_text && <p style={{ fontSize: 8, textAlign: 'center', fontStyle: 'italic', color: labelColor }}>{cfg.footer_text}</p>}
-            {cfg.terms_and_conditions && <p style={{ fontSize: 7, textAlign: 'center', marginTop: 2, color: mutedColor }}>{cfg.terms_and_conditions}</p>}
+            {cfg.footer_text && <p style={{ fontSize: 8, textAlign: 'center', fontStyle: 'italic', color: labelColor, marginTop: 4 }}>{cfg.footer_text}</p>}
+            {cfg.terms_and_conditions && <p style={{ fontSize: 7, textAlign: 'center', marginTop: 4, color: mutedColor }}>{cfg.terms_and_conditions}</p>}
         </>
     );
 
     const BarcodeBlock = () => cfg.show_barcode ? (
-        <div style={{ marginTop: 6, display: 'flex', justifyContent: 'center', gap: 1 }}>{Array(25).fill(0).map((_, i) => <div key={i} style={{ background: textColor, width: i % 3 === 0 ? 2 : 1, height: 18 }} />)}</div>
+        <div style={{ marginTop: 10, display: 'flex', justifyContent: 'center', gap: 1 }}>{Array(25).fill(0).map((_, i) => <div key={i} style={{ background: textColor, width: i % 3 === 0 ? 2 : 1, height: 18 }} />)}</div>
     ) : null;
 
     const QRBlock = () => cfg.show_qr_code ? (
-        <div style={{ marginTop: 6, display: 'flex', justifyContent: 'center' }}><div style={{ width: 40, height: 40, borderRadius: 4, display: 'flex', alignItems: 'center', justifyContent: 'center', border: `1px solid ${borderColor}`, background: subtleBg }}><QrCode size={20} style={{ color: labelColor }} /></div></div>
+        <div style={{ marginTop: 12, display: 'flex', justifyContent: 'center' }}>
+            <QRCodeSVG
+                value={`RECEIPT:${receiptNumber}`}
+                size={56}
+                level="M"
+                bgColor="transparent"
+                fgColor={textColor}
+            />
+        </div>
     ) : null;
 
     const InfoRow = ({ label, value }) => (
-        <div style={{ ...rowFlex, color: textColor, fontWeight }}>
+        <div style={{ ...rowFlex, color: textColor, fontWeight, marginBottom: 4 }}>
             <span style={{ color: labelColor }}>{label}</span>
             <span style={{ fontWeight: 500 }}>{value}</span>
         </div>
     );
 
-    const outerStyle = { backgroundColor: bgColor, borderRadius: 12, overflow: 'hidden' };
+    const outerStyle = { backgroundColor: bgColor, borderRadius: 14, overflow: 'hidden' };
     const outerProps = { ref, style: outerStyle, 'data-receipt-root': true };
 
     // Shared inline style helpers (px-based for html2canvas consistency)
-    const pad16 = { padding: 16 };
-    const pad12 = { padding: 12 };
+    const pad16 = { padding: 20 };
+    const pad12 = { padding: 16 };
     const center = { textAlign: 'center' };
     const right = { textAlign: 'right' };
     const flexCenter = { display: 'flex', justifyContent: 'center' };
     const flexBetween = { display: 'flex', justifyContent: 'space-between' };
     const flexItems = { display: 'flex', alignItems: 'center' };
-    const mb8 = { marginBottom: 8 };
-    const mb6 = { marginBottom: 6 };
-    const mb4 = { marginBottom: 4 };
-    const mb2 = { marginBottom: 2 };
-    const mt8 = { marginTop: 8 };
-    const mt4 = { marginTop: 4 };
-    const mt6 = { marginTop: 6 };
-    const mt2 = { marginTop: 2 };
-    const spacer8 = { height: 8 };
-    const spacer6 = { height: 6 };
-    const boldLine = (c) => ({ marginTop: 8, marginBottom: 8, borderBottom: `2px solid ${c || borderStrong}` });
-    const thinLine = (c) => ({ marginTop: 6, marginBottom: 6, borderBottom: `1px solid ${c || borderColor}` });
-    const infoGroup = { marginBottom: 6 };
-    const gridBox = (bg) => ({ borderRadius: 4, padding: 6, background: bg || 'transparent' });
-    const gridBoxBorder = { borderRadius: 4, padding: 6, border: `1px solid ${borderColor}` };
-    const elegantDivider = { display: 'flex', alignItems: 'center', gap: 6, marginTop: 8, marginBottom: 8 };
+    const mb8 = { marginBottom: 12 };
+    const mb6 = { marginBottom: 10 };
+    const mb4 = { marginBottom: 6 };
+    const mb2 = { marginBottom: 4 };
+    const mt8 = { marginTop: 12 };
+    const mt4 = { marginTop: 6 };
+    const mt6 = { marginTop: 10 };
+    const mt2 = { marginTop: 4 };
+    const spacer8 = { height: 12 };
+    const spacer6 = { height: 10 };
+    const boldLine = (c) => ({ marginTop: 12, marginBottom: 12, borderBottom: `2px solid ${c || borderStrong}` });
+    const thinLine = (c) => ({ marginTop: 10, marginBottom: 10, borderBottom: `1px solid ${c || borderColor}` });
+    const infoGroup = { marginBottom: 4 };
+    const gridBox = (bg) => ({ borderRadius: 4, padding: 8, background: bg || 'transparent' });
+    const gridBoxBorder = { borderRadius: 4, padding: 8, border: `1px solid ${borderColor}` };
+    const elegantDivider = { display: 'flex', alignItems: 'center', gap: 6, marginTop: 12, marginBottom: 12 };
     const elegantLine = { flex: 1, borderTop: `1px solid ${borderColor}` };
     const elegantDot = { width: 6, height: 6, borderRadius: '50%', background: accent };
 
@@ -227,7 +237,7 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
             <div style={{ ...pad16, color: textColor, fontWeight }}>
                 <div style={{ ...center, ...mb8 }}>
                     <div style={{ ...flexCenter, ...mb4 }}><Logo /></div>
-                    <CompanyName style={{ fontSize: 14 }} />
+                    <CompanyName style={{ fontSize: 15 }} />
                     <CompanyDetails style={{ ...mt2 }} />
                     <TaxNumber style={{ ...mt2 }} />
                 </div>
@@ -235,20 +245,22 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
                 <div style={infoGroup}>
                     <InfoRow label="Receipt #" value={receiptNumber} />
                     <InfoRow label="Date" value={dateStr} />
-                    {cfg.show_customer_details && customerName && <InfoRow label="Customer" value={customerName} />}
-                    {cashier && <InfoRow label="Cashier" value={cashier} />}
+                    {cfg.show_customer_details && customerName && <InfoRow label="Customer" value={`${customerName}${cashier ? `     ${cashier}` : ''}`} />}
+                    {!customerName && cashier && <InfoRow label="Cashier" value={cashier} />}
                     {branchName && <InfoRow label="Branch" value={branchName} />}
                 </div>
                 <Dash />
                 <ItemsTable headerBg={stdHeaderBg} />
-                <Dash />
+                <div style={{ height: 10 }} />
                 <Totals />
-                {cfg.show_payment_details && <><Dash /><PaymentInfo /></>}
-                {cfg.show_referrer_details && referrer && <><Dash /><ReferrerInfo /></>}
+                <Dash />
+                {cfg.show_payment_details && <><PaymentInfo /><div style={{ height: 6 }} /></>}
+                {cfg.show_referrer_details && referrer && <><ReferrerInfo /><div style={{ height: 6 }} /></>}
                 <Dash />
                 <FooterBlock />
                 <BarcodeBlock />
                 <QRBlock />
+                <div style={{ height: 6 }} />
             </div>
         </div>
     );

@@ -188,7 +188,7 @@ const ReceiptPreviewModal = ({
             body { padding:20px; background:#f3f4f6; display:flex; justify-content:center; align-items:flex-start; min-height:100vh; }
             .receipt-print-wrapper {
                 width:${paper.width}; margin:0 auto; background:${bgColor};
-                border-radius: 12px; box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+                border-radius: 14px; box-shadow: 0 4px 24px rgba(0,0,0,0.15);
                 overflow: hidden;
             }
             table { width:100%; border-collapse:collapse; }
@@ -446,7 +446,7 @@ const ReceiptPreviewModal = ({
                         )}
 
                         {!loading && !error && receiptData && (
-                            <div className="rounded-xl shadow-lg max-w-xs mx-auto overflow-hidden">
+                            <div style={{ maxWidth: 320, margin: '0 auto', borderRadius: 14, overflow: 'hidden', boxShadow: '0 4px 24px rgba(0,0,0,0.15)' }}>
                                 <ReceiptRenderer
                                     ref={receiptRef}
                                     config={effectiveConfig}
