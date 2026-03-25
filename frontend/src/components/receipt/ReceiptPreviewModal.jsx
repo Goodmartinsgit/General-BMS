@@ -108,12 +108,14 @@ const ReceiptPreviewModal = ({
         // Clone the receipt DOM
         const clone = receiptRef.current.cloneNode(true);
 
-        // Create an off-screen container
+        // Create an off-screen container at the configured paper width
+        const paperSize = receiptData?.config?.paper_size || 'A5';
+        const paper = getPaperConfig(paperSize);
         const container = document.createElement('div');
         container.style.position = 'fixed';
         container.style.left = '-9999px';
         container.style.top = '0';
-        container.style.width = '320px';
+        container.style.width = paper.width;
         document.body.appendChild(container);
         container.appendChild(clone);
 
@@ -143,6 +145,17 @@ const ReceiptPreviewModal = ({
         return clone;
     };
 
+    // ── Paper-size helpers ──
+    const getPaperConfig = (paperSize) => {
+        switch (paperSize) {
+            case 'A4': return { width: '190mm', widthPx: 719, pageSize: 'A4', margin: '10mm', pdfW: 190 };
+            case 'A5': return { width: '128mm', widthPx: 484, pageSize: 'A5', margin: '10mm', pdfW: 128 };
+            case 'A6': return { width: '85mm', widthPx: 321, pageSize: 'A6', margin: '10mm', pdfW: 85 };
+            case '80mm': return { width: '80mm', widthPx: 302, pageSize: '80mm 297mm', margin: '0', pdfW: 80 };
+            default: return { width: '128mm', widthPx: 484, pageSize: 'A5', margin: '10mm', pdfW: 128 };
+        }
+    };
+
     // ── Print ──
     const handlePrint = () => {
         if (!receiptRef.current) return;
@@ -161,15 +174,21 @@ const ReceiptPreviewModal = ({
         });
 
         const bgColor = receiptData?.config?.receipt_bg_color || '#ffffff';
+        const paperSize = receiptData?.config?.paper_size || 'A5';
+        const paper = getPaperConfig(paperSize);
 
         printWindow.document.write(`<!DOCTYPE html><html><head>
             <title>Receipt - ${fileName}</title>
             <style>${cssText}
             * { margin:0; padding:0; box-sizing:border-box; }
-            body { padding:10px; background:#fff; }
-            .receipt-print-wrapper { max-width:320px; margin:0 auto; background:${bgColor}; }
+            body { padding:10px; background:#fff; display:flex; justify-content:center; }
+            .receipt-print-wrapper { width:${paper.width}; margin:0 auto; background:${bgColor}; }
             table { width:100%; border-collapse:collapse; }
-            @media print { body { padding:0; } @page { margin:10mm; } }
+            @media print {
+                body { padding:0; }
+                @page { size:${paper.pageSize}; margin:${paper.margin}; }
+                .receipt-print-wrapper { width:100%; }
+            }
             </style>
         </head><body>
             <div class="receipt-print-wrapper" id="receipt-container"></div>
@@ -188,20 +207,40 @@ const ReceiptPreviewModal = ({
     const captureToCanvas = async () => {
         if (!receiptRef.current) return null;
         const bgColor = receiptData?.config?.receipt_bg_color || '#ffffff';
+        const paperSize = receiptData?.config?.paper_size || 'A5';
+        const paper = getPaperConfig(paperSize);
         const html2canvas = (await import('html2canvas')).default;
-        return html2canvas(receiptRef.current, {
-            scale: 3,
-            backgroundColor: bgColor,
-            useCORS: true,
-            allowTaint: false,
-            logging: false,
-            imageTimeout: 15000,
-            onclone: async (clonedDoc) => {
-                // Inline external images in the cloned document
-                const clonedEl = clonedDoc.body.querySelector('[data-receipt-root]') || clonedDoc.body;
-                await inlineExternalImages(clonedEl);
-            },
-        });
+
+        // Temporarily expand receipt to paper-size width for higher quality capture
+        const wrapper = receiptRef.current.parentElement;
+        const origMaxWidth = wrapper ? wrapper.style.maxWidth : '';
+        const origWidth = wrapper ? wrapper.style.width : '';
+        if (wrapper) {
+            wrapper.style.maxWidth = paper.width;
+            wrapper.style.width = paper.width;
+        }
+
+        try {
+            const canvas = await html2canvas(receiptRef.current, {
+                scale: 3,
+                backgroundColor: bgColor,
+                useCORS: true,
+                allowTaint: false,
+                logging: false,
+                imageTimeout: 15000,
+                onclone: async (clonedDoc) => {
+                    const clonedEl = clonedDoc.body.querySelector('[data-receipt-root]') || clonedDoc.body;
+                    await inlineExternalImages(clonedEl);
+                },
+            });
+            return canvas;
+        } finally {
+            // Restore original preview width
+            if (wrapper) {
+                wrapper.style.maxWidth = origMaxWidth;
+                wrapper.style.width = origWidth;
+            }
+        }
     };
 
     // ── Download as Image ──
@@ -244,17 +283,19 @@ const ReceiptPreviewModal = ({
             const imgWidth = canvas.width;
             const imgHeight = canvas.height;
 
-            // Use receipt aspect ratio for PDF size (in mm)
-            const pdfWidth = 80; // 80mm receipt width
+            // Use paper_size setting for PDF dimensions
+            const paperSize = receiptData?.config?.paper_size || 'A5';
+            const paper = getPaperConfig(paperSize);
+            const pdfWidth = paper.pdfW;
             const pdfHeight = (imgHeight * pdfWidth) / imgWidth;
 
             const pdf = new jsPDF({
                 orientation: pdfHeight > pdfWidth ? 'portrait' : 'landscape',
                 unit: 'mm',
-                format: [pdfWidth, pdfHeight + 10], // +10mm padding
+                format: [pdfWidth + 20, pdfHeight + 20], // +20mm padding
             });
 
-            pdf.addImage(imgData, 'PNG', 0, 5, pdfWidth, pdfHeight);
+            pdf.addImage(imgData, 'PNG', 10, 10, pdfWidth, pdfHeight);
             pdf.save(`receipt-${fileName}.pdf`);
         } catch (err) {
             console.error('PDF download failed:', err);

@@ -92,8 +92,9 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
     const Logo = () => cfg.show_logo && cfg.company_logo_url
         ? <img src={cfg.company_logo_url} alt="Logo" crossOrigin="anonymous" style={{ width: 40, height: 40, objectFit: 'contain', borderRadius: 8 }} />
         : null;
+    const companyNameColor = cfg.company_primary_color || headingColor;
     const CompanyName = ({ style: s = {} }) =>
-        <p style={{ fontWeight: 'bold', color: textColor, fontSize: 14, ...s }}>{cfg.company_name || 'Your Business'}</p>;
+        <p style={{ fontWeight: 'bold', color: companyNameColor, fontSize: 14, ...s }}>{cfg.company_name || 'Your Business'}</p>;
     const CompanyDetails = ({ style: s = {} }) => cfg.show_company_details ? (
         <div style={{ fontSize: 8, color: labelColor, ...s }}>
             {cfg.company_address && <p>{cfg.company_address}</p>}

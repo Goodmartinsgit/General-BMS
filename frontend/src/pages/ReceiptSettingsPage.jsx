@@ -371,7 +371,7 @@ Thank you for your business!
                                 )}
                                 {config.show_company_details && (
                                     <div className="text-center mb-3">
-                                        <p className="font-bold text-base" style={{ color: headingColor }}>{config.company_name || 'Your Business'}</p>
+                                        <p className="font-bold text-base" style={{ color: config.company_primary_color || headingColor }}>{config.company_name || 'Your Business'}</p>
                                         {config.company_address && <p className="text-[10px] mt-0.5" style={{ color: labelColor }}>{config.company_address}</p>}
                                         {config.company_phone && <p className="text-[10px]" style={{ color: labelColor }}>{config.company_phone}</p>}
                                         {config.company_email && <p className="text-[10px]" style={{ color: labelColor }}>{config.company_email}</p>}
@@ -417,9 +417,10 @@ Thank you for your business!
                                 {/* Totals */}
                                 <div className="text-[10px] space-y-0.5">
                                     <PvRow label="Subtotal" value={`${cs}7,500`} />
+                                    <div className="flex justify-between" style={{ color: '#ef4444' }}><span>Discount</span><span>-{cs}500</span></div>
                                     {config.show_tax_breakdown && <PvRow label={config.tax_label || 'VAT'} value={`${cs}0`} />}
                                     <div className="flex justify-between font-bold text-xs pt-1 mt-1" style={{ borderTop: `1px solid ${dividerColor}`, color: headingColor }}>
-                                        <span>Total</span><span>{cs}7,500</span>
+                                        <span>Total</span><span>{cs}7,000</span>
                                     </div>
                                 </div>
 
@@ -430,7 +431,7 @@ Thank you for your business!
                                         <div className="text-[10px] space-y-0.5">
                                             <PvRow label="Payment" value="Cash" />
                                             <PvRow label="Paid" value={`${cs}10,000`} />
-                                            <div className="flex justify-between font-semibold text-green-600"><span>Change</span><span>{cs}2,500</span></div>
+                                            <div className="flex justify-between font-semibold" style={{ color: '#16a34a' }}><span>Change</span><span>{cs}3,000</span></div>
                                         </div>
                                     </>
                                 )}

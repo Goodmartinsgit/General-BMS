@@ -75,6 +75,18 @@ const getReceiptConfig = async (req, res) => {
             Object.entries(result.rows[0]).filter(([_, v]) => v !== null && v !== undefined)
         );
         const config = { ...DEFAULT_CONFIG, ...dbRow };
+
+        // If branding overlay is enabled, include primary_color for company name styling
+        if (config.use_company_branding) {
+            try {
+                const brandingRes = await pool.query(
+                    'SELECT primary_color FROM branding_config ORDER BY updated_at DESC NULLS LAST, id DESC LIMIT 1'
+                );
+                const branding = brandingRes.rows[0] || {};
+                config.company_primary_color = branding.primary_color || '';
+            } catch { /* ignore */ }
+        }
+
         res.json(config);
     } catch (err) {
         console.error(err);
@@ -274,6 +286,7 @@ const generateReceiptData = async (saleId) => {
 
             config.receipt_accent_color = branding.accent_color || branding.primary_color || config.receipt_accent_color;
             config.receipt_bg_color = branding.background_color || config.receipt_bg_color || '#ffffff';
+            config.company_primary_color = branding.primary_color || '';
         } catch (err) {
             console.error('Failed to overlay branding for receipt:', err);
         }
