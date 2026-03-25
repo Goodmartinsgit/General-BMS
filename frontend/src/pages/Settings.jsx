@@ -560,7 +560,7 @@ const ReceiptSection = () => {
         show_company_details: true, show_tax_breakdown: false, show_payment_details: true,
         show_customer_details: true, show_referrer_details: true, show_barcode: true, show_qr_code: false,
         receipt_bg_color: '#ffffff', receipt_text_color: '', receipt_accent_color: '',
-        receipt_font_weight: 'normal', receipt_heading_color: '', receipt_label_color: '',
+        receipt_font_weight: 'normal', receipt_font_size: 'small', receipt_heading_color: '', receipt_label_color: '',
         use_company_branding: false, use_company_info: false,
         footer_text: 'Thank you for your business!', terms_and_conditions: '',
         currency_symbol: '₦', currency_code: 'NGN', paper_size: 'A5', delivery_format: 'auto',
@@ -888,6 +888,29 @@ const ReceiptSection = () => {
                                             </button>
                                         ))}
                                     </div>
+                                </div>
+
+                                {/* Font Size */}
+                                <div>
+                                    <label className={labelClass}>Font Size</label>
+                                    <div className="flex gap-1.5 flex-wrap">
+                                        {[
+                                            { val: 'small', label: 'Small', desc: 'Best for 80mm' },
+                                            { val: 'medium', label: 'Medium', desc: 'Good for A6' },
+                                            { val: 'large', label: 'Large', desc: 'Good for A5' },
+                                            { val: 'xlarge', label: 'X-Large', desc: 'Good for A4' },
+                                        ].map(fs => (
+                                            <button key={fs.val} type="button"
+                                                onClick={() => set('receipt_font_size', fs.val)}
+                                                title={fs.desc}
+                                                className={`px-2.5 py-1 text-[10px] sm:text-xs rounded-md border transition-all ${(cfg.receipt_font_size || 'small') === fs.val ? 'bg-accent-gold text-white border-accent-gold shadow-sm' : 'border-theme text-theme-muted hover:text-theme-primary hover:border-accent-gold/30'}`}>
+                                                {fs.label}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <p className="text-[9px] text-theme-muted mt-1">
+                                        {({ small: 'Best for 80mm thermal receipts', medium: 'Good for A6 paper', large: 'Good for A5 paper', xlarge: 'Good for A4 paper' })[cfg.receipt_font_size || 'small']}
+                                    </p>
                                 </div>
                             </div>
                             <p className="text-[9px] text-theme-muted mt-2">{cfg.use_company_branding ? 'Colors are synced from Branding settings.' : 'Leave color fields empty for auto-contrast defaults. Leave accent empty for template default.'}</p>
