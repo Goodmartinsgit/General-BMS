@@ -253,7 +253,7 @@ Thank you for your business!
 
                 {/* Template Selection */}
                 <div className="lg:col-span-7">
-                    <div className="bg-theme-secondary rounded-xl border border-theme shadow-theme-sm p-6 h-full">
+                    <div className="bg-theme-secondary rounded-xl border border-theme shadow-theme-sm p-6">
                         <h3 className="text-lg font-semibold text-theme-primary mb-5 flex items-center gap-2">
                             <Layout size={18} className="text-accent-gold" />
                             Template Design
