@@ -213,7 +213,7 @@ const ReceiptPreviewModal = ({
     };
 
     // ── Capture receipt to canvas (shared by image + PDF downloads) ──
-    // Returns a canvas with rounded corners, padding, and minimum page height.
+    // Returns a clean canvas of the receipt with a single background — no extra layers.
     const captureToCanvas = async () => {
         if (!receiptRef.current) throw new Error('Receipt element not found');
         const bgColor = receiptData?.config?.receipt_bg_color || '#ffffff';
@@ -229,6 +229,7 @@ const ReceiptPreviewModal = ({
         const origWidth = wrapper ? wrapper.style.width : '';
         const origMinHeight = el.style.minHeight;
         const origOverflow = el.style.overflow;
+        const origBorderRadius = el.style.borderRadius;
         if (wrapper) {
             wrapper.style.maxWidth = paper.width;
             wrapper.style.width = paper.width;
@@ -238,10 +239,11 @@ const ReceiptPreviewModal = ({
             el.style.minHeight = `${paper.heightPx}px`;
         }
         el.style.overflow = 'visible';
+        el.style.borderRadius = '0px';
 
         try {
-            // Capture the raw receipt content
-            const rawCanvas = await html2canvas(el, {
+            // Capture the receipt directly — single clean background, no extra layers
+            const canvas = await html2canvas(el, {
                 scale,
                 backgroundColor: bgColor,
                 useCORS: true,
@@ -266,46 +268,11 @@ const ReceiptPreviewModal = ({
                 },
             });
 
-            if (!rawCanvas || rawCanvas.width === 0 || rawCanvas.height === 0) {
+            if (!canvas || canvas.width === 0 || canvas.height === 0) {
                 throw new Error('html2canvas produced an empty canvas');
             }
 
-            // Build final canvas: padding + rounded receipt + subtle shadow
-            const pad = Math.round(24 * scale);        // padding around receipt
-            const radius = Math.round(14 * scale);     // matches CSS border-radius
-            const rw = rawCanvas.width;
-            const rh = rawCanvas.height;
-            const finalW = rw + pad * 2;
-            const finalH = rh + pad * 2;
-
-            const final = document.createElement('canvas');
-            final.width = finalW;
-            final.height = finalH;
-            const ctx = final.getContext('2d');
-
-            // Light-gray page background
-            ctx.fillStyle = '#f0f1f3';
-            ctx.fillRect(0, 0, finalW, finalH);
-
-            // Drop shadow behind the receipt card
-            ctx.save();
-            ctx.shadowColor = 'rgba(0,0,0,0.18)';
-            ctx.shadowBlur = 18 * scale;
-            ctx.shadowOffsetX = 0;
-            ctx.shadowOffsetY = 4 * scale;
-            roundedRect(ctx, pad, pad, rw, rh, radius);
-            ctx.fillStyle = bgColor;
-            ctx.fill();
-            ctx.restore();
-
-            // Clip to rounded rect, then draw the receipt image
-            ctx.save();
-            roundedRect(ctx, pad, pad, rw, rh, radius);
-            ctx.clip();
-            ctx.drawImage(rawCanvas, pad, pad);
-            ctx.restore();
-
-            return final;
+            return canvas;
         } finally {
             if (wrapper) {
                 wrapper.style.maxWidth = origMaxWidth;
@@ -313,6 +280,7 @@ const ReceiptPreviewModal = ({
             }
             el.style.minHeight = origMinHeight;
             el.style.overflow = origOverflow;
+            el.style.borderRadius = origBorderRadius;
         }
     };
 
