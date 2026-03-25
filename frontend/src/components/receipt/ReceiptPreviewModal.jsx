@@ -101,48 +101,33 @@ const ReceiptPreviewModal = ({
         }));
     };
 
-    // ── Helper: create a standalone receipt clone with all styles inlined ──
-    const createStandaloneClone = async () => {
-        if (!receiptRef.current) return null;
-
-        // Clone the receipt DOM
-        const clone = receiptRef.current.cloneNode(true);
-
-        // Create an off-screen container at the configured paper width
-        const paperSize = receiptData?.config?.paper_size || 'A5';
-        const paper = getPaperConfig(paperSize);
-        const container = document.createElement('div');
-        container.style.position = 'fixed';
-        container.style.left = '-9999px';
-        container.style.top = '0';
-        container.style.width = paper.width;
-        document.body.appendChild(container);
-        container.appendChild(clone);
-
-        // Copy computed styles from original to clone recursively
-        const copyComputedStyles = (source, target) => {
-            const computed = window.getComputedStyle(source);
-            for (let i = 0; i < computed.length; i++) {
-                const prop = computed[i];
-                try {
-                    target.style.setProperty(prop, computed.getPropertyValue(prop));
-                } catch { /* skip read-only */ }
-            }
-            const sourceChildren = source.children;
-            const targetChildren = target.children;
-            for (let i = 0; i < sourceChildren.length; i++) {
-                if (targetChildren[i]) {
-                    copyComputedStyles(sourceChildren[i], targetChildren[i]);
-                }
-            }
-        };
-        copyComputedStyles(receiptRef.current, clone);
-
-        // Inline external images as data URLs
-        await inlineExternalImages(clone);
-
-        document.body.removeChild(container);
-        return clone;
+    // ── Helper: convert SVG elements to canvas for html2canvas compatibility ──
+    const convertSVGsToCanvas = (element) => {
+        const svgs = element.querySelectorAll('svg');
+        svgs.forEach(svg => {
+            try {
+                const bbox = svg.getBoundingClientRect();
+                if (bbox.width === 0 || bbox.height === 0) return;
+                const canvas = document.createElement('canvas');
+                canvas.width = bbox.width * 3;
+                canvas.height = bbox.height * 3;
+                canvas.style.width = bbox.width + 'px';
+                canvas.style.height = bbox.height + 'px';
+                const ctx = canvas.getContext('2d');
+                ctx.scale(3, 3);
+                const svgData = new XMLSerializer().serializeToString(svg);
+                const img = new window.Image();
+                const svgBlob = new Blob([svgData], { type: 'image/svg+xml;charset=utf-8' });
+                const url = URL.createObjectURL(svgBlob);
+                img.onload = () => {
+                    ctx.drawImage(img, 0, 0, bbox.width, bbox.height);
+                    URL.revokeObjectURL(url);
+                };
+                img.src = url;
+                // Replace SVG with canvas in the DOM
+                svg.parentNode.replaceChild(canvas, svg);
+            } catch { /* skip if SVG conversion fails */ }
+        });
     };
 
     // ── Paper-size helpers ──
@@ -230,7 +215,7 @@ const ReceiptPreviewModal = ({
     // ── Capture receipt to canvas (shared by image + PDF downloads) ──
     // Returns a canvas with rounded corners, padding, and minimum page height.
     const captureToCanvas = async () => {
-        if (!receiptRef.current) return null;
+        if (!receiptRef.current) throw new Error('Receipt element not found');
         const bgColor = receiptData?.config?.receipt_bg_color || '#ffffff';
         const paperSize = receiptData?.config?.paper_size || 'A5';
         const paper = getPaperConfig(paperSize);
@@ -243,6 +228,7 @@ const ReceiptPreviewModal = ({
         const origMaxWidth = wrapper ? wrapper.style.maxWidth : '';
         const origWidth = wrapper ? wrapper.style.width : '';
         const origMinHeight = el.style.minHeight;
+        const origOverflow = el.style.overflow;
         if (wrapper) {
             wrapper.style.maxWidth = paper.width;
             wrapper.style.width = paper.width;
@@ -251,25 +237,38 @@ const ReceiptPreviewModal = ({
         if (paper.heightPx > 0) {
             el.style.minHeight = `${paper.heightPx}px`;
         }
+        el.style.overflow = 'visible';
 
         try {
-            // Capture the raw receipt content (no bg — we draw our own)
+            // Capture the raw receipt content
             const rawCanvas = await html2canvas(el, {
                 scale,
-                backgroundColor: null, // transparent — we composite ourselves
+                backgroundColor: bgColor,
                 useCORS: true,
-                allowTaint: false,
+                allowTaint: true,
                 logging: false,
-                imageTimeout: 15000,
+                imageTimeout: 30000,
+                removeContainer: true,
+                width: el.scrollWidth,
+                height: Math.max(el.scrollHeight, paper.heightPx > 0 ? paper.heightPx : el.scrollHeight),
                 onclone: async (clonedDoc) => {
-                    const clonedEl = clonedDoc.body.querySelector('[data-receipt-root]') || clonedDoc.body;
+                    const clonedEl = clonedDoc.querySelector('[data-receipt-root]') || clonedDoc.body;
                     // Enforce min-height in clone too
-                    if (paper.heightPx > 0 && clonedEl.hasAttribute('data-receipt-root')) {
+                    if (paper.heightPx > 0) {
                         clonedEl.style.minHeight = `${paper.heightPx}px`;
                     }
+                    clonedEl.style.overflow = 'visible';
+                    clonedEl.style.borderRadius = '0px';
+                    // Convert SVGs to canvas elements for better compatibility
+                    convertSVGsToCanvas(clonedEl);
+                    // Inline external images as data URLs
                     await inlineExternalImages(clonedEl);
                 },
             });
+
+            if (!rawCanvas || rawCanvas.width === 0 || rawCanvas.height === 0) {
+                throw new Error('html2canvas produced an empty canvas');
+            }
 
             // Build final canvas: padding + rounded receipt + subtle shadow
             const pad = Math.round(24 * scale);        // padding around receipt
@@ -313,6 +312,7 @@ const ReceiptPreviewModal = ({
                 wrapper.style.width = origWidth;
             }
             el.style.minHeight = origMinHeight;
+            el.style.overflow = origOverflow;
         }
     };
 
@@ -322,22 +322,25 @@ const ReceiptPreviewModal = ({
         setShowDownloadMenu(false);
         try {
             const canvas = await captureToCanvas();
-            if (!canvas) return;
+            if (!canvas) throw new Error('Canvas capture returned null');
+            // Convert canvas to blob for reliable download
+            const blob = await new Promise((resolve, reject) => {
+                canvas.toBlob((b) => {
+                    if (b) resolve(b);
+                    else reject(new Error('Canvas toBlob failed'));
+                }, 'image/png', 1.0);
+            });
+            const url = URL.createObjectURL(blob);
             const link = document.createElement('a');
             link.download = `receipt-${fileName}.png`;
-            link.href = canvas.toDataURL('image/png');
+            link.href = url;
+            document.body.appendChild(link);
             link.click();
+            document.body.removeChild(link);
+            setTimeout(() => URL.revokeObjectURL(url), 5000);
         } catch (err) {
             console.error('Image download failed:', err);
-            // Fallback to HTML download
-            if (receiptRef.current) {
-                const blob = new Blob([receiptRef.current.outerHTML], { type: 'text/html' });
-                const link = document.createElement('a');
-                link.download = `receipt-${fileName}.html`;
-                link.href = URL.createObjectURL(blob);
-                link.click();
-                URL.revokeObjectURL(link.href);
-            }
+            alert('Failed to generate receipt image. Please try again or use Print instead.');
         } finally {
             setDownloading(false);
         }
@@ -349,47 +352,62 @@ const ReceiptPreviewModal = ({
         setShowDownloadMenu(false);
         try {
             const canvas = await captureToCanvas();
-            if (!canvas) return;
+            if (!canvas) throw new Error('Canvas capture returned null');
             const { default: jsPDF } = await import('jspdf');
 
-            const imgData = canvas.toDataURL('image/png');
             const canvasW = canvas.width;
             const canvasH = canvas.height;
 
             const paperSize = receiptData?.config?.paper_size || 'A5';
             const paper = getPaperConfig(paperSize);
-            const pageW = paper.pdfW + 20; // include margins
+            const marginMm = 10;
+            const pageW = paper.pdfW + marginMm * 2; // include margins
             const imgOnPageW = paper.pdfW;
             const imgOnPageH = (canvasH * imgOnPageW) / canvasW;
 
             // Standard page height (use paper pdfH, or auto-fit for thermal/small)
-            const pageH = paper.pdfH > 0 ? paper.pdfH + 20 : imgOnPageH + 20;
+            const pageH = paper.pdfH > 0 ? paper.pdfH + marginMm * 2 : imgOnPageH + marginMm * 2;
+            const usableH = pageH - marginMm * 2;
 
             // If the receipt image fits in one page, single page PDF
-            if (imgOnPageH + 20 <= pageH) {
+            if (imgOnPageH <= usableH) {
                 const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [pageW, pageH] });
-                pdf.addImage(imgData, 'PNG', 10, 10, imgOnPageW, imgOnPageH);
+                const imgData = canvas.toDataURL('image/png', 1.0);
+                pdf.addImage(imgData, 'PNG', marginMm, marginMm, imgOnPageW, imgOnPageH);
                 pdf.save(`receipt-${fileName}.pdf`);
             } else {
-                // Multi-page: slice the canvas image across pages
-                const usableH = pageH - 20; // 10mm top + 10mm bottom margin
+                // Multi-page: slice the source canvas into page-sized chunks
                 const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: [pageW, pageH] });
-                let yOffset = 0;
+                // Calculate how many source pixels correspond to one page of usable height
+                const pxPerMm = canvasW / imgOnPageW;
+                const usableHPx = Math.round(usableH * pxPerMm);
+                let srcY = 0;
                 let page = 0;
 
-                while (yOffset < imgOnPageH) {
+                while (srcY < canvasH) {
                     if (page > 0) pdf.addPage([pageW, pageH]);
-                    const sliceH = Math.min(usableH, imgOnPageH - yOffset);
-                    // Draw the full image shifted up so the current slice is visible
-                    pdf.addImage(imgData, 'PNG', 10, 10 - yOffset, imgOnPageW, imgOnPageH);
-                    yOffset += usableH;
+                    const sliceHPx = Math.min(usableHPx, canvasH - srcY);
+                    const sliceHMm = sliceHPx / pxPerMm;
+
+                    // Create a sub-canvas for this page slice
+                    const sliceCanvas = document.createElement('canvas');
+                    sliceCanvas.width = canvasW;
+                    sliceCanvas.height = sliceHPx;
+                    const sliceCtx = sliceCanvas.getContext('2d');
+                    // Draw the relevant slice from the source canvas
+                    sliceCtx.drawImage(canvas, 0, srcY, canvasW, sliceHPx, 0, 0, canvasW, sliceHPx);
+
+                    const sliceData = sliceCanvas.toDataURL('image/png', 1.0);
+                    pdf.addImage(sliceData, 'PNG', marginMm, marginMm, imgOnPageW, sliceHMm);
+
+                    srcY += usableHPx;
                     page++;
                 }
                 pdf.save(`receipt-${fileName}.pdf`);
             }
         } catch (err) {
             console.error('PDF download failed:', err);
-            handleDownloadImage();
+            alert('Failed to generate receipt PDF. Please try again or use Print instead.');
         } finally {
             setDownloading(false);
         }

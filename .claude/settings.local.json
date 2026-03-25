@@ -98,7 +98,17 @@
       "Bash(find 'c:/Users/DELL XPS/Desktop/One Manager/platform/apps/store/src/types' -name *.ts)",
       "Bash(npx vite:*)",
       "Bash(find 'C:\\\\Users\\\\DELL XPS\\\\Desktop\\\\BMS\\\\Eldaved-BMS' -type f -name *receipt*)",
-      "Bash(find 'C:\\\\Users\\\\DELL XPS\\\\Desktop\\\\BMS\\\\Eldaved-BMS/frontend/src/pages' -type f -name *[Pp]os* -o -name *[Ss]ale*)"
+      "Bash(find 'C:\\\\Users\\\\DELL XPS\\\\Desktop\\\\BMS\\\\Eldaved-BMS/frontend/src/pages' -type f -name *[Pp]os* -o -name *[Ss]ale*)",
+      "Bash(npm run:*)",
+      "Bash(find 'c:\\\\Users\\\\DELL XPS\\\\Desktop\\\\BMS\\\\General-BMS' -name *migration* -o -name *001* -o -name *002*)",
+      "Bash(find . -name \"*.tsx\" -exec sed -i 's/bg-primary-600 text-white/bg-btn text-white/g; s/hover:bg-primary-700/hover:bg-btn-hover/g; s/active:bg-primary-700/active:bg-btn-hover/g; s/active:bg-primary-800/active:bg-btn-hover/g' {} +)",
+      "Bash(find . -name \"*.tsx\" -exec sed -i 's/text-white bg-primary-600/text-white bg-btn/g; s/bg-primary-600 hover:bg-btn-hover/bg-btn hover:bg-btn-hover/g; s/bg-primary-600 flex items-center justify-center/bg-btn flex items-center justify-center/g' {} +)",
+      "Bash(npx -y acorn --ecma2020 --module --allow-import-export-everywhere frontend/src/components/receipt/ReceiptPreviewModal.jsx)",
+      "Bash(npx -y esbuild src/components/receipt/ReceiptRenderer.jsx src/components/receipt/ReceiptPreviewModal.jsx src/pages/Settings.jsx --bundle --jsx=automatic --external:react --external:react-dom --external:lucide-react --external:qrcode.react --external:react-toastify --outdir=/tmp/test-build --format=esm)",
+      "Bash(find '/c/Users/DELL XPS/Desktop/BMS/General-BMS/frontend/src' -type f \\\\\\(-name *receipt* -o -name *Receipt* \\\\\\))",
+      "Bash(find '/c/Users/DELL XPS/Desktop/BMS/General-BMS/backend/src' -type f \\\\\\(-name *receipt* -o -name *Receipt* \\\\\\))",
+      "Bash(find '/c/Users/DELL XPS/Desktop/BMS/General-BMS/backend/database' -type f \\\\\\(-name *receipt* -o -name *Receipt* \\\\\\))",
+      "Bash(1:*)"
     ],
     "additionalDirectories": [
       "C:\\Users\\DELL XPS\\Desktop\\One Manager\\platform\\apps\\store",
