@@ -15,7 +15,6 @@ import { toast } from 'react-toastify';
 import { format } from 'date-fns';
 
 // ─── constants ────────────────────────────────────────────────────────────────
-const ADMIN_ROLES = ['super_admin', 'admin', 'manager'];
 
 const PAYMENT_STATUS_CFG = {
     paid:      { label: 'Fully Paid',  cls: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' },
@@ -43,7 +42,8 @@ const SalesListPage = ({ defaultTab = 'all' }) => {
     const { periodRange } = useFiscalPeriod();
     const { symbol } = useCurrency();
 
-    const isAdmin = ADMIN_ROLES.includes(auth?.user?.role);
+    const perms = auth?.user?.permissions || {};
+    const isAdmin = !!(perms.admin || perms.reverse_sales || perms.view_all_sales);
     const cs = symbol || '₦';
 
     // ── tabs ──────────────────────────────────────────────────────────────────

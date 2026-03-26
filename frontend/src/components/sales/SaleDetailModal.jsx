@@ -11,8 +11,6 @@ import { useCurrency } from '../../context/CurrencyContext';
 import { toast } from 'react-toastify';
 import { format } from 'date-fns';
 
-const ADMIN_ROLES = ['super_admin', 'admin', 'manager'];
-
 const SaleDetailModal = ({ saleId, onClose, onReverse }) => {
     const { auth } = useAuth();
     const { symbol } = useCurrency();
@@ -23,7 +21,8 @@ const SaleDetailModal = ({ saleId, onClose, onReverse }) => {
     const [showReverseConfirm, setShowReverseConfirm] = useState(false);
     const [reverseReason, setReverseReason] = useState('');
 
-    const isAdmin = ADMIN_ROLES.includes(auth?.user?.role);
+    const perms = auth?.user?.permissions || {};
+    const isAdmin = !!(perms.admin || perms.reverse_sales);
     const cs = symbol || '₦';
 
     useEffect(() => {
