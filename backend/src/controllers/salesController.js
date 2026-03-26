@@ -504,7 +504,7 @@ const getSaleById = async (req, res) => {
         const commentsResult = await pool.query(
             `SELECT sc.*, u.full_name as commenter_name
              FROM sale_comments sc
-             JOIN users u ON sc.user_id = u.id
+             LEFT JOIN users u ON sc.created_by = u.id
              WHERE sc.sale_id = $1
              ORDER BY sc.created_at ASC`,
             [id]
@@ -882,7 +882,7 @@ const getSaleComments = async (req, res) => {
         const result = await pool.query(
             `SELECT sc.*, u.full_name as commenter_name, u.email as commenter_email
              FROM sale_comments sc
-             JOIN users u ON sc.user_id = u.id
+             LEFT JOIN users u ON sc.created_by = u.id
              WHERE sc.sale_id = $1
              ORDER BY sc.created_at ASC`,
             [id]
