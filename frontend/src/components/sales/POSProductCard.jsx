@@ -33,7 +33,7 @@ const POSProductCard = ({ product, onProductClick }) => {
                 if (url) imgs.push(url);
             });
         }
-        if (image_url && !imgs.includes(image_url)) imgs.push(image_url);
+        if (product.image_url && !imgs.includes(product.image_url)) imgs.push(product.image_url);
         // Fallback to category assignment images
         if (imgs.length === 0 && category_assignments && category_assignments.length > 0) {
             category_assignments.forEach(a => {
