@@ -6,6 +6,7 @@ const {
     getSaleById,
     reverseSale,
     unreverseSale,
+    deleteSale,
     addSaleComment,
     getSaleComments,
     getSaleStatistics
@@ -83,6 +84,9 @@ router.post('/:id/reverse', authorize('reverse_sales'), reverseSale);
 
 // Unreverse sale (reactivate)
 router.post('/:id/unreverse', authorize('reverse_sales'), unreverseSale);
+
+// Delete sale permanently (restores stock)
+router.delete('/:id', authorize('reverse_sales'), deleteSale);
 
 // ============================================================================
 // SALE COMMENTS ROUTES

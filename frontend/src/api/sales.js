@@ -31,6 +31,12 @@ export const salesAPI = {
         return response.data;
     },
 
+    // Delete a sale permanently (restores stock)
+    deleteSale: async (id) => {
+        const response = await api.delete(`/sales/${id}`);
+        return response.data;
+    },
+
     // Add comment to a sale
     addComment: async (id, formData) => {
         const response = await api.post(`/sales/${id}/comments`, formData, {

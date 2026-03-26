@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     X, Printer, RotateCcw, RefreshCw, User, Package, Calendar,
-    CreditCard, Landmark, Tag, MessageSquare, ShoppingBag, AlertTriangle
+    CreditCard, Landmark, Tag, MessageSquare, ShoppingBag, AlertTriangle, Trash2
 } from 'lucide-react';
 import { salesAPI } from '../../api/sales';
 import { ReceiptPreviewModal } from '../receipt';
@@ -20,6 +20,8 @@ const SaleDetailModal = ({ saleId, onClose, onReverse }) => {
     const [reversing, setReversing] = useState(false);
     const [showReverseConfirm, setShowReverseConfirm] = useState(false);
     const [reverseReason, setReverseReason] = useState('');
+    const [deleting, setDeleting] = useState(false);
+    const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
     const perms = auth?.user?.permissions || {};
     const isAdmin = !!(perms.admin || perms.reverse_sales);
@@ -59,6 +61,21 @@ const SaleDetailModal = ({ saleId, onClose, onReverse }) => {
             toast.error(err?.response?.data?.message || 'Failed to reverse sale');
         } finally {
             setReversing(false);
+        }
+    };
+
+    const handleDelete = async () => {
+        setDeleting(true);
+        try {
+            await salesAPI.deleteSale(saleId);
+            toast.success('Sale deleted successfully — stock restored');
+            setShowDeleteConfirm(false);
+            if (onReverse) onReverse();
+            onClose();
+        } catch (err) {
+            toast.error(err?.response?.data?.message || 'Failed to delete sale');
+        } finally {
+            setDeleting(false);
         }
     };
 
@@ -122,6 +139,15 @@ const SaleDetailModal = ({ saleId, onClose, onReverse }) => {
                                         Reverse
                                     </button>
                                 )}
+                                {isAdmin && (
+                                    <button
+                                        onClick={() => setShowDeleteConfirm(true)}
+                                        className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-red-900 text-white rounded-lg hover:bg-red-950 transition"
+                                    >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                        Delete
+                                    </button>
+                                )}
                             </>
                         )}
                         <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-theme-tertiary text-theme-muted transition">
@@ -178,9 +204,9 @@ const SaleDetailModal = ({ saleId, onClose, onReverse }) => {
                                                     {item.product_code && (
                                                         <p className="text-[10px] font-mono text-theme-muted">{item.product_code}</p>
                                                     )}
-                                                    {item.variant_values && (
+                                                    {(item.variant_detail || item.variant_values) && (
                                                         <p className="text-[10px] text-accent-gold mt-0.5">
-                                                            {Object.entries(item.variant_values).map(([k, v]) => `${k}: ${v}`).join(' | ')}
+                                                            {item.variant_detail || Object.entries(item.variant_values).map(([k, v]) => `${k}: ${v}`).join(' | ')}
                                                         </p>
                                                     )}
                                                 </div>
@@ -367,6 +393,53 @@ const SaleDetailModal = ({ saleId, onClose, onReverse }) => {
                             >
                                 {reversing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
                                 {reversing ? 'Reversing…' : 'Confirm Reversal'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Delete Confirmation Dialog */}
+            {showDeleteConfirm && (
+                <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/70">
+                    <div className="bg-theme-secondary rounded-xl border border-theme shadow-2xl p-6 w-full max-w-md mx-4">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-xl flex items-center justify-center">
+                                <Trash2 className="w-5 h-5 text-red-600" />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-theme-primary">Delete Sale Permanently?</h3>
+                                <p className="text-xs text-theme-muted">{sale?.sale_number}</p>
+                            </div>
+                        </div>
+                        <p className="text-sm text-theme-muted mb-2">
+                            This will <strong>permanently delete</strong> this sale and all its records.
+                        </p>
+                        {!sale?.reversed_at && (
+                            <p className="text-sm text-amber-600 dark:text-amber-400 mb-4 flex items-center gap-1.5">
+                                <AlertTriangle className="w-4 h-4 shrink-0" />
+                                Stock will be restored to inventory for all items.
+                            </p>
+                        )}
+                        {sale?.reversed_at && (
+                            <p className="text-sm text-theme-muted mb-4">
+                                This sale is already reversed. Stock was already restored — only the record will be removed.
+                            </p>
+                        )}
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => setShowDeleteConfirm(false)}
+                                className="flex-1 px-4 py-2 text-sm font-medium bg-theme-primary border border-theme rounded-lg text-theme-secondary hover:bg-theme-tertiary transition"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleDelete}
+                                disabled={deleting}
+                                className="flex-1 px-4 py-2 text-sm font-semibold bg-red-900 text-white rounded-lg hover:bg-red-950 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                            >
+                                {deleting ? <RefreshCw className="w-4 h-4 animate-spin" /> : <Trash2 className="w-4 h-4" />}
+                                {deleting ? 'Deleting…' : 'Delete Forever'}
                             </button>
                         </div>
                     </div>

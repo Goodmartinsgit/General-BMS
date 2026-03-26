@@ -238,13 +238,13 @@ const generateReceiptData = async (saleId) => {
     );
 
     // Build category paths for items with category_id
-    const categoryIds = [...new Set(
+    const parentCatIds = [...new Set(
         itemsResult.rows
             .filter(i => i.category_id && i.leaf_parent_id)
             .map(i => i.leaf_parent_id)
     )];
     let categoryMap = {};
-    if (categoryIds.length > 0) {
+    if (parentCatIds.length > 0) {
         const catResult = await pool.query(
             `WITH RECURSIVE cat_tree AS (
                 SELECT id, category_name, parent_category_id, level
@@ -256,19 +256,55 @@ const generateReceiptData = async (saleId) => {
                 WHERE c.level > 1
             )
             SELECT * FROM cat_tree`,
-            [categoryIds]
+            [parentCatIds]
         );
         for (const c of catResult.rows) {
             categoryMap[c.id] = c;
         }
     }
 
+    // For old items without category_id, infer from product_category_assignments by price
+    const itemsNeedingInference = itemsResult.rows.filter(
+        i => !i.variant_name && !i.category_id && !i.variant_id
+    );
+    let pcaByProductPrice = {};
+    if (itemsNeedingInference.length > 0) {
+        const productIds = [...new Set(itemsNeedingInference.map(i => i.product_id))];
+        const pcaResult = await pool.query(
+            `SELECT pca.product_id, pca.price_override, pca.category_id,
+                    c.category_name, c.parent_category_id, c.level
+             FROM product_category_assignments pca
+             JOIN categories c ON pca.category_id = c.id
+             WHERE pca.product_id = ANY($1) AND c.level > 1
+             ORDER BY c.level`,
+            [productIds]
+        );
+        for (const pca of pcaResult.rows) {
+            const key = `${pca.product_id}_${pca.price_override}`;
+            if (!pcaByProductPrice[key]) pcaByProductPrice[key] = [];
+            pcaByProductPrice[key].push(pca);
+            if (!categoryMap[pca.category_id]) categoryMap[pca.category_id] = pca;
+        }
+        // Fetch missing parents
+        const missingParents = [...new Set(
+            pcaResult.rows
+                .filter(p => p.parent_category_id && !categoryMap[p.parent_category_id])
+                .map(p => p.parent_category_id)
+        )];
+        if (missingParents.length > 0) {
+            const parentResult = await pool.query(
+                `SELECT id, category_name, parent_category_id, level FROM categories WHERE id = ANY($1)`,
+                [missingParents]
+            );
+            for (const c of parentResult.rows) categoryMap[c.id] = c;
+        }
+    }
+
     // Format variant / category detail for each item
     itemsResult.rows = itemsResult.rows.map(item => {
-        // Priority: stored variant_name > category path > product_variants name > formatted variant_values
         let detail = item.variant_name || '';
 
-        // Build category path from DB if category_id is set and variant_name wasn't stored
+        // Build category path from DB if category_id is set
         if (!detail && item.category_id && item.leaf_category_name) {
             const parts = [item.leaf_category_name];
             let parentId = item.leaf_parent_id;
@@ -277,6 +313,22 @@ const generateReceiptData = async (saleId) => {
                 parentId = categoryMap[parentId].parent_category_id;
             }
             detail = parts.join(' / ');
+        }
+
+        // Infer from price match for old items without category_id
+        if (!detail && !item.variant_id && !item.category_id) {
+            const key = `${item.product_id}_${parseFloat(item.unit_price).toFixed(2)}`;
+            const matches = pcaByProductPrice[key] || [];
+            if (matches.length > 0) {
+                const deepest = matches.reduce((a, b) => (b.level > a.level ? b : a), matches[0]);
+                const parts = [deepest.category_name];
+                let parentId = deepest.parent_category_id;
+                while (parentId && categoryMap[parentId]) {
+                    parts.unshift(categoryMap[parentId].category_name);
+                    parentId = categoryMap[parentId].parent_category_id;
+                }
+                detail = parts.join(' / ');
+            }
         }
 
         if (!detail) detail = item.pv_variant_name || '';

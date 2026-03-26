@@ -480,14 +480,132 @@ const getSaleById = async (req, res) => {
         const itemsResult = await pool.query(
             `SELECT si.*, p.product_name, p.product_code,
              pv.sku as variant_sku, pv.variant_values,
-             b.batch_number, b.expiry_date
+             pv.variant_name as pv_variant_name,
+             b.batch_number, b.expiry_date,
+             cat.category_name as leaf_category_name,
+             cat.parent_category_id as leaf_parent_id
              FROM sale_items si
              JOIN products p ON si.product_id = p.id
              LEFT JOIN product_variants pv ON si.variant_id = pv.id
              LEFT JOIN product_batches b ON si.batch_id = b.id
+             LEFT JOIN categories cat ON si.category_id = cat.id
              WHERE si.sale_id = $1`,
             [id]
         );
+
+        // Build category paths for items with category_id
+        const parentCatIds = [...new Set(
+            itemsResult.rows
+                .filter(i => i.category_id && i.leaf_parent_id)
+                .map(i => i.leaf_parent_id)
+        )];
+        let categoryMap = {};
+        if (parentCatIds.length > 0) {
+            const catResult = await pool.query(
+                `WITH RECURSIVE cat_tree AS (
+                    SELECT id, category_name, parent_category_id, level
+                    FROM categories WHERE id = ANY($1)
+                    UNION ALL
+                    SELECT c.id, c.category_name, c.parent_category_id, c.level
+                    FROM categories c
+                    JOIN cat_tree ct ON c.id = ct.parent_category_id
+                    WHERE c.level > 1
+                )
+                SELECT * FROM cat_tree`,
+                [parentCatIds]
+            );
+            for (const c of catResult.rows) {
+                categoryMap[c.id] = c;
+            }
+        }
+
+        // For items without category_id, try to infer from product_category_assignments by price match
+        const itemsNeedingInference = itemsResult.rows.filter(
+            i => !i.variant_name && !i.category_id && !i.variant_id
+        );
+        if (itemsNeedingInference.length > 0) {
+            const productIds = [...new Set(itemsNeedingInference.map(i => i.product_id))];
+            const pcaResult = await pool.query(
+                `SELECT pca.product_id, pca.price_override, pca.category_id,
+                        c.category_name, c.parent_category_id, c.level
+                 FROM product_category_assignments pca
+                 JOIN categories c ON pca.category_id = c.id
+                 WHERE pca.product_id = ANY($1) AND c.level > 1
+                 ORDER BY c.level`,
+                [productIds]
+            );
+            // Group by product_id + price_override for matching
+            const pcaByProductPrice = {};
+            for (const pca of pcaResult.rows) {
+                const key = `${pca.product_id}_${pca.price_override}`;
+                if (!pcaByProductPrice[key]) pcaByProductPrice[key] = [];
+                pcaByProductPrice[key].push(pca);
+            }
+            // Also build parent map from these categories
+            for (const pca of pcaResult.rows) {
+                if (!categoryMap[pca.category_id]) {
+                    categoryMap[pca.category_id] = pca;
+                }
+            }
+            // Fetch any missing parents
+            const missingParents = [...new Set(
+                pcaResult.rows
+                    .filter(p => p.parent_category_id && !categoryMap[p.parent_category_id])
+                    .map(p => p.parent_category_id)
+            )];
+            if (missingParents.length > 0) {
+                const parentResult = await pool.query(
+                    `SELECT id, category_name, parent_category_id, level FROM categories WHERE id = ANY($1)`,
+                    [missingParents]
+                );
+                for (const c of parentResult.rows) {
+                    categoryMap[c.id] = c;
+                }
+            }
+        }
+
+        // Format variant_detail for each item
+        for (const item of itemsResult.rows) {
+            let detail = item.variant_name || '';
+
+            // Build from category_id if available
+            if (!detail && item.category_id && item.leaf_category_name) {
+                const parts = [item.leaf_category_name];
+                let parentId = item.leaf_parent_id;
+                while (parentId && categoryMap[parentId]) {
+                    parts.unshift(categoryMap[parentId].category_name);
+                    parentId = categoryMap[parentId].parent_category_id;
+                }
+                detail = parts.join(' / ');
+            }
+
+            // Infer from price match for old items without category_id
+            if (!detail && !item.variant_id && !item.category_id) {
+                const key = `${item.product_id}_${parseFloat(item.unit_price).toFixed(2)}`;
+                const matches = pcaByProductPrice?.[key] || [];
+                if (matches.length > 0) {
+                    // Get the deepest level match and build its path
+                    const deepest = matches.reduce((a, b) => (b.level > a.level ? b : a), matches[0]);
+                    const parts = [deepest.category_name];
+                    let parentId = deepest.parent_category_id;
+                    while (parentId && categoryMap[parentId]) {
+                        parts.unshift(categoryMap[parentId].category_name);
+                        parentId = categoryMap[parentId].parent_category_id;
+                    }
+                    detail = parts.join(' / ');
+                }
+            }
+
+            // Fallback to variant info
+            if (!detail) detail = item.pv_variant_name || '';
+            if (!detail && item.variant_values && typeof item.variant_values === 'object') {
+                detail = Object.entries(item.variant_values)
+                    .map(([k, v]) => `${k.charAt(0).toUpperCase() + k.slice(1)} ${v}`)
+                    .join(' / ');
+            }
+
+            item.variant_detail = detail || '';
+        }
 
         // Get serial numbers for each item
         for (const item of itemsResult.rows) {
@@ -566,6 +684,13 @@ const reverseSale = async (req, res) => {
                     `UPDATE variant_inventory SET quantity_on_hand = quantity_on_hand + $1, updated_at = NOW()
                      WHERE variant_id = $2 AND branch_id = $3`,
                     [item.quantity, item.variant_id, sale.branch_id]
+                );
+            } else if (item.category_id) {
+                // Restore category-based stock
+                await client.query(
+                    `UPDATE product_category_assignments SET stock_allocated = stock_allocated + $1, updated_at = NOW()
+                     WHERE product_id = $2 AND category_id = $3`,
+                    [item.quantity, item.product_id, item.category_id]
                 );
             } else {
                 // Restore product inventory
@@ -844,6 +969,155 @@ const unreverseSale = async (req, res) => {
 };
 
 // ============================================================================
+// DELETE SALE (Permanent removal with stock restoration)
+// ============================================================================
+const deleteSale = async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const { id } = req.params;
+        const deleted_by = req.user.id;
+
+        await client.query('BEGIN');
+
+        // Get sale details
+        const saleResult = await client.query(
+            'SELECT * FROM sales WHERE id = $1 FOR UPDATE',
+            [id]
+        );
+
+        if (saleResult.rows.length === 0) {
+            await client.query('ROLLBACK');
+            return res.status(404).json({ message: 'Sale not found' });
+        }
+
+        const sale = saleResult.rows[0];
+        const isAlreadyReversed = !!sale.reversed_at;
+
+        // Get sale items
+        const itemsResult = await client.query(
+            'SELECT * FROM sale_items WHERE sale_id = $1',
+            [id]
+        );
+
+        // Only restore stock if sale was NOT already reversed (reversed sales already had stock restored)
+        if (!isAlreadyReversed) {
+            for (const item of itemsResult.rows) {
+                if (item.variant_id) {
+                    // Restore variant inventory
+                    await client.query(
+                        `UPDATE variant_inventory SET quantity_on_hand = quantity_on_hand + $1, updated_at = NOW()
+                         WHERE variant_id = $2 AND branch_id = $3`,
+                        [item.quantity, item.variant_id, sale.branch_id]
+                    );
+                } else if (item.category_id) {
+                    // Restore category-based stock
+                    await client.query(
+                        `UPDATE product_category_assignments SET stock_allocated = stock_allocated + $1, updated_at = NOW()
+                         WHERE product_id = $2 AND category_id = $3`,
+                        [item.quantity, item.product_id, item.category_id]
+                    );
+                } else {
+                    // Restore product inventory
+                    await client.query(
+                        `UPDATE inventory SET quantity_on_hand = quantity_on_hand + $1, updated_at = NOW()
+                         WHERE product_id = $2 AND branch_id = $3`,
+                        [item.quantity, item.product_id, sale.branch_id]
+                    );
+                }
+
+                // Record stock movement
+                await client.query(
+                    `INSERT INTO stock_movements (
+                        product_id, branch_id, movement_type, quantity,
+                        notes, performed_by
+                    )
+                     VALUES ($1, $2, $3, $4, $5, $6)`,
+                    [
+                        item.product_id, sale.branch_id, 'sale_deletion', item.quantity,
+                        `Deletion of Sale #${sale.sale_number}`, deleted_by
+                    ]
+                );
+
+                // Restore batch quantity if applicable
+                if (item.batch_id) {
+                    await client.query(
+                        `UPDATE batches SET current_quantity = current_quantity + $1, updated_at = NOW()
+                         WHERE id = $2`,
+                        [item.quantity, item.batch_id]
+                    );
+                }
+
+                // Free serial numbers
+                await client.query(
+                    `UPDATE serial_numbers SET
+                        status = 'in_stock',
+                        sold_date = NULL,
+                        customer_id = NULL,
+                        sale_id = NULL,
+                        updated_at = NOW()
+                     WHERE sale_id = $1`,
+                    [id]
+                );
+            }
+
+            // Reverse customer statistics
+            if (sale.customer_id) {
+                await client.query(
+                    `UPDATE customers SET
+                        total_purchases = total_purchases - $1,
+                        updated_at = NOW()
+                     WHERE id = $2`,
+                    [sale.total_amount, sale.customer_id]
+                );
+            }
+
+            // Reverse referrer statistics
+            if (sale.referrer_id && sale.commission_amount > 0) {
+                await client.query(
+                    `UPDATE referrers SET
+                        total_referrals = total_referrals - 1,
+                        total_sales_value = total_sales_value - $1,
+                        total_commission_earned = total_commission_earned - $2,
+                        commission_balance = commission_balance - $2,
+                        updated_at = NOW()
+                     WHERE id = $3`,
+                    [sale.total_amount, sale.commission_amount, sale.referrer_id]
+                );
+            }
+
+            // Reverse promotion usage
+            if (sale.promotion_id) {
+                await client.query(
+                    `UPDATE promotions SET usage_count = usage_count - 1, updated_at = NOW()
+                     WHERE id = $1`,
+                    [sale.promotion_id]
+                );
+            }
+        }
+
+        // Delete related records then the sale itself
+        await client.query('DELETE FROM sale_item_serials WHERE sale_item_id IN (SELECT id FROM sale_items WHERE sale_id = $1)', [id]);
+        await client.query('DELETE FROM sale_comments WHERE sale_id = $1', [id]);
+        await client.query('DELETE FROM sale_items WHERE sale_id = $1', [id]);
+        await client.query('DELETE FROM sales WHERE id = $1', [id]);
+
+        await client.query('COMMIT');
+
+        res.json({
+            message: 'Sale deleted successfully',
+            saleId: id,
+            saleNumber: sale.sale_number
+        });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error(err);
+        res.status(500).json({ message: 'Server error' });
+    } finally {
+        client.release();
+    }
+};
+
+// ============================================================================
 // SALE COMMENTS
 // ============================================================================
 const addSaleComment = async (req, res) => {
@@ -1034,6 +1308,7 @@ module.exports = {
     getSaleById,
     reverseSale,
     unreverseSale,
+    deleteSale,
     addSaleComment,
     getSaleComments,
     getSaleStatistics
