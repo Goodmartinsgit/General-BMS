@@ -226,18 +226,60 @@ const generateReceiptData = async (saleId) => {
     const itemsResult = await pool.query(
         `SELECT si.*, p.product_name, p.product_code,
                 pv.sku as variant_sku, pv.variant_values,
-                pv.variant_name as pv_variant_name
+                pv.variant_name as pv_variant_name,
+                cat.category_name as leaf_category_name,
+                cat.parent_category_id as leaf_parent_id
          FROM sale_items si
          JOIN products p ON si.product_id = p.id
          LEFT JOIN product_variants pv ON si.variant_id = pv.id
+         LEFT JOIN categories cat ON si.category_id = cat.id
          WHERE si.sale_id = $1`,
         [saleId]
     );
 
+    // Build category paths for items with category_id
+    const categoryIds = [...new Set(
+        itemsResult.rows
+            .filter(i => i.category_id && i.leaf_parent_id)
+            .map(i => i.leaf_parent_id)
+    )];
+    let categoryMap = {};
+    if (categoryIds.length > 0) {
+        const catResult = await pool.query(
+            `WITH RECURSIVE cat_tree AS (
+                SELECT id, category_name, parent_category_id, level
+                FROM categories WHERE id = ANY($1)
+                UNION ALL
+                SELECT c.id, c.category_name, c.parent_category_id, c.level
+                FROM categories c
+                JOIN cat_tree ct ON c.id = ct.parent_category_id
+                WHERE c.level > 1
+            )
+            SELECT * FROM cat_tree`,
+            [categoryIds]
+        );
+        for (const c of catResult.rows) {
+            categoryMap[c.id] = c;
+        }
+    }
+
     // Format variant / category detail for each item
     itemsResult.rows = itemsResult.rows.map(item => {
-        // Priority: stored variant_name > product_variants.variant_name > formatted variant_values > variant_sku
-        let detail = item.variant_name || item.pv_variant_name || '';
+        // Priority: stored variant_name > category path > product_variants name > formatted variant_values
+        let detail = item.variant_name || '';
+
+        // Build category path from DB if category_id is set and variant_name wasn't stored
+        if (!detail && item.category_id && item.leaf_category_name) {
+            const parts = [item.leaf_category_name];
+            let parentId = item.leaf_parent_id;
+            while (parentId && categoryMap[parentId]) {
+                parts.unshift(categoryMap[parentId].category_name);
+                parentId = categoryMap[parentId].parent_category_id;
+            }
+            detail = parts.join(' / ');
+        }
+
+        if (!detail) detail = item.pv_variant_name || '';
         if (!detail && item.variant_values && typeof item.variant_values === 'object') {
             detail = Object.entries(item.variant_values)
                 .map(([k, v]) => `${k.charAt(0).toUpperCase() + k.slice(1)} ${v}`)

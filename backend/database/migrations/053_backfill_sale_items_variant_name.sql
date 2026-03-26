@@ -1,6 +1,11 @@
--- Backfill variant_name on existing sale_items from product_variants
--- For items with a variant_id but no variant_name stored yet
+-- Migration: Add category_id to sale_items and backfill variant details
+-- 1. Add category_id column for tracking category-based selections
+ALTER TABLE sale_items
+  ADD COLUMN IF NOT EXISTS category_id INTEGER REFERENCES categories(id);
 
+CREATE INDEX IF NOT EXISTS idx_sale_items_category ON sale_items(category_id);
+
+-- 2. Backfill variant_name from product_variants (for variant-based items)
 UPDATE sale_items si
 SET variant_name = COALESCE(
     pv.variant_name,
