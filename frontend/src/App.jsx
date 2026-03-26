@@ -23,6 +23,7 @@ import PurchaseOrders from './pages/PurchaseOrders';
 
 // Sales & POS Pages
 import SalesPage from './pages/SalesPage';
+import SalesListPage from './pages/SalesListPage';
 import SalesHistoryPage from './pages/SalesHistoryPage';
 import SalesHistory from './pages/SalesHistory';
 import SaleDetail from './pages/SaleDetail';
@@ -183,9 +184,9 @@ function App() {
 
                         {/* POS & Sales */}
                         <Route path="pos" element={<POS />} />
-                        <Route path="sales" element={<SalesHistory />} />
-                        <Route path="sales/pending-confirmations" element={<PendingConfirmations />} />
-                        <Route path="sales/cancelled" element={<CancelledSales />} />
+                        <Route path="sales" element={<SalesListPage />} />
+                        <Route path="sales/pending-confirmations" element={<SalesListPage defaultTab="pending" />} />
+                        <Route path="sales/cancelled" element={<SalesListPage defaultTab="cancelled" />} />
                         <Route path="sales/:id" element={<SaleDetail />} />
                         <Route path="sales-history" element={<SalesHistoryPage />} />
                         <Route path="sales-legacy" element={<SalesPage />} />

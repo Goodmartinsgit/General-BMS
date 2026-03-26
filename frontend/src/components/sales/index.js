@@ -9,3 +9,4 @@ export { default as POSCheckout } from './POSCheckout';
 export { default as SaleCard } from './SaleCard';
 export { default as SaleCommentForm } from './SaleCommentForm';
 export { default as SaleCommentList } from './SaleCommentList';
+export { default as SaleDetailModal } from './SaleDetailModal';

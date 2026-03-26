@@ -359,22 +359,16 @@ const createSale = async (req, res) => {
 
 const getAllSales = async (req, res) => {
     try {
-        const { branchId, startDate, endDate, status, includeReversed } = req.query;
+        const {
+            branchId, startDate, endDate, status, includeReversed,
+            reversedOnly, search, page = 1, limit = 20
+        } = req.query;
         const userId = req.user.id;
+        const pageNum  = Math.max(1, parseInt(page)  || 1);
+        const limitNum = Math.min(200, parseInt(limit) || 20);
+        const offset   = (pageNum - 1) * limitNum;
 
-        let q = `SELECT s.*, b.branch_name, c.customer_name, u.full_name as salesperson,
-                 r.full_name as referrer_name, p.promotion_name,
-                 CASE WHEN s.reversed_at IS NOT NULL THEN true ELSE false END as is_reversed
-                 FROM sales s
-                 JOIN branches b ON s.branch_id = b.id
-                 LEFT JOIN customers c ON s.customer_id = c.id
-                 LEFT JOIN users u ON s.processed_by = u.id
-                 LEFT JOIN referrers r ON s.referrer_id = r.id
-                 LEFT JOIN promotions p ON s.promotion_id = p.id
-                 WHERE 1=1`;
-        const params = [];
-
-        // Role-based scoping: users without view_all_sales only see their own
+        // Role-based scoping
         const permRes = await pool.query(
             `SELECT r.permissions FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = $1`,
             [userId]
@@ -382,37 +376,76 @@ const getAllSales = async (req, res) => {
         const perms = permRes.rows[0]?.permissions || {};
         const canSeeAll = perms['view_all_sales'] === true || perms['admin'] === true;
 
+        const params = [];
+        let where = `WHERE 1=1`;
+
         if (!canSeeAll) {
             params.push(userId);
-            q += ` AND s.processed_by = $${params.length}`;
+            where += ` AND s.processed_by = $${params.length}`;
         }
-
         if (branchId) {
             params.push(branchId);
-            q += ` AND s.branch_id = $${params.length}`;
+            where += ` AND s.branch_id = $${params.length}`;
         }
         if (startDate) {
             params.push(startDate);
-            q += ` AND s.created_at >= $${params.length}`;
+            where += ` AND s.created_at >= $${params.length}`;
         }
         if (endDate) {
-            params.push(endDate);
-            q += ` AND s.created_at <= $${params.length}`;
+            params.push(endDate + ' 23:59:59');
+            where += ` AND s.created_at <= $${params.length}`;
         }
         if (status) {
             params.push(status);
-            q += ` AND s.status = $${params.length}`;
+            where += ` AND s.status = $${params.length}`;
+        }
+        if (search) {
+            params.push(`%${search}%`);
+            where += ` AND (s.sale_number ILIKE $${params.length} OR c.customer_name ILIKE $${params.length})`;
+        }
+        if (reversedOnly === 'true') {
+            where += ` AND s.reversed_at IS NOT NULL`;
+        } else if (includeReversed !== 'true') {
+            where += ` AND s.reversed_at IS NULL`;
         }
 
-        // Filter reversed sales unless explicitly included
-        if (includeReversed !== 'true') {
-            q += ` AND s.reversed_at IS NULL`;
-        }
+        const joins = `FROM sales s
+                 JOIN branches b ON s.branch_id = b.id
+                 LEFT JOIN customers c ON s.customer_id = c.id
+                 LEFT JOIN users u ON s.processed_by = u.id
+                 LEFT JOIN referrers r ON s.referrer_id = r.id
+                 LEFT JOIN promotions p ON s.promotion_id = p.id
+                 LEFT JOIN users rv ON s.reversed_by = rv.id`;
 
-        q += ` ORDER BY s.created_at DESC`;
+        // Count for pagination
+        const countResult = await pool.query(
+            `SELECT COUNT(*) ${joins} ${where}`, params
+        );
+        const total = parseInt(countResult.rows[0].count);
 
-        const result = await pool.query(q, params);
-        res.json(result.rows);
+        // Main query with new computed fields
+        const pageParams = [...params, limitNum, offset];
+        const q = `SELECT s.*, b.branch_name, c.customer_name, u.full_name as salesperson,
+                 r.full_name as referrer_name, p.promotion_name,
+                 rv.full_name as reversed_by_name,
+                 CASE WHEN s.reversed_at IS NOT NULL THEN true ELSE false END as is_reversed,
+                 (SELECT COUNT(*)::int FROM sale_items WHERE sale_id = s.id) AS total_items,
+                 CASE
+                   WHEN s.reversed_at IS NOT NULL THEN 'cancelled'
+                   WHEN s.amount_paid >= s.total_amount THEN 'paid'
+                   WHEN s.amount_paid > 0 THEN 'partial'
+                   ELSE 'credit'
+                 END AS payment_status
+                 ${joins}
+                 ${where}
+                 ORDER BY s.created_at DESC
+                 LIMIT $${pageParams.length - 1} OFFSET $${pageParams.length}`;
+
+        const result = await pool.query(q, pageParams);
+        res.json({
+            sales: result.rows,
+            pagination: { page: pageNum, limit: limitNum, total, totalPages: Math.ceil(total / limitNum) }
+        });
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: 'Server error' });

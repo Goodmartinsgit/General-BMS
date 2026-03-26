@@ -190,9 +190,7 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, toggleCollapse }) => {
       roles: ['super_admin', 'admin', 'staff'],
       children: [
         { name: 'Point of Sale', href: '/pos', icon: ShoppingCart },
-        { name: 'Sales History', href: '/sales-history', icon: History },
-        { name: 'Confirmations', href: '/sales/pending-confirmations', icon: UserCheck, roles: ['super_admin', 'admin'] },
-        { name: 'Cancelled / Reversed', href: '/sales/cancelled', icon: RotateCcw, roles: ['super_admin', 'admin'] },
+        { name: 'Sales', href: '/sales', icon: History },
         { name: 'Quotations', href: '/quotations', icon: FilePlus },
         { name: 'Wholesale Orders', href: '/wholesale-orders', icon: FileBox },
         { name: 'Returns', href: '/returns', icon: RotateCcw },

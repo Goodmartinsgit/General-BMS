@@ -1,7 +1,7 @@
 import api from './axios';
 
 export const salesAPI = {
-    // Get all sales with optional filters
+    // Get all sales with optional filters — returns { sales, pagination }
     getSales: async (params = {}) => {
         const response = await api.get('/sales', { params });
         return response.data;
