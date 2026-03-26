@@ -13,6 +13,7 @@ async function deductInventory(client, orderId) {
     `SELECT * FROM online_order_items WHERE order_id = $1`,
     [orderId]
   );
+  const productTotals = {};
   for (const item of items.rows) {
     if (!item.product_id) continue;
     await client.query(
@@ -27,6 +28,14 @@ async function deductInventory(client, orderId) {
          (product_id, movement_type, quantity, reference_type, reference_id, notes, created_at)
        VALUES ($1, 'online_sale', $2, 'online_order', $3, $4, NOW())`,
       [item.product_id, -item.quantity, orderId, `Online order ${orderId}`]
+    );
+    productTotals[item.product_id] = (productTotals[item.product_id] || 0) + item.quantity;
+  }
+  // Increment sale_count for each product
+  for (const [productId, qty] of Object.entries(productTotals)) {
+    await client.query(
+      'UPDATE products SET sale_count = sale_count + $1, updated_at = NOW() WHERE id = $2',
+      [qty, productId]
     );
   }
 }

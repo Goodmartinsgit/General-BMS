@@ -461,9 +461,6 @@ const getProductById = async (req, res) => {
       }
     }
 
-    // Increment view count
-    await query('UPDATE products SET view_count = view_count + 1 WHERE id = $1', [id]);
-
     res.json(product);
   } catch (err) {
     console.error('Error fetching product:', err);

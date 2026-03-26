@@ -310,6 +310,16 @@ const createSale = async (req, res) => {
             }
         }
 
+        // Update product sale_count for each unique product
+        const uniqueProductIds = [...new Set(items.map(i => i.product_id))];
+        for (const productId of uniqueProductIds) {
+            const productQty = items.filter(i => i.product_id === productId).reduce((sum, i) => sum + i.quantity, 0);
+            await client.query(
+                'UPDATE products SET sale_count = sale_count + $1, updated_at = NOW() WHERE id = $2',
+                [productQty, productId]
+            );
+        }
+
         // Update customer statistics
         if (customer_id) {
             await client.query(
@@ -677,7 +687,18 @@ const reverseSale = async (req, res) => {
 
         // Restore inventory for each item
         for (const item of itemsResult.rows) {
+            let quantity_before = 0;
+            let quantity_after = 0;
+
             if (item.variant_id) {
+                // Get current variant stock
+                const variantInvResult = await client.query(
+                    'SELECT quantity_on_hand FROM variant_inventory WHERE variant_id = $1 AND branch_id = $2',
+                    [item.variant_id, sale.branch_id]
+                );
+                quantity_before = variantInvResult.rows.length > 0 ? parseInt(variantInvResult.rows[0].quantity_on_hand) : 0;
+                quantity_after = quantity_before + item.quantity;
+
                 // Restore variant inventory
                 await client.query(
                     `UPDATE variant_inventory SET quantity_on_hand = quantity_on_hand + $1, updated_at = NOW()
@@ -685,6 +706,14 @@ const reverseSale = async (req, res) => {
                     [item.quantity, item.variant_id, sale.branch_id]
                 );
             } else if (item.category_id) {
+                // Get current category-based stock
+                const pcaResult = await client.query(
+                    'SELECT stock_allocated FROM product_category_assignments WHERE product_id = $1 AND category_id = $2',
+                    [item.product_id, item.category_id]
+                );
+                quantity_before = pcaResult.rows.length > 0 ? parseInt(pcaResult.rows[0].stock_allocated) || 0 : 0;
+                quantity_after = quantity_before + item.quantity;
+
                 // Restore category-based stock
                 await client.query(
                     `UPDATE product_category_assignments SET stock_allocated = stock_allocated + $1, updated_at = NOW()
@@ -692,6 +721,14 @@ const reverseSale = async (req, res) => {
                     [item.quantity, item.product_id, item.category_id]
                 );
             } else {
+                // Get current product stock
+                const invResult = await client.query(
+                    'SELECT quantity_on_hand FROM inventory WHERE product_id = $1 AND branch_id = $2',
+                    [item.product_id, sale.branch_id]
+                );
+                quantity_before = invResult.rows.length > 0 ? parseInt(invResult.rows[0].quantity_on_hand) : 0;
+                quantity_after = quantity_before + item.quantity;
+
                 // Restore product inventory
                 await client.query(
                     `UPDATE inventory SET quantity_on_hand = quantity_on_hand + $1, updated_at = NOW()
@@ -704,11 +741,12 @@ const reverseSale = async (req, res) => {
             await client.query(
                 `INSERT INTO stock_movements (
                     product_id, branch_id, movement_type, quantity,
-                    notes, performed_by
+                    quantity_before, quantity_after, notes, performed_by
                 )
-                 VALUES ($1, $2, $3, $4, $5, $6)`,
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
                 [
                     item.product_id, sale.branch_id, 'sale_reversal', item.quantity,
+                    quantity_before, quantity_after,
                     `Reversal of Sale #${sale.sale_number} - ${reversal_reason}`, reversed_by
                 ]
             );
@@ -732,6 +770,18 @@ const reverseSale = async (req, res) => {
                     updated_at = NOW()
                  WHERE sale_id = $1`,
                 [id]
+            );
+        }
+
+        // Decrement product sale_count
+        const reversalProductTotals = {};
+        for (const item of itemsResult.rows) {
+            reversalProductTotals[item.product_id] = (reversalProductTotals[item.product_id] || 0) + item.quantity;
+        }
+        for (const [productId, qty] of Object.entries(reversalProductTotals)) {
+            await client.query(
+                'UPDATE products SET sale_count = GREATEST(sale_count - $1, 0), updated_at = NOW() WHERE id = $2',
+                [qty, productId]
             );
         }
 
@@ -835,6 +885,9 @@ const unreverseSale = async (req, res) => {
 
         // Deduct inventory again for each item
         for (const item of itemsResult.rows) {
+            let quantity_before = 0;
+            let quantity_after = 0;
+
             if (item.variant_id) {
                 // Check variant stock
                 const variantInvResult = await client.query(
@@ -846,6 +899,9 @@ const unreverseSale = async (req, res) => {
                     await client.query('ROLLBACK');
                     return res.status(400).json({ message: `Insufficient variant stock to reactivate this sale` });
                 }
+
+                quantity_before = parseInt(variantInvResult.rows[0].quantity_on_hand);
+                quantity_after = quantity_before - item.quantity;
 
                 await client.query(
                     `UPDATE variant_inventory SET quantity_on_hand = quantity_on_hand - $1, updated_at = NOW()
@@ -864,6 +920,9 @@ const unreverseSale = async (req, res) => {
                     return res.status(400).json({ message: `Insufficient category stock to reactivate this sale` });
                 }
 
+                quantity_before = parseInt(pcaResult.rows[0].stock_allocated) || 0;
+                quantity_after = quantity_before - item.quantity;
+
                 await client.query(
                     `UPDATE product_category_assignments SET stock_allocated = stock_allocated - $1, updated_at = NOW()
                      WHERE product_id = $2 AND category_id = $3`,
@@ -881,6 +940,9 @@ const unreverseSale = async (req, res) => {
                     return res.status(400).json({ message: `Insufficient stock to reactivate this sale` });
                 }
 
+                quantity_before = parseInt(invResult.rows[0].quantity_on_hand);
+                quantity_after = quantity_before - item.quantity;
+
                 await client.query(
                     `UPDATE inventory SET quantity_on_hand = quantity_on_hand - $1, updated_at = NOW()
                      WHERE product_id = $2 AND branch_id = $3`,
@@ -892,11 +954,12 @@ const unreverseSale = async (req, res) => {
             await client.query(
                 `INSERT INTO stock_movements (
                     product_id, branch_id, movement_type, quantity,
-                    notes, performed_by
+                    quantity_before, quantity_after, notes, performed_by
                 )
-                 VALUES ($1, $2, $3, $4, $5, $6)`,
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
                 [
                     item.product_id, sale.branch_id, 'sale', -item.quantity,
+                    quantity_before, quantity_after,
                     `Unreversal of Sale #${sale.sale_number}`, unreversed_by
                 ]
             );
@@ -922,6 +985,18 @@ const unreverseSale = async (req, res) => {
                      SELECT serial_number_id FROM sale_item_serials WHERE sale_item_id = $4
                  )`,
                 [sale.created_at, sale.customer_id, id, item.id]
+            );
+        }
+
+        // Re-increment product sale_count
+        const unreversalProductTotals = {};
+        for (const item of itemsResult.rows) {
+            unreversalProductTotals[item.product_id] = (unreversalProductTotals[item.product_id] || 0) + item.quantity;
+        }
+        for (const [productId, qty] of Object.entries(unreversalProductTotals)) {
+            await client.query(
+                'UPDATE products SET sale_count = sale_count + $1, updated_at = NOW() WHERE id = $2',
+                [qty, productId]
             );
         }
 
@@ -1109,6 +1184,20 @@ const deleteSale = async (req, res) => {
                     `UPDATE promotions SET usage_count = usage_count - 1, updated_at = NOW()
                      WHERE id = $1`,
                     [sale.promotion_id]
+                );
+            }
+        }
+
+        // Decrement sale_count if sale was not already reversed (reversal already decremented)
+        if (!isAlreadyReversed) {
+            const deleteProductTotals = {};
+            for (const item of itemsResult.rows) {
+                deleteProductTotals[item.product_id] = (deleteProductTotals[item.product_id] || 0) + item.quantity;
+            }
+            for (const [productId, qty] of Object.entries(deleteProductTotals)) {
+                await client.query(
+                    'UPDATE products SET sale_count = GREATEST(sale_count - $1, 0), updated_at = NOW() WHERE id = $2',
+                    [qty, productId]
                 );
             }
         }
