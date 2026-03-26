@@ -225,13 +225,26 @@ const generateReceiptData = async (saleId) => {
 
     const itemsResult = await pool.query(
         `SELECT si.*, p.product_name, p.product_code,
-                pv.sku as variant_sku, pv.variant_values
+                pv.sku as variant_sku, pv.variant_values,
+                pv.variant_name as pv_variant_name
          FROM sale_items si
          JOIN products p ON si.product_id = p.id
          LEFT JOIN product_variants pv ON si.variant_id = pv.id
          WHERE si.sale_id = $1`,
         [saleId]
     );
+
+    // Format variant / category detail for each item
+    itemsResult.rows = itemsResult.rows.map(item => {
+        // Priority: stored variant_name > product_variants.variant_name > formatted variant_values > variant_sku
+        let detail = item.variant_name || item.pv_variant_name || '';
+        if (!detail && item.variant_values && typeof item.variant_values === 'object') {
+            detail = Object.entries(item.variant_values)
+                .map(([k, v]) => `${k.charAt(0).toUpperCase() + k.slice(1)} ${v}`)
+                .join(' / ');
+        }
+        return { ...item, variant_detail: detail || '' };
+    });
 
     const configResult = await pool.query(
         'SELECT * FROM receipt_config ORDER BY updated_at DESC LIMIT 1'
@@ -411,7 +424,7 @@ const printReceipt = async (req, res) => {
                 { type: 'line' },
                 ...receiptData.items.map(item => ({
                     type: 'item',
-                    name: item.product_name + (item.variant_sku ? ` (${item.variant_sku})` : ''),
+                    name: item.product_name + (item.variant_detail ? ` (${item.variant_detail})` : ''),
                     quantity: item.quantity,
                     price: item.unit_price,
                     total: item.subtotal

@@ -106,7 +106,7 @@ const ReceiptRenderer = forwardRef(({ config: cfg = {}, sale = {}, items = [], c
         price: Number(item.unit_price || item.price || 0),
         total: Number(item.line_total || item.subtotal || item.total || 0),
         discount: Number(item.discount_amount || 0),
-        variant: item.variant_name || item.variant_sku || '',
+        variant: item.variant_detail || item.variant_name || item.variant_sku || '',
     }));
 
     // ── Shared building blocks ──

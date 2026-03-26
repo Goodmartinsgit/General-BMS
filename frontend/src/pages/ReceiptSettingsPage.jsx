@@ -61,8 +61,8 @@ const SAMPLE_SALE = {
 };
 
 const SAMPLE_ITEMS = [
-    { product_name: 'Premium Floor Tile', product_code: 'FLR-001', quantity: 3, unit_price: 5000, line_total: 15000 },
-    { product_name: 'Wall Tile Set', product_code: 'WLL-002', quantity: 1, unit_price: 8500, line_total: 8500 },
+    { product_name: 'Stone Zipper', product_code: 'STN-001', quantity: 3, unit_price: 5000, line_total: 15000, variant_detail: 'Size 24 / White' },
+    { product_name: '1000 Thread', product_code: 'THR-002', quantity: 1, unit_price: 8500, line_total: 8500, variant_detail: '1000m Thread / Mix colours' },
 ];
 
 // ============================================================================

@@ -54,6 +54,7 @@ const POSCheckout = ({ onSaleComplete }) => {
                     product_id: item.product.id,
                     variant_id: item.variant?.id || null,
                     category_id: item.categoryId || null,
+                    variant_name: item.categoryName || item.variant?.variant_name || null,
                     quantity: item.quantity,
                     unit_price: item.price,
                     subtotal: item.price * item.quantity

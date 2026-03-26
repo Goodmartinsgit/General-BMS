@@ -170,14 +170,14 @@ const createSale = async (req, res) => {
             const saleItemResult = await client.query(
                 `INSERT INTO sale_items (
                     sale_id, product_id, variant_id, quantity, unit_price, line_total,
-                    cost_price
+                    cost_price, variant_name
                 )
-                 VALUES ($1, $2, $3, $4, $5, $6, $7)
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
                  RETURNING id`,
                 [
                     saleId, item.product_id, item.variant_id || null,
                     item.quantity, item.unit_price, item.subtotal,
-                    cost_price
+                    cost_price, item.variant_name || null
                 ]
             );
             const saleItemId = saleItemResult.rows[0].id;
