@@ -63,6 +63,9 @@ const SalesListPage = ({ defaultTab = 'all' }) => {
 
     // ── modals ────────────────────────────────────────────────────────────────
     const [selectedSaleId, setSelectedSaleId] = useState(null);
+    const [reverseTarget, setReverseTarget] = useState(null);
+    const [reverseReason, setReverseReason] = useState('');
+    const [reversing, setReversing] = useState(false);
 
     // Active date range: local override wins over global fiscal period
     const activeDateRange = useMemo(() => {
@@ -125,18 +128,25 @@ const SalesListPage = ({ defaultTab = 'all' }) => {
     useEffect(() => { fetchSales(); }, [fetchSales]);
 
     // ── action handlers ───────────────────────────────────────────────────────
-    const handleReverse = async (e, sale) => {
+    const handleReverseClick = (e, sale) => {
         e.stopPropagation();
-        // eslint-disable-next-line no-alert
-        const reason = window.prompt(`Reason for reversing ${sale.sale_number}?`);
-        if (reason === null) return;
-        if (!reason.trim()) { toast.error('Reversal reason is required'); return; }
+        setReverseTarget(sale);
+        setReverseReason('');
+    };
+
+    const handleReverseConfirm = async () => {
+        if (!reverseReason.trim()) { toast.error('Please enter a reversal reason'); return; }
+        setReversing(true);
         try {
-            await salesAPI.reverseSale(sale.id, reason.trim());
+            await salesAPI.reverseSale(reverseTarget.id, reverseReason.trim());
             toast.success('Sale reversed successfully');
+            setReverseTarget(null);
+            setReverseReason('');
             fetchSales();
         } catch (err) {
             toast.error(err?.response?.data?.message || 'Failed to reverse sale');
+        } finally {
+            setReversing(false);
         }
     };
 
@@ -404,7 +414,7 @@ const SalesListPage = ({ defaultTab = 'all' }) => {
                                                 <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
                                                     {isAdmin && (!isReversed ? (
                                                         <button
-                                                            onClick={(e) => handleReverse(e, sale)}
+                                                            onClick={(e) => handleReverseClick(e, sale)}
                                                             title="Reverse sale"
                                                             className="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition"
                                                         >
@@ -468,6 +478,49 @@ const SalesListPage = ({ defaultTab = 'all' }) => {
                     onClose={() => setSelectedSaleId(null)}
                     onReverse={fetchSales}
                 />
+            )}
+
+            {/* Reverse Confirmation Dialog */}
+            {reverseTarget && (
+                <div className="fixed inset-0 z-60 flex items-center justify-center bg-black/70">
+                    <div className="bg-theme-secondary rounded-xl border border-theme shadow-2xl p-6 w-full max-w-md mx-4">
+                        <div className="flex items-center gap-3 mb-4">
+                            <div className="w-10 h-10 bg-red-100 dark:bg-red-900/30 rounded-xl flex items-center justify-center">
+                                <RotateCcw className="w-5 h-5 text-red-600" />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-theme-primary">Reverse Sale?</h3>
+                                <p className="text-xs text-theme-muted">{reverseTarget.sale_number}</p>
+                            </div>
+                        </div>
+                        <p className="text-sm text-theme-muted mb-4">
+                            This will cancel the sale, restore stock, and reverse payments. This action cannot be undone easily.
+                        </p>
+                        <textarea
+                            value={reverseReason}
+                            onChange={(e) => setReverseReason(e.target.value)}
+                            placeholder="Enter reason for reversal (required)..."
+                            rows={3}
+                            className="w-full px-3 py-2 bg-theme-primary border border-theme rounded-lg text-sm text-theme-primary placeholder-theme-muted focus:ring-2 focus:ring-red-400/20 focus:border-red-400/40 outline-none resize-none mb-4"
+                        />
+                        <div className="flex gap-3">
+                            <button
+                                onClick={() => { setReverseTarget(null); setReverseReason(''); }}
+                                className="flex-1 px-4 py-2 text-sm font-medium bg-theme-primary border border-theme rounded-lg text-theme-secondary hover:bg-theme-tertiary transition"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={handleReverseConfirm}
+                                disabled={reversing || !reverseReason.trim()}
+                                className="flex-1 px-4 py-2 text-sm font-semibold bg-red-600 text-white rounded-lg hover:bg-red-700 transition disabled:opacity-50 flex items-center justify-center gap-2"
+                            >
+                                {reversing ? <RefreshCw className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
+                                {reversing ? 'Reversing…' : 'Confirm Reversal'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );
