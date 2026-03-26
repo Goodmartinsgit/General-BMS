@@ -523,6 +523,7 @@ const getSaleById = async (req, res) => {
         const itemsNeedingInference = itemsResult.rows.filter(
             i => !i.variant_name && !i.category_id && !i.variant_id
         );
+        let pcaByProductPrice = {};
         if (itemsNeedingInference.length > 0) {
             const productIds = [...new Set(itemsNeedingInference.map(i => i.product_id))];
             const pcaResult = await pool.query(
@@ -534,8 +535,6 @@ const getSaleById = async (req, res) => {
                  ORDER BY c.level`,
                 [productIds]
             );
-            // Group by product_id + price_override for matching
-            const pcaByProductPrice = {};
             for (const pca of pcaResult.rows) {
                 const key = `${pca.product_id}_${pca.price_override}`;
                 if (!pcaByProductPrice[key]) pcaByProductPrice[key] = [];
