@@ -9,8 +9,7 @@ const POSProductCard = ({ product, onProductClick }) => {
     const { formatCurrency } = useCurrency();
     const {
         product_name,
-        selling_price,
-        image_url,
+        retail_price,
         product_images,
         is_featured,
         has_variants,
@@ -20,7 +19,7 @@ const POSProductCard = ({ product, onProductClick }) => {
         category_assignments
     } = product;
     const hasPriceRange = price_min && price_max && price_min !== price_max;
-    const displayPrice = effective_price || selling_price || 0;
+    const displayPrice = effective_price || retail_price || 0;
 
     // Stock: prefer total_stock (enriched with category assignment fallback)
     const stockQty = product.total_stock ?? product.quantity_on_hand ?? 0;

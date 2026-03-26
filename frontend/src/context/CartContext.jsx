@@ -49,7 +49,7 @@ export const CartProvider = ({ children }) => {
 
             const sellingPrice = variant
                 ? variant.selling_price
-                : (product.effective_price || product.selling_price || product.retail_price || 0);
+                : (product.effective_price || product.retail_price || 0);
             const costPrice = variant
                 ? (variant.cost_price || product.cost_price || 0)
                 : (product.effective_cost_price || product.cost_price || 0);

@@ -179,7 +179,7 @@ const POSProductDetail = ({ productId, onBack }) => {
                     categoryId: a.category_id,
                     name: a.category_name,
                     quantity: catQuantities[id] ?? 1,
-                    price: parseFloat(a.price_override) || parseFloat(product?.selling_price) || 0,
+                    price: parseFloat(a.price_override) || parseFloat(product?.retail_price) || 0,
                     costPrice: parseFloat(a.cost_price_override) || parseFloat(product?.cost_price) || 0,
                     stock: parseInt(a.stock_allocated) || 0,
                 });
@@ -238,8 +238,8 @@ const POSProductDetail = ({ productId, onBack }) => {
     // ── Price computation ──
     const currentPrice = useMemo(() => {
         if (leafSelections.length === 1) return leafSelections[0].price;
-        if (selectedVariant) return parseFloat(selectedVariant.selling_price) || parseFloat(product?.selling_price) || 0;
-        return parseFloat(product?.effective_price) || parseFloat(product?.selling_price) || 0;
+        if (selectedVariant) return parseFloat(selectedVariant.selling_price) || parseFloat(product?.retail_price) || 0;
+        return parseFloat(product?.effective_price) || parseFloat(product?.retail_price) || 0;
     }, [product, selectedVariant, leafSelections]);
 
     const priceRange = useMemo(() => {
@@ -284,7 +284,7 @@ const POSProductDetail = ({ productId, onBack }) => {
                 const assignment = product.category_assignments?.find(a => a.category_id === sel.categoryId);
                 const fullPath = assignment ? buildLeafPath(assignment) : sel.name;
                 addToCart(
-                    { ...product, effective_price: sel.price, selling_price: sel.price, effective_cost_price: sel.costPrice, cost_price: sel.costPrice },
+                    { ...product, effective_price: sel.price, retail_price: sel.price, effective_cost_price: sel.costPrice, cost_price: sel.costPrice },
                     selectedVariant,
                     sel.categoryId,
                     fullPath,
@@ -504,7 +504,7 @@ const POSProductDetail = ({ productId, onBack }) => {
                                                 const isSelected = currentSelected === item.category_id;
                                                 const stock = parseInt(item.stock_allocated) || 0;
                                                 const isOOS = stock <= 0 && !item.price_override;
-                                                const displayPrice = parseFloat(item.price_override) || parseFloat(product.selling_price) || 0;
+                                                const displayPrice = parseFloat(item.price_override) || parseFloat(product.retail_price) || 0;
 
                                                 return (
                                                     <button
@@ -524,7 +524,7 @@ const POSProductDetail = ({ productId, onBack }) => {
                                                         )}
                                                         <div>
                                                             <span>{item.category_name}</span>
-                                                            {item.price_override && parseFloat(item.price_override) !== parseFloat(product.selling_price) && (
+                                                            {item.price_override && parseFloat(item.price_override) !== parseFloat(product.retail_price) && (
                                                                 <span className={`block text-[10px] mt-0.5 ${isSelected ? 'text-white/70' : 'text-theme-muted'}`}>
                                                                     {formatCurrency(displayPrice)}
                                                                 </span>
@@ -546,7 +546,7 @@ const POSProductDetail = ({ productId, onBack }) => {
                                         const a = product.category_assignments.find(x => x.category_id === primaryLeafId);
                                         if (!a) return null;
                                         const stock = parseInt(a.stock_allocated) || 0;
-                                        const price = parseFloat(a.price_override) || parseFloat(product.selling_price) || 0;
+                                        const price = parseFloat(a.price_override) || parseFloat(product.retail_price) || 0;
                                         const qty = catQuantities[primaryLeafId] ?? 1;
                                         return (
                                             <div className="flex items-center gap-3 rounded-lg px-3 py-2 bg-theme-secondary">
@@ -581,7 +581,7 @@ const POSProductDetail = ({ productId, onBack }) => {
                                         const a = product.category_assignments.find(x => x.category_id === catId);
                                         if (!a) return null;
                                         const stock = parseInt(a.stock_allocated) || 0;
-                                        const price = parseFloat(a.price_override) || parseFloat(product.selling_price) || 0;
+                                        const price = parseFloat(a.price_override) || parseFloat(product.retail_price) || 0;
                                         const qty = catQuantities[catId] ?? 1;
                                         return (
                                             <div key={catId} className="flex items-center gap-3 rounded-lg px-3 py-2 bg-theme-secondary">
@@ -649,7 +649,7 @@ const POSProductDetail = ({ productId, onBack }) => {
                                                                         </span>
                                                                     )}
                                                                     {item.category_name}
-                                                                    {item.price_override && parseFloat(item.price_override) !== parseFloat(product.selling_price) && (
+                                                                    {item.price_override && parseFloat(item.price_override) !== parseFloat(product.retail_price) && (
                                                                         <span className="block text-[10px] text-theme-muted">
                                                                             {formatCurrency(parseFloat(item.price_override))}
                                                                         </span>
