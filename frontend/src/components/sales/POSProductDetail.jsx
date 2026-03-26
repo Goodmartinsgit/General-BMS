@@ -180,6 +180,7 @@ const POSProductDetail = ({ productId, onBack }) => {
                     name: a.category_name,
                     quantity: catQuantities[id] ?? 1,
                     price: parseFloat(a.price_override) || parseFloat(product?.selling_price) || 0,
+                    costPrice: parseFloat(a.cost_price_override) || parseFloat(product?.cost_price) || 0,
                     stock: parseInt(a.stock_allocated) || 0,
                 });
             }
@@ -283,7 +284,7 @@ const POSProductDetail = ({ productId, onBack }) => {
                 const assignment = product.category_assignments?.find(a => a.category_id === sel.categoryId);
                 const fullPath = assignment ? buildLeafPath(assignment) : sel.name;
                 addToCart(
-                    { ...product, effective_price: sel.price, selling_price: sel.price },
+                    { ...product, effective_price: sel.price, selling_price: sel.price, effective_cost_price: sel.costPrice, cost_price: sel.costPrice },
                     selectedVariant,
                     sel.categoryId,
                     fullPath,

@@ -25,17 +25,19 @@ export const CartProvider = ({ children }) => {
         localStorage.setItem('pos_cart', JSON.stringify(cartItems));
     }, [cartItems]);
 
+    const _matchItem = (item, productId, variantId, categoryId) => {
+        if (categoryId) {
+            return item.product.id === productId && item.categoryId === categoryId;
+        }
+        if (variantId) {
+            return item.product.id === productId && item.variant?.id === variantId && !item.categoryId;
+        }
+        return item.product.id === productId && !item.variant && !item.categoryId;
+    };
+
     const addToCart = (product, variant = null, categoryId = null, categoryName = null, qty = 1) => {
         setCartItems(prev => {
-            const matchItem = (item) => {
-                if (categoryId) {
-                    return item.product.id === product.id && item.categoryId === categoryId;
-                }
-                if (variant) {
-                    return item.product.id === product.id && item.variant?.id === variant.id && !item.categoryId;
-                }
-                return item.product.id === product.id && !item.variant && !item.categoryId;
-            };
+            const matchItem = (item) => _matchItem(item, product.id, variant?.id, categoryId);
 
             const existingItem = prev.find(matchItem);
 
@@ -45,26 +47,30 @@ export const CartProvider = ({ children }) => {
                 );
             }
 
+            const sellingPrice = variant
+                ? variant.selling_price
+                : (product.effective_price || product.selling_price || product.retail_price || 0);
+            const costPrice = variant
+                ? (variant.cost_price || product.cost_price || 0)
+                : (product.effective_cost_price || product.cost_price || 0);
+
             return [...prev, {
                 product,
                 variant,
                 categoryId: categoryId || null,
                 categoryName: categoryName || null,
                 quantity: qty,
-                price: variant ? variant.selling_price : (product.effective_price || product.selling_price),
+                price: sellingPrice,
+                originalPrice: sellingPrice,
+                costPrice: costPrice,
+                unitDiscount: 0,
             }];
         });
     };
 
     const removeFromCart = (productId, variantId = null, categoryId = null) => {
         setCartItems(prev => prev.filter(item => {
-            if (categoryId) {
-                return !(item.product.id === productId && item.categoryId === categoryId);
-            }
-            if (variantId) {
-                return !(item.product.id === productId && item.variant?.id === variantId && !item.categoryId);
-            }
-            return !(item.product.id === productId && !item.variant && !item.categoryId);
+            return !_matchItem(item, productId, variantId, categoryId);
         }));
     };
 
@@ -74,16 +80,33 @@ export const CartProvider = ({ children }) => {
             return;
         }
         setCartItems(prev => prev.map(item => {
-            if (categoryId) {
-                return (item.product.id === productId && item.categoryId === categoryId)
-                    ? { ...item, quantity } : item;
+            if (_matchItem(item, productId, variantId, categoryId)) {
+                return { ...item, quantity };
             }
-            if (variantId) {
-                return (item.product.id === productId && item.variant?.id === variantId && !item.categoryId)
-                    ? { ...item, quantity } : item;
+            return item;
+        }));
+    };
+
+    const updatePrice = (productId, variantId = null, newPrice, categoryId = null) => {
+        const price = parseFloat(newPrice) || 0;
+        if (price < 0) return;
+        setCartItems(prev => prev.map(item => {
+            if (_matchItem(item, productId, variantId, categoryId)) {
+                return { ...item, price };
             }
-            return (item.product.id === productId && !item.variant && !item.categoryId)
-                ? { ...item, quantity } : item;
+            return item;
+        }));
+    };
+
+    const updateUnitDiscount = (productId, variantId = null, newDiscount, categoryId = null) => {
+        const unitDiscount = parseFloat(newDiscount) || 0;
+        if (unitDiscount < 0) return;
+        setCartItems(prev => prev.map(item => {
+            if (_matchItem(item, productId, variantId, categoryId)) {
+                if (unitDiscount >= item.price) return item; // discount can't exceed price
+                return { ...item, unitDiscount };
+            }
+            return item;
         }));
     };
 
@@ -96,7 +119,7 @@ export const CartProvider = ({ children }) => {
     };
 
     const getCartSubtotal = () => {
-        return cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
+        return cartItems.reduce((total, item) => total + ((item.price - (item.unitDiscount || 0)) * item.quantity), 0);
     };
 
     const getCartTotal = () => {
@@ -116,6 +139,8 @@ export const CartProvider = ({ children }) => {
             addToCart,
             removeFromCart,
             updateQuantity,
+            updatePrice,
+            updateUnitDiscount,
             clearCart,
             getCartSubtotal,
             getCartTotal

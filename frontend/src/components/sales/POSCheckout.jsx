@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CheckCircle, AlertCircle, RefreshCw, Printer } from 'lucide-react';
+import { CheckCircle, AlertCircle, RefreshCw, Printer, TrendingUp, TrendingDown } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { useAuth } from '../../context/AuthContext';
 import { useBranch } from '../../context/BranchContext';
@@ -38,6 +38,12 @@ const POSCheckout = ({ onSaleComplete }) => {
     const total = getCartTotal();
     const tax = 0;
 
+    // Calculate total cost and gross profit
+    const totalCost = cartItems.reduce((sum, item) => sum + ((item.costPrice || 0) * item.quantity), 0);
+    const totalProductDiscounts = cartItems.reduce((sum, item) => sum + ((item.unitDiscount || 0) * item.quantity), 0);
+    const grossProfit = total - totalCost;
+    const hasAnyCost = cartItems.some(item => item.costPrice > 0);
+
     const handleCompleteSale = async () => {
         if (cartItems.length === 0) {
             toast.error('Cart is empty');
@@ -50,15 +56,18 @@ const POSCheckout = ({ onSaleComplete }) => {
                 branch_id: currentBranchId,
                 customer_id: customer?.id || null,
                 referrer_id: referrer?.id || null,
-                items: cartItems.map(item => ({
-                    product_id: item.product.id,
-                    variant_id: item.variant?.id || null,
-                    category_id: item.categoryId || null,
-                    variant_name: item.categoryName || item.variant?.variant_name || null,
-                    quantity: item.quantity,
-                    unit_price: item.price,
-                    subtotal: item.price * item.quantity
-                })),
+                items: cartItems.map(item => {
+                    const effectivePrice = item.price - (item.unitDiscount || 0);
+                    return {
+                        product_id: item.product.id,
+                        variant_id: item.variant?.id || null,
+                        category_id: item.categoryId || null,
+                        variant_name: item.categoryName || item.variant?.variant_name || null,
+                        quantity: item.quantity,
+                        unit_price: effectivePrice,
+                        subtotal: effectivePrice * item.quantity
+                    };
+                }),
                 subtotal: subtotal,
                 discount_amount: discount,
                 tax_amount: tax,
@@ -160,9 +169,15 @@ const POSCheckout = ({ onSaleComplete }) => {
                         <span>Subtotal</span>
                         <span className="text-theme-primary font-medium">{formatCurrency(subtotal)}</span>
                     </div>
+                    {totalProductDiscounts > 0 && (
+                        <div className="flex justify-between items-center text-[10px] sm:text-xs text-rose-500">
+                            <span>Product Discounts</span>
+                            <span>-{formatCurrency(totalProductDiscounts)}</span>
+                        </div>
+                    )}
                     {discount > 0 && (
                         <div className="flex justify-between items-center text-[10px] sm:text-xs text-rose-500">
-                            <span>Discount</span>
+                            <span>Sale Discount</span>
                             <span>-{formatCurrency(discount)}</span>
                         </div>
                     )}
@@ -171,6 +186,15 @@ const POSCheckout = ({ onSaleComplete }) => {
                         <span className="text-xs sm:text-sm font-medium text-theme-secondary">Total</span>
                         <span className="text-lg sm:text-xl font-bold text-theme-primary">{formatCurrency(total)}</span>
                     </div>
+                    {hasAnyCost && (
+                        <div className={`flex justify-between items-center text-[10px] sm:text-xs font-medium ${grossProfit >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                            <span className="flex items-center gap-1">
+                                {grossProfit >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                                {grossProfit >= 0 ? 'Gross Profit' : 'Gross Loss'}
+                            </span>
+                            <span>{formatCurrency(Math.abs(grossProfit))}</span>
+                        </div>
+                    )}
                 </div>
 
                 <button

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Search, LayoutGrid, List as ListIcon, ShoppingBag, Package } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { productAPI } from '../api/products';
@@ -28,25 +28,30 @@ const POS = () => {
         }
     }, [cartItems.length]);
 
-    const fetchProducts = async (search = '', page = 1, categoryId = null) => {
+    const fetchProducts = useCallback(async (search = '', page = 1, categoryId = null) => {
         setLoading(true);
         try {
-            const params = { search, page, limit: 20, view_mode: 'compact', is_active: true };
+            const params = { page, limit: 20, view_mode: 'compact', is_active: true };
+            if (search && search.trim()) params.search = search.trim();
             if (categoryId) params.category_id = categoryId;
             const data = await productAPI.getProducts(params);
-            setProducts(data.products);
-            setPagination(data.pagination);
+            setProducts(data.products || []);
+            setPagination(data.pagination || { page: 1, totalPages: 1 });
         } catch (error) {
             console.error('Error fetching products:', error);
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
+
+    // Use a ref to always call the latest fetchProducts from within debounce
+    const fetchRef = useRef(fetchProducts);
+    fetchRef.current = fetchProducts;
 
     const debouncedSearch = useCallback(
         debounce((term, categoryId) => {
-            fetchProducts(term, 1, categoryId);
-        }, 500),
+            fetchRef.current(term, 1, categoryId);
+        }, 300),
         []
     );
 
@@ -68,6 +73,7 @@ const POS = () => {
             debouncedSearch(value, selectedCategoryId);
         } else {
             // Cleared search with no category — reset to empty
+            debouncedSearch.cancel();
             setProducts([]);
             setPagination({ page: 1, totalPages: 1 });
         }

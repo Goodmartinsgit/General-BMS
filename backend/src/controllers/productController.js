@@ -187,7 +187,7 @@ const getAllProducts = async (req, res) => {
     // Select fields based on view mode
     let selectFields = 'p.*';
     if (view_mode === 'compact') {
-      selectFields = 'p.id, p.product_code, p.product_name, p.base_product_name, p.product_group_id, p.retail_price, p.product_images, p.is_active';
+      selectFields = 'p.id, p.product_code, p.product_name, p.base_product_name, p.product_group_id, p.retail_price, p.selling_price, p.cost_price, p.product_images, p.image_url, p.is_active, p.is_featured, p.has_variants';
     } else if (view_mode === 'list') {
       selectFields = 'p.id, p.product_code, p.product_name, p.base_product_name, p.product_group_id, p.product_type, p.retail_price, p.cost_price, p.reorder_level, p.is_active, p.is_featured, p.product_images';
     }
