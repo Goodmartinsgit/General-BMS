@@ -323,9 +323,8 @@ const SalesListPage = ({ defaultTab = 'all' }) => {
                                         <th className="px-4 py-3 text-left text-[10px] font-bold text-theme-muted uppercase tracking-wider">Customer</th>
                                         <th className="px-4 py-3 text-left text-[10px] font-bold text-theme-muted uppercase tracking-wider">Details</th>
                                         <th className="px-4 py-3 text-right text-[10px] font-bold text-theme-muted uppercase tracking-wider">Amount</th>
-                                        <th className="px-4 py-3 text-center text-[10px] font-bold text-theme-muted uppercase tracking-wider">Payment</th>
                                         <th className="px-4 py-3 text-center text-[10px] font-bold text-theme-muted uppercase tracking-wider">Status</th>
-                                        {isAdmin && <th className="px-4 py-3 text-center text-[10px] font-bold text-theme-muted uppercase tracking-wider">Actions</th>}
+                                        <th className="px-4 py-3 text-center text-[10px] font-bold text-theme-muted uppercase tracking-wider">Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-theme">
@@ -383,18 +382,16 @@ const SalesListPage = ({ defaultTab = 'all' }) => {
                                                             Paid: {cs}{parseFloat(sale.amount_paid).toLocaleString()}
                                                         </p>
                                                     )}
-                                                </td>
-                                                <td className="px-4 py-3 text-center">
-                                                    <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${methodCls}`}>
+                                                    <span className={`inline-flex mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${methodCls}`}>
                                                         {sale.payment_method || '—'}
                                                     </span>
                                                 </td>
                                                 <td className="px-4 py-3 text-center">
                                                     {activeTab === 'pending' ? (
                                                         <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                                                            isReversed          ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
+                                                            isReversed                ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400' :
                                                             sale.status === 'On Hold' ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400' :
-                                                                                  'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                                                                                        'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
                                                         }`}>
                                                             {isReversed ? 'Reversed' : sale.status === 'On Hold' ? 'On Hold' : 'Pending'}
                                                         </span>
@@ -404,29 +401,27 @@ const SalesListPage = ({ defaultTab = 'all' }) => {
                                                         </span>
                                                     )}
                                                 </td>
-                                                {isAdmin && (
-                                                    <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
-                                                        {!isReversed ? (
-                                                            <button
-                                                                onClick={(e) => handleReverse(e, sale)}
-                                                                title="Reverse sale"
-                                                                className="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition"
-                                                            >
-                                                                <RotateCcw className="w-3 h-3" />
-                                                                Reverse
-                                                            </button>
-                                                        ) : (
-                                                            <button
-                                                                onClick={(e) => handleUnreverse(e, sale)}
-                                                                title="Reactivate sale"
-                                                                className="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/30 transition"
-                                                            >
-                                                                <RefreshCw className="w-3 h-3" />
-                                                                Reactivate
-                                                            </button>
-                                                        )}
-                                                    </td>
-                                                )}
+                                                <td className="px-4 py-3 text-center" onClick={e => e.stopPropagation()}>
+                                                    {isAdmin && (!isReversed ? (
+                                                        <button
+                                                            onClick={(e) => handleReverse(e, sale)}
+                                                            title="Reverse sale"
+                                                            className="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition"
+                                                        >
+                                                            <RotateCcw className="w-3 h-3" />
+                                                            Reverse
+                                                        </button>
+                                                    ) : (
+                                                        <button
+                                                            onClick={(e) => handleUnreverse(e, sale)}
+                                                            title="Reactivate sale"
+                                                            className="inline-flex items-center gap-1 px-2.5 py-1 text-[10px] font-bold bg-green-50 dark:bg-green-900/20 text-green-600 dark:text-green-400 rounded-lg hover:bg-green-100 dark:hover:bg-green-900/30 transition"
+                                                        >
+                                                            <RefreshCw className="w-3 h-3" />
+                                                            Reactivate
+                                                        </button>
+                                                    ))}
+                                                </td>
                                             </tr>
                                         );
                                     })}
