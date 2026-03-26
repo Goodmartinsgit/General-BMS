@@ -843,13 +843,31 @@ const unreverseSale = async (req, res) => {
                 );
 
                 if (variantInvResult.rows.length === 0 || variantInvResult.rows[0].quantity_on_hand < item.quantity) {
-                    throw new Error(`Insufficient stock to unreverse sale for variant ${item.variant_id}`);
+                    await client.query('ROLLBACK');
+                    return res.status(400).json({ message: `Insufficient variant stock to reactivate this sale` });
                 }
 
                 await client.query(
                     `UPDATE variant_inventory SET quantity_on_hand = quantity_on_hand - $1, updated_at = NOW()
                      WHERE variant_id = $2 AND branch_id = $3`,
                     [item.quantity, item.variant_id, sale.branch_id]
+                );
+            } else if (item.category_id) {
+                // Check category-based stock
+                const pcaResult = await client.query(
+                    'SELECT stock_allocated FROM product_category_assignments WHERE product_id = $1 AND category_id = $2',
+                    [item.product_id, item.category_id]
+                );
+
+                if (pcaResult.rows.length === 0 || pcaResult.rows[0].stock_allocated < item.quantity) {
+                    await client.query('ROLLBACK');
+                    return res.status(400).json({ message: `Insufficient category stock to reactivate this sale` });
+                }
+
+                await client.query(
+                    `UPDATE product_category_assignments SET stock_allocated = stock_allocated - $1, updated_at = NOW()
+                     WHERE product_id = $2 AND category_id = $3`,
+                    [item.quantity, item.product_id, item.category_id]
                 );
             } else {
                 // Check product stock
@@ -859,7 +877,8 @@ const unreverseSale = async (req, res) => {
                 );
 
                 if (invResult.rows.length === 0 || invResult.rows[0].quantity_on_hand < item.quantity) {
-                    throw new Error(`Insufficient stock to unreverse sale for product ${item.product_id}`);
+                    await client.query('ROLLBACK');
+                    return res.status(400).json({ message: `Insufficient stock to reactivate this sale` });
                 }
 
                 await client.query(
