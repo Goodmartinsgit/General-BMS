@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Trash2, Plus, Minus, ShoppingCart, ShoppingBag, ChevronDown, ChevronUp, AlertTriangle, TrendingUp, TrendingDown, Edit3 } from 'lucide-react';
+import { Trash2, Plus, Minus, ShoppingCart, ShoppingBag, AlertTriangle, TrendingUp, TrendingDown, Edit3 } from 'lucide-react';
 import { useCart } from '../../context/CartContext';
 import { useCurrency } from '../../context/CurrencyContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -36,8 +36,8 @@ const POSCartItem = ({ item }) => {
                         : 'border-theme hover:border-accent-gold/20'
             }`}
         >
-            {/* Main row — always visible */}
-            <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3">
+            {/* Main row — tap anywhere to expand/collapse */}
+            <div className="flex items-center gap-2 sm:gap-3 p-2 sm:p-3 cursor-pointer select-none" onClick={() => setExpanded(!expanded)}>
                 {/* Product Info */}
                 <div className="flex-1 min-w-0">
                     <h5 className="text-xs sm:text-sm font-medium text-theme-primary truncate">
@@ -80,50 +80,40 @@ const POSCartItem = ({ item }) => {
                             {isLoss ? 'Loss' : 'Profit'}: {formatCurrency(Math.abs(lineProfit))}
                         </div>
                     )}
-                    <div className="flex items-center gap-1">
-                        {/* Quantity controls */}
-                        <div className="flex items-center bg-theme-secondary rounded-lg p-0.5 border border-theme">
-                            <button
-                                onClick={() => updateQuantity(productId, variantId, item.quantity - 1, categoryId)}
-                                className="p-0.5 sm:p-1 hover:bg-theme-primary hover:text-rose-500 rounded transition text-theme-muted"
-                            >
-                                <Minus className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-                            </button>
-                            <input
-                                type="number"
-                                min={1}
-                                value={item.quantity || ''}
-                                onChange={e => {
-                                    const v = parseInt(e.target.value);
-                                    if (e.target.value === '') return;
-                                    if (!isNaN(v) && v >= 1) updateQuantity(productId, variantId, v, categoryId);
-                                }}
-                                onBlur={e => {
-                                    if (!e.target.value || parseInt(e.target.value) < 1) updateQuantity(productId, variantId, 1, categoryId);
-                                }}
-                                className="w-7 sm:w-8 text-center text-[10px] sm:text-xs font-medium text-theme-primary bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                            />
-                            <button
-                                onClick={() => updateQuantity(productId, variantId, item.quantity + 1, categoryId)}
-                                className="p-0.5 sm:p-1 hover:bg-theme-primary hover:text-accent-gold rounded transition text-theme-muted"
-                            >
-                                <Plus className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-                            </button>
-                        </div>
-                        {/* Expand/collapse toggle */}
+                    {/* Quantity controls */}
+                    <div className="flex items-center bg-theme-secondary rounded-lg p-0.5 border border-theme" onClick={e => e.stopPropagation()}>
                         <button
-                            onClick={() => setExpanded(!expanded)}
-                            className="p-0.5 sm:p-1 rounded hover:bg-theme-secondary text-theme-muted transition"
-                            title="Edit pricing"
+                            onClick={() => updateQuantity(productId, variantId, item.quantity - 1, categoryId)}
+                            className="p-0.5 sm:p-1 hover:bg-theme-primary hover:text-rose-500 rounded transition text-theme-muted"
                         >
-                            {expanded ? <ChevronUp className="w-3 h-3 sm:w-3.5 sm:h-3.5" /> : <ChevronDown className="w-3 h-3 sm:w-3.5 sm:h-3.5" />}
+                            <Minus className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                        </button>
+                        <input
+                            type="number"
+                            min={1}
+                            value={item.quantity || ''}
+                            onChange={e => {
+                                const v = parseInt(e.target.value);
+                                if (e.target.value === '') return;
+                                if (!isNaN(v) && v >= 1) updateQuantity(productId, variantId, v, categoryId);
+                            }}
+                            onBlur={e => {
+                                if (!e.target.value || parseInt(e.target.value) < 1) updateQuantity(productId, variantId, 1, categoryId);
+                            }}
+                            className="w-7 sm:w-8 text-center text-[10px] sm:text-xs font-medium text-theme-primary bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                        />
+                        <button
+                            onClick={() => updateQuantity(productId, variantId, item.quantity + 1, categoryId)}
+                            className="p-0.5 sm:p-1 hover:bg-theme-primary hover:text-accent-gold rounded transition text-theme-muted"
+                        >
+                            <Plus className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                         </button>
                     </div>
                 </div>
 
                 {/* Remove button */}
                 <button
-                    onClick={() => removeFromCart(productId, variantId, categoryId)}
+                    onClick={e => { e.stopPropagation(); removeFromCart(productId, variantId, categoryId); }}
                     className="absolute -top-1 -right-1 p-0.5 sm:p-1 bg-rose-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-all shadow-sm"
                 >
                     <Trash2 size={8} className="sm:w-[9px] sm:h-[9px]" />
@@ -140,7 +130,7 @@ const POSCartItem = ({ item }) => {
                         transition={{ duration: 0.2 }}
                         className="overflow-hidden"
                     >
-                        <div className="px-2 sm:px-3 pb-2 sm:pb-3 pt-1 border-t border-theme space-y-1.5 sm:space-y-2">
+                        <div className="px-2 sm:px-3 pb-2 sm:pb-3 pt-1 border-t border-theme space-y-1.5 sm:space-y-2" onClick={e => e.stopPropagation()}>
                             {/* Sold Price */}
                             <div className="flex items-center justify-between gap-2">
                                 <label className="text-[10px] sm:text-xs text-theme-muted whitespace-nowrap">Sold Price</label>
