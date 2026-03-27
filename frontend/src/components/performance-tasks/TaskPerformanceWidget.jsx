@@ -12,7 +12,8 @@ const TaskPerformanceWidget = () => {
     const [isExpanded, setIsExpanded] = useState(false);
     const [loading, setLoading] = useState(false);
 
-    const isStaff = auth.user?.role_name?.toLowerCase() === 'staff' || auth.user?.role_name?.toLowerCase() === 'retail_staff';
+    const perms = auth.user?.permissions || {};
+    const isStaff = perms['view_performance_tasks'] === true && perms['manage_performance_tasks'] !== true && perms['admin'] !== true;
 
     useEffect(() => {
         if (isStaff && auth.accessToken) {

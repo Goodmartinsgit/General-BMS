@@ -137,32 +137,36 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, toggleCollapse }) => {
 
   const isActive = (path) => location.pathname === path || (path !== '/' && location.pathname.startsWith(path + '/'));
 
+  // Helper: check if user has at least one of the given permissions
+  const perms = user?.permissions || {};
+  const hasPerm = (...keys) => perms['admin'] === true || keys.some(k => perms[k] === true);
+
   const navigationGroups = [
     {
       id: 'dashboard',
       name: 'Dashboard',
       icon: LayoutDashboard,
       href: '/',
-      roles: ['super_admin', 'admin', 'staff'],
+      permission: () => hasPerm('view_dashboard', 'view_analytics'),
       standalone: true
     },
     {
       id: 'online_store',
       name: 'Online Store',
       icon: Store,
-      roles: ['super_admin', 'admin'],
+      permission: () => hasPerm('view_online_orders', 'manage_online_orders', 'view_online_store', 'manage_online_store'),
       children: [
-        { name: 'Orders', href: '/online-orders', icon: ShoppingBag },
-        { name: 'Change Requests', href: '/change-requests', icon: RefreshCw },
-        { name: 'App Builder', href: '/app-builder', icon: Monitor },
-        { name: 'Store Settings', href: '/store-settings', icon: Sliders },
+        { name: 'Orders', href: '/online-orders', icon: ShoppingBag, permission: () => hasPerm('view_online_orders') },
+        { name: 'Change Requests', href: '/change-requests', icon: RefreshCw, permission: () => hasPerm('manage_online_orders') },
+        { name: 'App Builder', href: '/app-builder', icon: Monitor, permission: () => hasPerm('manage_online_store') },
+        { name: 'Store Settings', href: '/store-settings', icon: Sliders, permission: () => hasPerm('manage_online_store') },
       ]
     },
     {
       id: 'branches',
       name: 'Branches',
       icon: Building2,
-      roles: ['super_admin', 'admin'],
+      permission: () => hasPerm('view_branches'),
       children: [
         { name: 'All Branches', href: '/branches', icon: Building2 },
       ]
@@ -171,85 +175,85 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, toggleCollapse }) => {
       id: 'inventory',
       name: 'Inventory',
       icon: Package,
-      roles: ['super_admin', 'admin', 'staff'],
+      permission: () => hasPerm('view_products', 'view_inventory', 'view_stock', 'view_purchase_orders'),
       children: [
-        { name: 'Catalogue', href: '/product-catalog', icon: ImageIcon },
-        { name: 'Products', href: '/products', icon: Package },
-        { name: 'Stock Levels', href: '/inventory', icon: ClipboardList },
-        { name: 'Categories', href: '/categories', icon: Tags },
-        { name: 'Transfers', href: '/stock-transfers', icon: ArrowLeftRight },
-        { name: 'Damages', href: '/stock-damages', icon: AlertTriangle },
-        { name: 'Activity', href: '/stock-activity', icon: Activity },
-        { name: 'Purchase Orders', href: '/purchase-orders', icon: FileBox },
+        { name: 'Catalogue', href: '/product-catalog', icon: ImageIcon, permission: () => hasPerm('view_products') },
+        { name: 'Products', href: '/products', icon: Package, permission: () => hasPerm('view_products') },
+        { name: 'Stock Levels', href: '/inventory', icon: ClipboardList, permission: () => hasPerm('view_inventory') },
+        { name: 'Categories', href: '/categories', icon: Tags, permission: () => hasPerm('view_products') },
+        { name: 'Transfers', href: '/stock-transfers', icon: ArrowLeftRight, permission: () => hasPerm('view_stock') },
+        { name: 'Damages', href: '/stock-damages', icon: AlertTriangle, permission: () => hasPerm('view_stock') },
+        { name: 'Activity', href: '/stock-activity', icon: Activity, permission: () => hasPerm('view_stock') },
+        { name: 'Purchase Orders', href: '/purchase-orders', icon: FileBox, permission: () => hasPerm('view_purchase_orders') },
       ]
     },
     {
       id: 'sales',
       name: 'Sales & Orders',
       icon: ShoppingCart,
-      roles: ['super_admin', 'admin', 'staff'],
+      permission: () => hasPerm('access_pos', 'view_sales', 'create_sales', 'view_quotations', 'view_wholesale_orders', 'view_returns'),
       children: [
-        { name: 'Point of Sale', href: '/pos', icon: ShoppingCart },
-        { name: 'Sales', href: '/sales', icon: History },
-        { name: 'Quotations', href: '/quotations', icon: FilePlus },
-        { name: 'Wholesale Orders', href: '/wholesale-orders', icon: FileBox },
-        { name: 'Returns', href: '/returns', icon: RotateCcw },
+        { name: 'Point of Sale', href: '/pos', icon: ShoppingCart, permission: () => hasPerm('access_pos') },
+        { name: 'Sales', href: '/sales', icon: History, permission: () => hasPerm('view_sales') },
+        { name: 'Quotations', href: '/quotations', icon: FilePlus, permission: () => hasPerm('view_quotations') },
+        { name: 'Wholesale Orders', href: '/wholesale-orders', icon: FileBox, permission: () => hasPerm('view_wholesale_orders') },
+        { name: 'Returns', href: '/returns', icon: RotateCcw, permission: () => hasPerm('view_returns') },
       ]
     },
     {
       id: 'crm',
       name: 'CRM',
       icon: Users,
-      roles: ['super_admin', 'admin', 'staff'],
+      permission: () => hasPerm('view_customers', 'view_suppliers', 'view_referrers'),
       children: [
-        { name: 'Customers', href: '/customers', icon: Users },
-        { name: 'Suppliers', href: '/suppliers', icon: Truck },
-        { name: 'Referrers', href: '/referrers', icon: UserCheck },
+        { name: 'Customers', href: '/customers', icon: Users, permission: () => hasPerm('view_customers') },
+        { name: 'Suppliers', href: '/suppliers', icon: Truck, permission: () => hasPerm('view_suppliers') },
+        { name: 'Referrers', href: '/referrers', icon: UserCheck, permission: () => hasPerm('view_referrers') },
       ]
     },
     {
       id: 'expenses',
       name: 'Expenses',
       icon: Wallet,
-      roles: ['super_admin', 'admin'],
+      permission: () => hasPerm('view_expenses', 'view_budgets'),
       children: [
-        { name: 'Expenses', href: '/expenses', icon: CreditCard },
-        { name: 'Budgets', href: '/budgets', icon: Target },
+        { name: 'Expenses', href: '/expenses', icon: CreditCard, permission: () => hasPerm('view_expenses') },
+        { name: 'Budgets', href: '/budgets', icon: Target, permission: () => hasPerm('view_budgets') },
       ]
     },
     {
       id: 'accounting',
       name: 'Accounting',
       icon: Calculator,
-      roles: ['super_admin', 'admin'],
+      permission: () => hasPerm('view_payments', 'view_banks', 'view_price_tiers', 'view_accounting'),
       children: [
-        { name: 'Cash Flow', href: '/cash-flow', icon: PieChart },
-        { name: 'Payments', href: '/payments', icon: Wallet },
-        { name: 'Price Tiers', href: '/price-tiers', icon: Tags },
-        { name: 'Bank Channels', href: '/bank-channels', icon: Landmark },
-        { name: 'Chart of Accounts', href: '/accounting/chart-of-accounts', icon: BookOpen },
-        { name: 'Journal Entries', href: '/accounting/journal-entries', icon: ScrollText },
-        { name: 'Bank Reconciliation', href: '/accounting/bank-reconciliation', icon: GitMerge },
-        { name: 'Cost Centers', href: '/accounting/cost-centers', icon: Target },
-        { name: 'Fixed Assets', href: '/accounting/fixed-assets', icon: Layers },
+        { name: 'Cash Flow', href: '/cash-flow', icon: PieChart, permission: () => hasPerm('view_payments') },
+        { name: 'Payments', href: '/payments', icon: Wallet, permission: () => hasPerm('view_payments') },
+        { name: 'Price Tiers', href: '/price-tiers', icon: Tags, permission: () => hasPerm('view_price_tiers') },
+        { name: 'Bank Channels', href: '/bank-channels', icon: Landmark, permission: () => hasPerm('view_banks') },
+        { name: 'Chart of Accounts', href: '/accounting/chart-of-accounts', icon: BookOpen, permission: () => hasPerm('view_accounting') },
+        { name: 'Journal Entries', href: '/accounting/journal-entries', icon: ScrollText, permission: () => hasPerm('view_accounting') },
+        { name: 'Bank Reconciliation', href: '/accounting/bank-reconciliation', icon: GitMerge, permission: () => hasPerm('view_accounting') },
+        { name: 'Cost Centers', href: '/accounting/cost-centers', icon: Target, permission: () => hasPerm('view_accounting') },
+        { name: 'Fixed Assets', href: '/accounting/fixed-assets', icon: Layers, permission: () => hasPerm('view_accounting') },
       ]
     },
     {
       id: 'ap_ar',
       name: 'AP / AR',
       icon: Receipt,
-      roles: ['super_admin', 'admin'],
+      permission: () => hasPerm('view_vendors', 'view_bills', 'view_invoices'),
       children: [
-        { name: 'Vendors', href: '/vendors', icon: Truck },
-        { name: 'Bills', href: '/bills', icon: FileText },
-        { name: 'Invoices', href: '/invoices', icon: Receipt },
+        { name: 'Vendors', href: '/vendors', icon: Truck, permission: () => hasPerm('view_vendors') },
+        { name: 'Bills', href: '/bills', icon: FileText, permission: () => hasPerm('view_bills') },
+        { name: 'Invoices', href: '/invoices', icon: Receipt, permission: () => hasPerm('view_invoices') },
       ]
     },
     {
       id: 'payroll',
       name: 'Payroll & HR',
       icon: DollarSign,
-      roles: ['super_admin', 'admin'],
+      permission: () => hasPerm('manage_payroll'),
       children: [
         { name: 'Payroll Dashboard', href: '/payroll', icon: DollarSign, exact: true },
         { name: 'Employee Salaries', href: '/payroll/salaries', icon: Users },
@@ -262,17 +266,17 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, toggleCollapse }) => {
       id: 'tasks',
       name: 'Task Management',
       icon: CheckSquare,
-      roles: ['super_admin', 'admin', 'staff'],
+      permission: () => hasPerm('view_tasks', 'view_performance_tasks'),
       children: [
-        { name: 'Tasks', href: '/tasks', icon: CheckSquare, exact: true },
-        { name: 'Performance Tasks', href: '/performance-tasks', icon: Activity },
+        { name: 'Tasks', href: '/tasks', icon: CheckSquare, exact: true, permission: () => hasPerm('view_tasks') },
+        { name: 'Performance Tasks', href: '/performance-tasks', icon: Activity, permission: () => hasPerm('view_performance_tasks') },
       ]
     },
     {
       id: 'analytics',
       name: 'Analytics',
       icon: BarChart3,
-      roles: ['super_admin', 'admin'],
+      permission: () => hasPerm('view_analytics'),
       children: [
         { name: 'Sales', href: '/analytics/sales', icon: BarChart3 },
         { name: 'Inventory', href: '/analytics/inventory', icon: BarChart3 },
@@ -284,7 +288,7 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, toggleCollapse }) => {
       id: 'reports',
       name: 'Financial Reports',
       icon: FileText,
-      roles: ['super_admin', 'admin'],
+      permission: () => hasPerm('view_reports'),
       children: [
         { name: 'Reports Hub', href: '/reports', icon: BarChart3, exact: true },
         { name: 'Sales Book', href: '/reports/sales-book', icon: BookOpen },
@@ -304,47 +308,41 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, toggleCollapse }) => {
       name: 'Notifications',
       icon: Bell,
       href: '/notifications',
-      roles: ['super_admin', 'admin', 'staff'],
+      permission: () => true, // all authenticated users
       standalone: true
     },
     {
       id: 'settings',
       name: 'Settings',
       icon: Settings,
-      roles: ['super_admin', 'admin'],
+      permission: () => hasPerm('manage_settings', 'view_users', 'manage_users', 'view_recycle_bin', 'view_audit_logs'),
       children: [
-        { name: 'System Settings', href: '/settings', icon: Settings, exact: true },
-        { name: 'Users', href: '/users', icon: Users },
-        { name: 'Recycle Bin', href: '/recycle-bin', icon: Trash2 },
-        { name: 'Activity Logs', href: '/activity-logs', icon: Activity },
-        { name: 'Purge Management', href: '/purge-management', icon: Trash2, roles: ['super_admin'] },
+        { name: 'System Settings', href: '/settings', icon: Settings, exact: true, permission: () => hasPerm('manage_settings') },
+        { name: 'Users', href: '/users', icon: Users, permission: () => hasPerm('view_users', 'manage_users') },
+        { name: 'Recycle Bin', href: '/recycle-bin', icon: Trash2, permission: () => hasPerm('view_recycle_bin') },
+        { name: 'Activity Logs', href: '/activity-logs', icon: Activity, permission: () => hasPerm('view_audit_logs') },
+        { name: 'Purge Management', href: '/purge-management', icon: Trash2, permission: () => hasPerm('manage_recycle_bin') },
       ]
     }
   ];
 
   const filteredNavigation = navigationGroups
     .filter(item => {
-      if (!item.roles) return true;
-      if (!user?.role_name) return true; // Show all items if no role (fallback)
-      
-      const normalizedRole = user.role_name.toLowerCase().replace(/\s+/g, '_');
-      if (normalizedRole === 'super_admin') return true; // Super admin sees everything
-      return item.roles.includes(normalizedRole);
+      if (item.permission) return item.permission();
+      return true;
     })
     .map(item => ({
       ...item,
       isActive: item.standalone ? isActive(item.href) : item.children?.some(c => isActive(c.href)),
       children: item.children?.filter(child => {
-        if (!child.roles) return true;
-        if (!user?.role_name) return true; // Show all items if no role (fallback)
-        const normalizedRole = user.role_name.toLowerCase().replace(/\s+/g, '_');
-        if (normalizedRole === 'super_admin') return true;
-        return child.roles.includes(normalizedRole);
+        if (child.permission) return child.permission();
+        return true;
       }).map(child => ({
         ...child,
         isActive: child.exact ? location.pathname === child.href : isActive(child.href)
       }))
-    }));
+    }))
+    .filter(item => item.standalone || (item.children && item.children.length > 0));
 
   const searchResults = searchQuery
     ? filteredNavigation.flatMap(group =>

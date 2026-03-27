@@ -9,9 +9,17 @@ const PERMISSION_GROUPS = [
   {
     group: 'Dashboard & Analytics',
     permissions: [
+      { key: 'view_dashboard', label: 'View Dashboard' },
       { key: 'view_analytics', label: 'View Analytics' },
       { key: 'view_reports', label: 'View Reports' },
       { key: 'view_dashboard_financials', label: 'View Financial Data on Dashboard' },
+    ],
+  },
+  {
+    group: 'Point of Sale',
+    permissions: [
+      { key: 'access_pos', label: 'Access POS' },
+      { key: 'apply_discounts', label: 'Apply Discounts on Sales' },
     ],
   },
   {
@@ -152,10 +160,20 @@ const PERMISSION_GROUPS = [
     ],
   },
   {
+    group: 'Online Store',
+    permissions: [
+      { key: 'view_online_orders', label: 'View Online Orders' },
+      { key: 'manage_online_orders', label: 'Manage Online Orders' },
+      { key: 'view_online_store', label: 'View Store Settings & Builder' },
+      { key: 'manage_online_store', label: 'Manage Store Settings & Builder' },
+    ],
+  },
+  {
     group: 'Settings & System',
     permissions: [
       { key: 'view_settings', label: 'View Settings' },
       { key: 'manage_settings', label: 'Manage Settings' },
+      { key: 'view_audit_logs', label: 'View Audit / Activity Logs' },
       { key: 'view_recycle_bin', label: 'View Recycle Bin' },
       { key: 'manage_recycle_bin', label: 'Manage Recycle Bin' },
     ],

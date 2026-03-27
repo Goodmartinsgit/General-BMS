@@ -218,8 +218,8 @@ const ProductsPage = () => {
     }
   };
 
-  const roleName = (user?.role_name || user?.role || '').toLowerCase().replace(/\s+/g, '_');
-  const canEdit = ['admin', 'super_admin', 'system_admin', 'manager'].includes(roleName);
+  const userPerms = user?.permissions || {};
+  const canEdit = userPerms['manage_products'] === true || userPerms['admin'] === true;
 
   // Get first product image — prefer product_images_v2 (images array), then legacy JSONB, then category assignments
   const getImage = (product) => {

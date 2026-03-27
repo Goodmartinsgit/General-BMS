@@ -29,8 +29,8 @@ const PayslipsPage = () => {
     const [selectedPayslip, setSelectedPayslip] = useState(null);
     const [isDetailOpen, setIsDetailOpen] = useState(false);
 
-    const userRole = auth?.user?.role || '';
-    const isAdmin = ['admin', 'super_admin', 'manager'].includes(userRole);
+    const userPerms = auth?.user?.permissions || {};
+    const isAdmin = userPerms['manage_payroll'] === true || userPerms['admin'] === true;
 
     useEffect(() => {
         fetchPayslips();

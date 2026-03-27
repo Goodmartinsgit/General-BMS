@@ -183,112 +183,356 @@ function App() {
                         <Route index element={<Dashboard />} />
 
                         {/* POS & Sales */}
-                        <Route path="pos" element={<POS />} />
-                        <Route path="sales" element={<SalesListPage />} />
-                        <Route path="sales/pending-confirmations" element={<SalesListPage defaultTab="pending" />} />
-                        <Route path="sales/cancelled" element={<SalesListPage defaultTab="cancelled" />} />
-                        <Route path="sales/:id" element={<SaleDetail />} />
-                        <Route path="sales-history" element={<SalesHistoryPage />} />
-                        <Route path="sales-legacy" element={<SalesPage />} />
+                        <Route path="pos" element={
+                            <RoleProtectedRoute requiredPermission="access_pos">
+                                <POS />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="sales" element={
+                            <RoleProtectedRoute requiredPermission="view_sales">
+                                <SalesListPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="sales/pending-confirmations" element={
+                            <RoleProtectedRoute requiredPermission="view_sales">
+                                <SalesListPage defaultTab="pending" />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="sales/cancelled" element={
+                            <RoleProtectedRoute requiredPermission="view_sales">
+                                <SalesListPage defaultTab="cancelled" />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="sales/:id" element={
+                            <RoleProtectedRoute requiredPermission="view_sales">
+                                <SaleDetail />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="sales-history" element={
+                            <RoleProtectedRoute requiredPermission="view_sales">
+                                <SalesHistoryPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="sales-legacy" element={
+                            <RoleProtectedRoute requiredPermission="view_sales">
+                                <SalesPage />
+                            </RoleProtectedRoute>
+                        } />
 
                         {/* Products & Catalog */}
-                        <Route path="products" element={<ProductsPage />} />
-                        <Route path="products/category-insights" element={<CategoryInsightsPage />} />
-                        <Route path="products/:id" element={<ProductDetailPage />} />
-                        <Route path="product-catalog" element={<ProductCatalog />} />
-                        <Route path="categories" element={<CategoryManagement />} />
-                        <Route path="purchase-orders" element={<PurchaseOrders />} />
+                        <Route path="products" element={
+                            <RoleProtectedRoute requiredPermission="view_products">
+                                <ProductsPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="products/category-insights" element={
+                            <RoleProtectedRoute requiredPermission="view_products">
+                                <CategoryInsightsPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="products/:id" element={
+                            <RoleProtectedRoute requiredPermission="view_products">
+                                <ProductDetailPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="product-catalog" element={
+                            <RoleProtectedRoute requiredPermission="view_products">
+                                <ProductCatalog />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="categories" element={
+                            <RoleProtectedRoute requiredPermission="view_products">
+                                <CategoryManagement />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="purchase-orders" element={
+                            <RoleProtectedRoute requiredPermission="view_purchase_orders">
+                                <PurchaseOrders />
+                            </RoleProtectedRoute>
+                        } />
 
                         {/* Returns & Exchanges */}
-                        <Route path="returns" element={<Returns />} />
+                        <Route path="returns" element={
+                            <RoleProtectedRoute requiredPermission="view_returns">
+                                <Returns />
+                            </RoleProtectedRoute>
+                        } />
 
                         {/* Stock Management */}
-                        <Route path="inventory" element={<InventoryPage />} />
-                        <Route path="inventory/movements" element={<StockMovementsPage />} />
-                        <Route path="stock-transfers" element={<StockTransfers />} />
-                        <Route path="stock-damages" element={<StockDamages />} />
-                        <Route path="stock-activity" element={<StockActivity />} />
+                        <Route path="inventory" element={
+                            <RoleProtectedRoute requiredPermission="view_inventory">
+                                <InventoryPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="inventory/movements" element={
+                            <RoleProtectedRoute requiredPermission="view_inventory">
+                                <StockMovementsPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="stock-transfers" element={
+                            <RoleProtectedRoute requiredPermission="view_stock">
+                                <StockTransfers />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="stock-damages" element={
+                            <RoleProtectedRoute requiredPermission="view_stock">
+                                <StockDamages />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="stock-activity" element={
+                            <RoleProtectedRoute requiredPermission="view_stock">
+                                <StockActivity />
+                            </RoleProtectedRoute>
+                        } />
 
                         {/* Promotions */}
-                        <Route path="promotions" element={<PromotionsPage />} />
+                        <Route path="promotions" element={
+                            <RoleProtectedRoute requiredPermission="view_promotions">
+                                <PromotionsPage />
+                            </RoleProtectedRoute>
+                        } />
 
                         {/* Online Store */}
-                        <Route path="online-orders" element={<OnlineOrdersPage />} />
-                        <Route path="online-orders/:id" element={<OnlineOrderDetailPage />} />
-                        <Route path="store-settings" element={<StoreSettingsPage />} />
-                        <Route path="app-builder" element={<WebsiteBuilderPage />} />
-                        <Route path="change-requests" element={<ChangeRequestsPage />} />
+                        <Route path="online-orders" element={
+                            <RoleProtectedRoute requiredPermission="view_online_orders">
+                                <OnlineOrdersPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="online-orders/:id" element={
+                            <RoleProtectedRoute requiredPermission="view_online_orders">
+                                <OnlineOrderDetailPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="store-settings" element={
+                            <RoleProtectedRoute requiredPermission="manage_online_store">
+                                <StoreSettingsPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="app-builder" element={
+                            <RoleProtectedRoute requiredPermission="manage_online_store">
+                                <WebsiteBuilderPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="change-requests" element={
+                            <RoleProtectedRoute requiredPermission="manage_online_orders">
+                                <ChangeRequestsPage />
+                            </RoleProtectedRoute>
+                        } />
 
                         {/* Analytics */}
-                        <Route path="analytics/sales" element={<SalesAnalytics />} />
-                        <Route path="analytics/inventory" element={<InventoryAnalytics />} />
-                        <Route path="analytics/customers" element={<CustomerAnalytics />} />
-                        <Route path="analytics/expenses" element={<ExpenseAnalyticsPage />} />
+                        <Route path="analytics/sales" element={
+                            <RoleProtectedRoute requiredPermission="view_analytics">
+                                <SalesAnalytics />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="analytics/inventory" element={
+                            <RoleProtectedRoute requiredPermission="view_analytics">
+                                <InventoryAnalytics />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="analytics/customers" element={
+                            <RoleProtectedRoute requiredPermission="view_analytics">
+                                <CustomerAnalytics />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="analytics/expenses" element={
+                            <RoleProtectedRoute requiredPermission="view_analytics">
+                                <ExpenseAnalyticsPage />
+                            </RoleProtectedRoute>
+                        } />
 
                         {/* Users & Branches (Admin) */}
                         <Route path="users" element={
-                            <RoleProtectedRoute requiredPermission="manage_users">
+                            <RoleProtectedRoute requiredPermission="view_users">
                                 <UsersPage />
                             </RoleProtectedRoute>
                         } />
                         <Route path="branches" element={
-                            <RoleProtectedRoute requiredPermission="manage_branches">
+                            <RoleProtectedRoute requiredPermission="view_branches">
                                 <BranchesPage />
                             </RoleProtectedRoute>
                         } />
-                        <Route path="branches/:id" element={<BranchDetailPage />} />
-                        <Route path="branches/:id/analytics" element={<BranchAnalyticsPage />} />
+                        <Route path="branches/:id" element={
+                            <RoleProtectedRoute requiredPermission="view_branches">
+                                <BranchDetailPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="branches/:id/analytics" element={
+                            <RoleProtectedRoute requiredPermission="view_analytics">
+                                <BranchAnalyticsPage />
+                            </RoleProtectedRoute>
+                        } />
 
                         {/* Customers & Suppliers */}
-                        <Route path="customers" element={<CustomersPage />} />
-                        <Route path="customers/:id" element={<CustomerDetailPage />} />
-                        <Route path="suppliers" element={<SuppliersPage />} />
-                        <Route path="referrers" element={<ReferrersPage />} />
+                        <Route path="customers" element={
+                            <RoleProtectedRoute requiredPermission="view_customers">
+                                <CustomersPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="customers/:id" element={
+                            <RoleProtectedRoute requiredPermission="view_customers">
+                                <CustomerDetailPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="suppliers" element={
+                            <RoleProtectedRoute requiredPermission="view_suppliers">
+                                <SuppliersPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="referrers" element={
+                            <RoleProtectedRoute requiredPermission="view_referrers">
+                                <ReferrersPage />
+                            </RoleProtectedRoute>
+                        } />
 
                         {/* Finance & Payments */}
-                        <Route path="price-tiers" element={<PriceTiersPage />} />
-                        <Route path="wholesale-orders" element={<WholesaleOrdersPage />} />
-                        <Route path="expenses" element={<ExpensesPage />} />
-                        <Route path="budgets" element={<BudgetsPage />} />
-                        <Route path="payments" element={<PaymentsPage />} />
-                        <Route path="bank-channels" element={<BankChannelsPage />} />
-                        <Route path="cash-flow" element={<CashFlowPage />} />
+                        <Route path="price-tiers" element={
+                            <RoleProtectedRoute requiredPermission="view_price_tiers">
+                                <PriceTiersPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="wholesale-orders" element={
+                            <RoleProtectedRoute requiredPermission="view_wholesale_orders">
+                                <WholesaleOrdersPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="expenses" element={
+                            <RoleProtectedRoute requiredPermission="view_expenses">
+                                <ExpensesPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="budgets" element={
+                            <RoleProtectedRoute requiredPermission="view_budgets">
+                                <BudgetsPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="payments" element={
+                            <RoleProtectedRoute requiredPermission="view_payments">
+                                <PaymentsPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="bank-channels" element={
+                            <RoleProtectedRoute requiredPermission="view_banks">
+                                <BankChannelsPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="cash-flow" element={
+                            <RoleProtectedRoute requiredPermission="view_payments">
+                                <CashFlowPage />
+                            </RoleProtectedRoute>
+                        } />
 
                         {/* Performance Tasks */}
-                        <Route path="performance-tasks" element={<PerformanceTasksPage />} />
-                        <Route path="performance-tasks/:id" element={<PerformanceTaskDetailPage />} />
+                        <Route path="performance-tasks" element={
+                            <RoleProtectedRoute requiredPermission="view_performance_tasks">
+                                <PerformanceTasksPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="performance-tasks/:id" element={
+                            <RoleProtectedRoute requiredPermission="view_performance_tasks">
+                                <PerformanceTaskDetailPage />
+                            </RoleProtectedRoute>
+                        } />
 
                         {/* Quotations */}
-                        <Route path="quotations" element={<QuotationsDashboard />} />
-                        <Route path="quotations/:id" element={<QuotationDetailPage />} />
+                        <Route path="quotations" element={
+                            <RoleProtectedRoute requiredPermission="view_quotations">
+                                <QuotationsDashboard />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="quotations/:id" element={
+                            <RoleProtectedRoute requiredPermission="view_quotations">
+                                <QuotationDetailPage />
+                            </RoleProtectedRoute>
+                        } />
 
                         {/* Accounting / GL */}
-                        <Route path="accounting/chart-of-accounts" element={<ChartOfAccountsPage />} />
-                        <Route path="accounting/journal-entries" element={<JournalEntriesPage />} />
-                        <Route path="accounting/bank-reconciliation" element={<BankReconciliationPage />} />
-                        <Route path="accounting/cost-centers" element={<CostCentersPage />} />
-                        <Route path="accounting/fixed-assets" element={<FixedAssetsPage />} />
+                        <Route path="accounting/chart-of-accounts" element={
+                            <RoleProtectedRoute requiredPermission="view_accounting">
+                                <ChartOfAccountsPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="accounting/journal-entries" element={
+                            <RoleProtectedRoute requiredPermission="view_accounting">
+                                <JournalEntriesPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="accounting/bank-reconciliation" element={
+                            <RoleProtectedRoute requiredPermission="view_accounting">
+                                <BankReconciliationPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="accounting/cost-centers" element={
+                            <RoleProtectedRoute requiredPermission="view_accounting">
+                                <CostCentersPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="accounting/fixed-assets" element={
+                            <RoleProtectedRoute requiredPermission="view_accounting">
+                                <FixedAssetsPage />
+                            </RoleProtectedRoute>
+                        } />
 
                         {/* AP / AR */}
-                        <Route path="vendors" element={<VendorsPage />} />
-                        <Route path="bills" element={<BillsPage />} />
-                        <Route path="invoices" element={<InvoicesPage />} />
+                        <Route path="vendors" element={
+                            <RoleProtectedRoute requiredPermission="view_vendors">
+                                <VendorsPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="bills" element={
+                            <RoleProtectedRoute requiredPermission="view_bills">
+                                <BillsPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="invoices" element={
+                            <RoleProtectedRoute requiredPermission="view_invoices">
+                                <InvoicesPage />
+                            </RoleProtectedRoute>
+                        } />
 
                         {/* Payroll */}
-                        <Route path="payroll" element={<PayrollDashboardPage />} />
-                        <Route path="payroll/salaries" element={<EmployeeSalariesPage />} />
-                        <Route path="payroll/runs" element={<PayrollRunsPage />} />
-                        <Route path="payroll/payslips" element={<PayslipsPage />} />
-                        <Route path="payroll/loans" element={<EmployeeLoansPage />} />
+                        <Route path="payroll" element={
+                            <RoleProtectedRoute requiredPermission="manage_payroll">
+                                <PayrollDashboardPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="payroll/salaries" element={
+                            <RoleProtectedRoute requiredPermission="manage_payroll">
+                                <EmployeeSalariesPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="payroll/runs" element={
+                            <RoleProtectedRoute requiredPermission="manage_payroll">
+                                <PayrollRunsPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="payroll/payslips" element={
+                            <RoleProtectedRoute requiredPermission="manage_payroll">
+                                <PayslipsPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="payroll/loans" element={
+                            <RoleProtectedRoute requiredPermission="manage_payroll">
+                                <EmployeeLoansPage />
+                            </RoleProtectedRoute>
+                        } />
 
                         {/* Tasks */}
-                        <Route path="tasks" element={<TasksPage />} />
-                        <Route path="tasks/:id" element={<TaskDetailPage />} />
+                        <Route path="tasks" element={
+                            <RoleProtectedRoute requiredPermission="view_tasks">
+                                <TasksPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="tasks/:id" element={
+                            <RoleProtectedRoute requiredPermission="view_tasks">
+                                <TaskDetailPage />
+                            </RoleProtectedRoute>
+                        } />
 
-                        {/* Notifications */}
+                        {/* Notifications — accessible to all authenticated users */}
                         <Route path="notifications" element={<NotificationsPage />} />
 
-                        {/* Account */}
+                        {/* Account — accessible to all authenticated users */}
                         <Route path="change-password" element={<ChangePassword />} />
 
                         {/* Settings (Admin) — unified hub */}
@@ -305,25 +549,73 @@ function App() {
                         <Route path="receipts/settings"       element={<Navigate to="/settings" replace />} />
 
                         {/* Financial Reports */}
-                        <Route path="reports" element={<FinancialReportsHub />} />
-                        <Route path="reports/income-statement" element={<IncomeStatementPage />} />
-                        <Route path="reports/balance-sheet" element={<BalanceSheetPage />} />
-                        <Route path="reports/trial-balance" element={<TrialBalancePage />} />
-                        <Route path="reports/cash-flow" element={<CashFlowReportPage />} />
-                        <Route path="reports/ar-aging" element={<ARAgingReportPage />} />
-                        <Route path="reports/ap-aging" element={<APAgingReportPage />} />
-                        <Route path="reports/branch-pl" element={<BranchPLReportPage />} />
-                        <Route path="reports/consolidated-pl" element={<ConsolidatedPLReportPage />} />
-                        <Route path="reports/inventory-valuation" element={<InventoryValuationReportPage />} />
-                        <Route path="reports/sales-book" element={<SalesBookPage />} />
+                        <Route path="reports" element={
+                            <RoleProtectedRoute requiredPermission="view_reports">
+                                <FinancialReportsHub />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="reports/income-statement" element={
+                            <RoleProtectedRoute requiredPermission="view_reports">
+                                <IncomeStatementPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="reports/balance-sheet" element={
+                            <RoleProtectedRoute requiredPermission="view_reports">
+                                <BalanceSheetPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="reports/trial-balance" element={
+                            <RoleProtectedRoute requiredPermission="view_reports">
+                                <TrialBalancePage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="reports/cash-flow" element={
+                            <RoleProtectedRoute requiredPermission="view_reports">
+                                <CashFlowReportPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="reports/ar-aging" element={
+                            <RoleProtectedRoute requiredPermission="view_reports">
+                                <ARAgingReportPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="reports/ap-aging" element={
+                            <RoleProtectedRoute requiredPermission="view_reports">
+                                <APAgingReportPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="reports/branch-pl" element={
+                            <RoleProtectedRoute requiredPermission="view_reports">
+                                <BranchPLReportPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="reports/consolidated-pl" element={
+                            <RoleProtectedRoute requiredPermission="view_reports">
+                                <ConsolidatedPLReportPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="reports/inventory-valuation" element={
+                            <RoleProtectedRoute requiredPermission="view_reports">
+                                <InventoryValuationReportPage />
+                            </RoleProtectedRoute>
+                        } />
+                        <Route path="reports/sales-book" element={
+                            <RoleProtectedRoute requiredPermission="view_reports">
+                                <SalesBookPage />
+                            </RoleProtectedRoute>
+                        } />
 
                         {/* Administration (Admin) */}
                         <Route path="recycle-bin" element={
-                            <RoleProtectedRoute requiredPermission="manage_recycle_bin">
+                            <RoleProtectedRoute requiredPermission="view_recycle_bin">
                                 <RecycleBin />
                             </RoleProtectedRoute>
                         } />
-                        <Route path="activity-logs" element={<ActivityLogsPage />} />
+                        <Route path="activity-logs" element={
+                            <RoleProtectedRoute requiredPermission="view_audit_logs">
+                                <ActivityLogsPage />
+                            </RoleProtectedRoute>
+                        } />
                         <Route path="purge-management" element={
                             <RoleProtectedRoute requiredPermission="manage_recycle_bin">
                                 <PurgeManagementPage />

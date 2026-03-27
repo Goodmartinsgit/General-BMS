@@ -400,8 +400,8 @@ const ProductDetailPage = () => {
   const [refreshKey, setRefreshKey] = useState(0);   // increment to re-fetch activity
   const [toggling, setToggling]     = useState(false);
 
-  const roleName = (user?.role_name || user?.role || '').toLowerCase().replace(/\s+/g, '_');
-  const canEdit  = ['admin', 'super_admin', 'system_admin', 'manager'].includes(roleName);
+  const userPerms = user?.permissions || {};
+  const canEdit  = userPerms['manage_products'] === true || userPerms['admin'] === true;
 
   useEffect(() => { fetchProduct(); }, [id]);
 

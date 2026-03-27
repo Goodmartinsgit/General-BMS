@@ -5,9 +5,10 @@ import StaffPerformanceTasksPage from './StaffPerformanceTasksPage';
 
 const PerformanceTasksPage = () => {
     const { auth } = useAuth();
-    const role = auth.user?.role_name?.toLowerCase();
+    const perms = auth.user?.permissions || {};
+    const canManage = perms['manage_performance_tasks'] === true || perms['admin'] === true;
 
-    if (role === 'admin' || role === 'super_admin' || role === 'retail_admin') {
+    if (canManage) {
         return <AdminPerformanceTasksPage />;
     }
 
