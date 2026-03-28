@@ -8,8 +8,8 @@ router.use(authenticateToken);
 
 router.get('/', authorize('view_customers'), getAllCustomers);
 router.get('/:id', authorize('view_customers'), getCustomerById);
-router.post('/', authorize('manage_customers'), createCustomer);
-router.put('/:id', authorize('manage_customers'), updateCustomer);
-router.delete('/:id', authorize('manage_customers'), deleteCustomer);
+router.post('/', authorize('create_customers'), createCustomer);
+router.put('/:id', authorize('update_customers'), updateCustomer);
+router.delete('/:id', authorize('delete_customers'), deleteCustomer);
 
 module.exports = router;

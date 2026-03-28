@@ -36,6 +36,9 @@ const updatePermissions = async () => {
             // Customer permissions
             view_customers: true,
             manage_customers: true,
+            create_customers: true,
+            update_customers: true,
+            delete_customers: true,
 
             // User permissions
             view_users: true,
@@ -46,7 +49,17 @@ const updatePermissions = async () => {
 
             // Branch permissions
             view_branches: true,
-            manage_branches: true
+            manage_branches: true,
+
+            // Online Order permissions
+            view_online_orders: true,
+            process_online_orders: true,
+            verify_order_payment: true,
+            update_order_tracking: true,
+            edit_order_notes: true,
+            manage_change_requests: true,
+            view_online_store: true,
+            manage_online_store: true
         };
 
         await pool.query(

@@ -4,9 +4,13 @@ import { Plus, Edit, Landmark, Wallet, List, Search, X, DollarSign, Store, Monit
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '../components/common/PageHeader';
 import { useCurrency } from '../context/CurrencyContext';
+import { useAuth } from '../context/AuthContext';
 
 const BankChannelsPage = () => {
     const { formatCurrency, symbol } = useCurrency();
+    const { auth } = useAuth();
+    const userPerms = auth?.user?.permissions || {};
+    const canManageBanks = userPerms['admin'] === true || userPerms['manage_banks'] === true;
     const navigate = useNavigate();
     const [channels, setChannels] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -91,14 +95,14 @@ const BankChannelsPage = () => {
     const totalBalance = channels.reduce((sum, c) => sum + parseFloat(c.current_balance), 0);
     const activeChannels = channels.filter(c => c.is_active).length;
 
-    const actions = (
+    const actions = canManageBanks ? (
         <button
             onClick={() => { resetForm(); setIsModalOpen(true); }}
             className="bg-accent-gold text-white px-4 py-2 rounded-lg font-semibold text-sm hover:bg-accent-goldDark transition flex items-center gap-2"
         >
             <Plus className="w-4 h-4" /> Add Channel
         </button>
-    );
+    ) : null;
 
     return (
         <div className="space-y-6 max-w-[1700px] mx-auto pb-10">
@@ -181,7 +185,7 @@ const BankChannelsPage = () => {
                     <p className="text-theme-muted mb-6">
                         {searchTerm ? 'Try adjusting your search term.' : 'Get started by adding your first bank channel.'}
                     </p>
-                    {!searchTerm && (
+                    {!searchTerm && canManageBanks && (
                         <button
                             onClick={() => { resetForm(); setIsModalOpen(true); }}
                             className="bg-accent-gold text-white px-6 py-2 rounded-lg font-semibold hover:bg-accent-goldDark transition inline-flex items-center gap-2"
@@ -248,12 +252,14 @@ const BankChannelsPage = () => {
                             </div>
 
                             <div className="px-6 pb-6 flex gap-2">
+                                {canManageBanks && (
                                 <button
                                     onClick={() => handleEdit(channel)}
                                     className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-theme-primary border border-theme text-theme-secondary font-medium text-sm rounded-lg hover:bg-theme-tertiary transition"
                                 >
                                     <Edit size={15} /> Edit
                                 </button>
+                                )}
                                 <button
                                     className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-accent-gold/10 border border-accent-gold/20 text-accent-gold font-medium text-sm rounded-lg hover:bg-accent-gold/20 transition"
                                     onClick={() => navigate(`/cash-flow?channelId=${channel.id}`)}

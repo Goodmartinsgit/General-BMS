@@ -16,6 +16,7 @@ import {
     rejectPayment,
 } from '../api/onlineOrders';
 import { useCurrency } from '../context/CurrencyContext';
+import { useAuth } from '../context/AuthContext';
 
 const ORDER_STATUSES = ['PENDING', 'CONFIRMED', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'CANCELLED'];
 
@@ -138,6 +139,13 @@ const OnlineOrderDetailPage = () => {
     const { id } = useParams();
     const navigate = useNavigate();
     const { formatCurrency } = useCurrency();
+    const { auth } = useAuth();
+    const userPerms = auth?.user?.permissions || {};
+    const hasPerm = (key) => userPerms['admin'] === true || userPerms[key] === true;
+    const canProcessOrders = hasPerm('process_online_orders');
+    const canVerifyPayment = hasPerm('verify_order_payment');
+    const canUpdateTracking = hasPerm('update_order_tracking');
+    const canEditNotes = hasPerm('edit_order_notes');
 
     const [order, setOrder] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -328,7 +336,7 @@ const OnlineOrderDetailPage = () => {
     const shippingAddr = order.shipping_address || {};
     const billingAddr = order.billing_address || {};
     const isSameAddress = JSON.stringify(shippingAddr) === JSON.stringify(billingAddr);
-    const canManagePayment = paymentStatus === 'AWAITING_CONFIRMATION' && ['bank_transfer', 'manual'].includes(order.payment_method);
+    const canManagePayment = canVerifyPayment && paymentStatus === 'AWAITING_CONFIRMATION' && ['bank_transfer', 'manual'].includes(order.payment_method);
     const isPaymentPending = paymentStatus === 'AWAITING_CONFIRMATION';
     const items = order.items || order.order_items || [];
     const statusHistory = order.status_history || [];
@@ -590,6 +598,7 @@ const OnlineOrderDetailPage = () => {
                     </Card>
 
                     {/* Admin Actions */}
+                    {(canProcessOrders || canUpdateTracking || canEditNotes) && (
                     <Card title="Admin Actions" icon={Package}>
                         <div className="space-y-5">
                             {/* Payment pending warning */}
@@ -603,6 +612,7 @@ const OnlineOrderDetailPage = () => {
                             )}
 
                             {/* Status Update */}
+                            {canProcessOrders && (
                             <div>
                                 <label className="block text-xs font-semibold text-theme-muted mb-1.5">Update Order Status</label>
                                 <div className="flex gap-2">
@@ -632,8 +642,10 @@ const OnlineOrderDetailPage = () => {
                                     </button>
                                 </div>
                             </div>
+                            )}
 
                             {/* Tracking */}
+                            {canUpdateTracking && (
                             <div>
                                 <label className="block text-xs font-semibold text-theme-muted mb-1.5">Tracking</label>
                                 <div className="space-y-2">
@@ -661,8 +673,10 @@ const OnlineOrderDetailPage = () => {
                                     </button>
                                 </div>
                             </div>
+                            )}
 
                             {/* Admin Notes */}
+                            {canEditNotes && (
                             <div>
                                 <label className="block text-xs font-semibold text-theme-muted mb-1.5">Admin Notes</label>
                                 <textarea
@@ -681,8 +695,10 @@ const OnlineOrderDetailPage = () => {
                                     Save Notes
                                 </button>
                             </div>
+                            )}
                         </div>
                     </Card>
+                    )}
                 </div>
             </div>
 

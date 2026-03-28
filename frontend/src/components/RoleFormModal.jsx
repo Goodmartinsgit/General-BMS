@@ -52,7 +52,9 @@ const PERMISSION_GROUPS = [
     group: 'Customers',
     permissions: [
       { key: 'view_customers', label: 'View Customers' },
-      { key: 'manage_customers', label: 'Manage Customers' },
+      { key: 'create_customers', label: 'Create Customers' },
+      { key: 'update_customers', label: 'Update Customers' },
+      { key: 'delete_customers', label: 'Delete Customers' },
     ],
   },
   {
@@ -163,7 +165,11 @@ const PERMISSION_GROUPS = [
     group: 'Online Store',
     permissions: [
       { key: 'view_online_orders', label: 'View Online Orders' },
-      { key: 'manage_online_orders', label: 'Manage Online Orders' },
+      { key: 'process_online_orders', label: 'Process Orders (update status)' },
+      { key: 'verify_order_payment', label: 'Verify / Confirm Payments' },
+      { key: 'update_order_tracking', label: 'Update Tracking Info' },
+      { key: 'edit_order_notes', label: 'Edit Order Notes' },
+      { key: 'manage_change_requests', label: 'Manage Change Requests' },
       { key: 'view_online_store', label: 'View Store Settings & Builder' },
       { key: 'manage_online_store', label: 'Manage Store Settings & Builder' },
     ],

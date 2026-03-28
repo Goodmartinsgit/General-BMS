@@ -9,11 +9,15 @@ import { toast } from 'react-toastify';
 import InventoryUpdateModal from '../components/InventoryUpdateModal';
 import PageHeader from '../components/common/PageHeader';
 import { useBranch } from '../context/BranchContext';
+import { useAuth } from '../context/AuthContext';
 
 const LOW_STOCK_THRESHOLD = 10;
 
 const InventoryPage = () => {
   const { singleBranchMode, branches, currentBranchId } = useBranch();
+  const { auth } = useAuth();
+  const userPerms = auth?.user?.permissions || {};
+  const canManageInventory = userPerms['admin'] === true || userPerms['manage_inventory'] === true || userPerms['manage_stock'] === true;
   const [inventory, setInventory] = useState([]);
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -134,6 +138,7 @@ const InventoryPage = () => {
               <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
               <span className="hidden sm:inline">Refresh</span>
             </button>
+            {canManageInventory && (
             <button
               onClick={() => setIsModalOpen(true)}
               className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-white bg-accent-gold rounded-lg hover:bg-accent-goldDark transition-colors"
@@ -141,6 +146,7 @@ const InventoryPage = () => {
               <RefreshCw className="w-4 h-4" />
               Update Stock
             </button>
+            )}
           </>
         }
       />

@@ -314,7 +314,7 @@ function App() {
                             </RoleProtectedRoute>
                         } />
                         <Route path="change-requests" element={
-                            <RoleProtectedRoute requiredPermission="manage_online_orders">
+                            <RoleProtectedRoute requiredPermission="manage_change_requests">
                                 <ChangeRequestsPage />
                             </RoleProtectedRoute>
                         } />

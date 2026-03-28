@@ -3,9 +3,12 @@ import api from '../api/axios';
 import { Landmark, Plus, TrendingDown, TrendingUp, Calendar, ChevronRight, DollarSign, Target } from 'lucide-react';
 import PageHeader from '../components/common/PageHeader';
 import { useCurrency } from '../context/CurrencyContext';
+import { useAuth } from '../context/AuthContext';
 
 const BudgetsPage = () => {
     const { formatCurrency, symbol } = useCurrency();
+    const { auth } = useAuth();
+    const canManageBudgets = auth?.user?.permissions?.['admin'] === true || auth?.user?.permissions?.['manage_budgets'] === true;
     const [budgets, setBudgets] = useState([]);
     const [loading, setLoading] = useState(true);
     const [branches, setBranches] = useState([]);
@@ -79,14 +82,14 @@ const BudgetsPage = () => {
         return b.month === currentMonth && b.year === currentYear;
     }).length;
 
-    const actions = (
+    const actions = canManageBudgets ? (
         <button
             onClick={() => setIsModalOpen(true)}
             className="bg-accent-gold text-white px-4 py-2 rounded-lg font-semibold text-sm hover:bg-accent-goldDark transition flex items-center gap-2"
         >
             <Plus className="w-4 h-4" /> New Budget
         </button>
-    );
+    ) : null;
 
     return (
         <div className="space-y-6 max-w-[1700px] mx-auto pb-10">

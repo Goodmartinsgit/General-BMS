@@ -5,9 +5,15 @@ import { format } from 'date-fns';
 import PageHeader from '../components/common/PageHeader';
 import BillFormModal from '../components/BillFormModal';
 import { useCurrency } from '../context/CurrencyContext';
+import { useAuth } from '../context/AuthContext';
 
 const BillsPage = () => {
     const { formatCurrency } = useCurrency();
+    const { auth } = useAuth();
+    const userPerms = auth?.user?.permissions || {};
+    const hasPerm = (key) => userPerms['admin'] === true || userPerms[key] === true;
+    const canManageBills = hasPerm('manage_bills');
+    const canManagePayments = hasPerm('manage_payments');
     const [bills, setBills] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -134,12 +140,14 @@ const BillsPage = () => {
             <button className="bg-theme-secondary border border-theme text-theme-secondary px-4 py-2 rounded-lg font-medium text-sm hover:bg-theme-tertiary transition flex items-center gap-2">
                 <Download size={16} /> Export
             </button>
+            {canManageBills && (
             <button
                 onClick={handleAddBill}
                 className="bg-accent-gold text-white px-4 py-2 rounded-lg font-semibold text-sm hover:bg-accent-goldDark transition flex items-center gap-2"
             >
                 <Plus className="w-4 h-4" /> New Bill
             </button>
+            )}
         </>
     );
 
@@ -313,7 +321,7 @@ const BillsPage = () => {
                                             </td>
                                             <td className="px-6 py-4 text-right">
                                                 <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                                    {balance > 0 && bill.status !== 'cancelled' && bill.status !== 'draft' && (
+                                                    {canManagePayments && balance > 0 && bill.status !== 'cancelled' && bill.status !== 'draft' && (
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); openPaymentModal(bill); }}
                                                             className="p-2 text-theme-muted hover:text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20 rounded-lg transition"
@@ -322,6 +330,7 @@ const BillsPage = () => {
                                                             <CreditCard size={16} />
                                                         </button>
                                                     )}
+                                                    {canManageBills && (
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); handleEditBill(bill); }}
                                                         className="p-2 text-theme-muted hover:text-accent-gold hover:bg-accent-gold/10 rounded-lg transition"
@@ -329,6 +338,8 @@ const BillsPage = () => {
                                                     >
                                                         <Edit size={16} />
                                                     </button>
+                                                    )}
+                                                    {canManageBills && (
                                                     <button
                                                         onClick={(e) => { e.stopPropagation(); handleDelete(bill.id); }}
                                                         className="p-2 text-theme-muted hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"
@@ -336,6 +347,7 @@ const BillsPage = () => {
                                                     >
                                                         <Trash2 size={16} />
                                                     </button>
+                                                    )}
                                                 </div>
                                             </td>
                                         </tr>

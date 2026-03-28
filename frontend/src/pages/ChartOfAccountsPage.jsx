@@ -3,6 +3,7 @@ import api from '../api/axios';
 import { BookOpen, Search, Plus, Edit, Trash2, X, Loader2 } from 'lucide-react';
 import { toast } from 'react-toastify';
 import PageHeader from '../components/common/PageHeader';
+import { useAuth } from '../context/AuthContext';
 
 const ACCOUNT_TYPES = ['All', 'Asset', 'Liability', 'Equity', 'Revenue', 'Expense'];
 const NORMAL_BALANCES = ['debit', 'credit'];
@@ -19,6 +20,8 @@ const emptyForm = {
 };
 
 const ChartOfAccountsPage = () => {
+    const { auth } = useAuth();
+    const canManageAccounting = auth?.user?.permissions?.['admin'] === true || auth?.user?.permissions?.['manage_accounting'] === true;
     const [accounts, setAccounts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState('');
@@ -135,14 +138,14 @@ const ChartOfAccountsPage = () => {
         return colors[type?.toLowerCase()] || 'bg-gray-100 text-gray-700 dark:bg-gray-900/20 dark:text-gray-400';
     };
 
-    const actions = (
+    const actions = canManageAccounting ? (
         <button
             onClick={handleAdd}
             className="bg-accent-gold text-white px-4 py-2 rounded-lg font-semibold text-sm hover:bg-accent-goldDark transition flex items-center gap-2"
         >
             <Plus className="w-4 h-4" /> Add Account
         </button>
-    );
+    ) : null;
 
     return (
         <div className="space-y-6 max-w-[1700px] mx-auto pb-10">
@@ -258,6 +261,7 @@ const ChartOfAccountsPage = () => {
                                             {getStatusBadge(acc)}
                                         </td>
                                         <td className="px-6 py-4 text-right">
+                                            {canManageAccounting && (
                                             <div className="flex justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <button
                                                     onClick={() => handleEdit(acc)}
@@ -274,6 +278,7 @@ const ChartOfAccountsPage = () => {
                                                     <Trash2 size={16} />
                                                 </button>
                                             </div>
+                                            )}
                                         </td>
                                     </tr>
                                 ))

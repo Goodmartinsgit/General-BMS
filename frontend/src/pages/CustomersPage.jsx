@@ -4,6 +4,7 @@ import { Plus, Edit, Trash2, User, Users, Search, Filter, Phone, Mail, DollarSig
 import PageHeader from '../components/common/PageHeader';
 import CustomerFormModal from '../components/CustomerFormModal';
 import { useCurrency } from '../context/CurrencyContext';
+import { useAuth } from '../context/AuthContext';
 
 const TABS = [
     { key: 'all', label: 'All Customers' },
@@ -31,6 +32,12 @@ const SourceBadge = ({ source }) => {
 
 const CustomersPage = () => {
     const { formatCurrency } = useCurrency();
+    const { auth } = useAuth();
+    const userPerms = auth?.user?.permissions || {};
+    const hasPerm = (key) => userPerms['admin'] === true || userPerms[key] === true;
+    const canCreate = hasPerm('create_customers');
+    const canUpdate = hasPerm('update_customers');
+    const canDelete = hasPerm('delete_customers');
     const [customers, setCustomers] = useState([]);
     const [priceTiers, setPriceTiers] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -117,12 +124,14 @@ const CustomersPage = () => {
             <button className="hidden sm:flex bg-theme-secondary border border-theme text-theme-secondary px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium text-xs sm:text-sm hover:bg-theme-tertiary transition items-center gap-1.5 sm:gap-2">
                 <Download size={14} className="sm:w-4 sm:h-4" /> Export
             </button>
-            <button
-                onClick={handleAddCustomer}
-                className="bg-accent-gold text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm hover:bg-accent-goldDark transition flex items-center justify-center gap-1.5 sm:gap-2 w-full sm:w-auto"
-            >
-                <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Add Customer
-            </button>
+            {canCreate && (
+                <button
+                    onClick={handleAddCustomer}
+                    className="bg-accent-gold text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm hover:bg-accent-goldDark transition flex items-center justify-center gap-1.5 sm:gap-2 w-full sm:w-auto"
+                >
+                    <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Add Customer
+                </button>
+            )}
         </>
     );
 
@@ -198,7 +207,7 @@ const CustomersPage = () => {
                                 {isOnlineTab && (
                                     <th className="px-3 sm:px-6 py-2 sm:py-3 text-[10px] sm:text-xs font-semibold text-theme-muted uppercase hidden sm:table-cell">Verified</th>
                                 )}
-                                <th className="px-3 sm:px-6 py-2 sm:py-3 text-[10px] sm:text-xs font-semibold text-theme-muted uppercase text-right">Actions</th>
+                                {(canUpdate || canDelete) && <th className="px-3 sm:px-6 py-2 sm:py-3 text-[10px] sm:text-xs font-semibold text-theme-muted uppercase text-right">Actions</th>}
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-theme">
@@ -286,8 +295,10 @@ const CustomersPage = () => {
                                                 )}
                                             </td>
                                         )}
+                                        {(canUpdate || canDelete) && (
                                         <td className="px-3 sm:px-6 py-3 sm:py-4 text-right">
                                             <div className="flex justify-end gap-1 sm:gap-2 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                                                {canUpdate && (
                                                 <button
                                                     onClick={() => handleEditCustomer(cust)}
                                                     className="p-1.5 sm:p-2 text-theme-muted hover:text-accent-gold hover:bg-accent-gold/10 rounded-lg transition"
@@ -295,6 +306,8 @@ const CustomersPage = () => {
                                                 >
                                                     <Edit size={14} className="sm:w-4 sm:h-4" />
                                                 </button>
+                                                )}
+                                                {canDelete && (
                                                 <button
                                                     onClick={() => handleDeleteCustomer(cust.id)}
                                                     className="p-1.5 sm:p-2 text-theme-muted hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"
@@ -302,8 +315,10 @@ const CustomersPage = () => {
                                                 >
                                                     <Trash2 size={14} className="sm:w-4 sm:h-4" />
                                                 </button>
+                                                )}
                                             </div>
                                         </td>
+                                        )}
                                     </tr>
                                 ))
                             )}

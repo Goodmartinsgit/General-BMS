@@ -6,9 +6,15 @@ import PageHeader from '../components/common/PageHeader';
 import PeriodFilter from '../components/common/PeriodFilter';
 import ExpenseFormModal from '../components/ExpenseFormModal';
 import { useCurrency } from '../context/CurrencyContext';
+import { useAuth } from '../context/AuthContext';
 
 const ExpensesPage = () => {
     const { formatCurrency } = useCurrency();
+    const { auth } = useAuth();
+    const userPerms = auth?.user?.permissions || {};
+    const hasPerm = (key) => userPerms['admin'] === true || userPerms[key] === true;
+    const canManageExpenses = hasPerm('manage_expenses');
+    const canDeleteExpenses = hasPerm('delete_expenses');
     const [expenses, setExpenses] = useState([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -101,12 +107,14 @@ const ExpensesPage = () => {
             <button className="hidden sm:flex bg-theme-secondary border border-theme text-theme-secondary px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-medium text-xs sm:text-sm hover:bg-theme-tertiary transition items-center gap-1.5 sm:gap-2">
                 <Download size={14} className="sm:w-4 sm:h-4" /> Export
             </button>
+            {canManageExpenses && (
             <button
                 onClick={handleAddExpense}
                 className="bg-accent-gold text-white px-3 sm:px-4 py-1.5 sm:py-2 rounded-lg font-semibold text-xs sm:text-sm hover:bg-accent-goldDark transition flex items-center justify-center gap-1.5 sm:gap-2 w-full sm:w-auto"
             >
                 <Plus className="w-3.5 h-3.5 sm:w-4 sm:h-4" /> Add Expense
             </button>
+            )}
         </>
     );
 
@@ -256,6 +264,7 @@ const ExpensesPage = () => {
                                         </td>
                                         <td className="px-6 py-4 text-right">
                                             <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                {canManageExpenses && (
                                                 <button
                                                     onClick={() => handleEditExpense(exp)}
                                                     className="p-2 text-theme-muted hover:text-accent-gold hover:bg-accent-gold/10 rounded-lg transition"
@@ -263,6 +272,8 @@ const ExpensesPage = () => {
                                                 >
                                                     <Edit size={16} />
                                                 </button>
+                                                )}
+                                                {canDeleteExpenses && (
                                                 <button
                                                     onClick={() => handleDelete(exp.id)}
                                                     className="p-2 text-theme-muted hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"
@@ -270,6 +281,7 @@ const ExpensesPage = () => {
                                                 >
                                                     <Trash2 size={16} />
                                                 </button>
+                                                )}
                                             </div>
                                         </td>
                                     </tr>

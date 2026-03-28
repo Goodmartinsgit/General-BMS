@@ -154,10 +154,10 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, toggleCollapse }) => {
       id: 'online_store',
       name: 'Online Store',
       icon: Store,
-      permission: () => hasPerm('view_online_orders', 'manage_online_orders', 'view_online_store', 'manage_online_store'),
+      permission: () => hasPerm('view_online_orders', 'process_online_orders', 'verify_order_payment', 'manage_change_requests', 'view_online_store', 'manage_online_store'),
       children: [
         { name: 'Orders', href: '/online-orders', icon: ShoppingBag, permission: () => hasPerm('view_online_orders') },
-        { name: 'Change Requests', href: '/change-requests', icon: RefreshCw, permission: () => hasPerm('manage_online_orders') },
+        { name: 'Change Requests', href: '/change-requests', icon: RefreshCw, permission: () => hasPerm('manage_change_requests') },
         { name: 'App Builder', href: '/app-builder', icon: Monitor, permission: () => hasPerm('manage_online_store') },
         { name: 'Store Settings', href: '/store-settings', icon: Sliders, permission: () => hasPerm('manage_online_store') },
       ]

@@ -7,6 +7,7 @@ import { toast } from 'react-toastify';
 import { stockAPI } from '../api/stock';
 import { branchesAPI } from '../api/branches';
 import { useCurrency } from '../context/CurrencyContext';
+import { useAuth } from '../context/AuthContext';
 import PageHeader from '../components/common/PageHeader';
 import Modal from '../components/ui/Modal';
 import StockDamageFormModal from '../components/stock/StockDamageFormModal';
@@ -27,6 +28,9 @@ const DATE_TABS = ['All', 'Today', 'This Week', 'This Month'];
 
 const StockDamages = () => {
   const { formatCurrency } = useCurrency();
+  const { auth } = useAuth();
+  const userPerms = auth?.user?.permissions || {};
+  const canManageStock = userPerms['admin'] === true || userPerms['manage_stock'] === true;
 
   const [damages, setDamages] = useState([]);
   const [branches, setBranches] = useState([]);
@@ -148,7 +152,7 @@ const StockDamages = () => {
   const visibleDamages = filterBySearch(filterByTab(damages));
   const activeFilterCount = Object.values(filters).filter(Boolean).length;
 
-  const headerActions = (
+  const headerActions = canManageStock ? (
     <button
       onClick={() => setShowDamageForm(true)}
       className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white font-semibold text-sm rounded-lg hover:bg-red-700 transition-colors"
@@ -156,7 +160,7 @@ const StockDamages = () => {
       <Plus className="w-4 h-4" />
       Record Damage
     </button>
-  );
+  ) : null;
 
   return (
     <div className="space-y-4 sm:space-y-6 max-w-[1700px] mx-auto pb-6 sm:pb-10">
@@ -311,12 +315,14 @@ const StockDamages = () => {
                   ? 'Try adjusting your search or filters'
                   : 'No damaged stock has been recorded yet'}
               </p>
+              {canManageStock && (
               <button
                 onClick={() => setShowDamageForm(true)}
                 className="inline-flex items-center gap-2 px-5 py-2.5 bg-red-600 text-white font-semibold text-sm rounded-lg hover:bg-red-700 transition-colors"
               >
                 <Plus className="w-4 h-4" /> Record Damage
               </button>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

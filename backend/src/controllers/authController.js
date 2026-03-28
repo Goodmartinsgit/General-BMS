@@ -1,11 +1,23 @@
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
-const { query } = require('../config/db');
+const { query, pool } = require('../config/db');
 
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^()_\-+=])[A-Za-z\d@$!%*?&#^()_\-+=]{8,}$/;
 
 const generateRefreshToken = () => crypto.randomBytes(40).toString('hex');
+
+/** Fetch session_timeout (minutes) from the security settings row. */
+const getSessionTimeout = async () => {
+  try {
+    const res = await pool.query(
+      `SELECT s.settings FROM settings s JOIN organizations o ON s.organization_id = o.id WHERE s.category = 'security' LIMIT 1`
+    );
+    return res.rows[0]?.settings?.session_timeout ?? 30;
+  } catch {
+    return 30; // default
+  }
+};
 
 const register = async (req, res) => {
   try {
@@ -183,8 +195,11 @@ const login = async (req, res) => {
       path: '/'
     });
 
+    const sessionTimeout = await getSessionTimeout();
+
     res.json({
       accessToken,
+      sessionTimeout,
       user: {
         id: user.id,
         email: user.email,
@@ -243,8 +258,11 @@ const refresh = async (req, res) => {
       { expiresIn: '15m' }
     );
 
+    const sessionTimeout = await getSessionTimeout();
+
     res.json({
       accessToken,
+      sessionTimeout,
       user: {
         id: matchedToken.user_id,
         email: matchedToken.email,

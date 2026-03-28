@@ -14,6 +14,7 @@ import StockTransferCard from '../components/stock/StockTransferCard';
 import StockTransferListItem from '../components/stock/StockTransferListItem';
 import TransferApprovalModal from '../components/stock/TransferApprovalModal';
 import { useBranch } from '../context/BranchContext';
+import { useAuth } from '../context/AuthContext';
 
 const STATUS_TABS = ['All', 'Pending', 'Approved', 'Completed', 'Rejected'];
 
@@ -37,6 +38,11 @@ export const StatusBadge = ({ status }) => (
 
 const StockTransfers = () => {
   const { singleBranchMode } = useBranch();
+  const { auth } = useAuth();
+  const userPerms = auth?.user?.permissions || {};
+  const hasPerm = (key) => userPerms['admin'] === true || userPerms[key] === true;
+  const canManageStock = hasPerm('manage_stock');
+  const canApproveTransfers = hasPerm('approve_stock_transfers');
 
   // In single-branch mode, stock transfers are not applicable
   if (singleBranchMode) {
@@ -202,7 +208,7 @@ const StockTransfers = () => {
   const tabCount = (tab) =>
     tab === 'All' ? transfers.length : transfers.filter(t => t.status === tab.toLowerCase()).length;
 
-  const headerActions = (
+  const headerActions = canManageStock ? (
     <button
       onClick={() => setShowTransferForm(true)}
       className="flex items-center gap-2 px-4 py-2 bg-accent-gold text-white font-semibold text-sm rounded-lg hover:bg-accent-goldDark transition-colors"
@@ -210,7 +216,7 @@ const StockTransfers = () => {
       <Plus className="w-4 h-4" />
       Create Transfer
     </button>
-  );
+  ) : null;
 
   return (
     <div className="space-y-4 sm:space-y-6 max-w-[1700px] mx-auto pb-6 sm:pb-10">
@@ -373,12 +379,14 @@ const StockTransfers = () => {
                   ? 'Try adjusting your search or filters'
                   : 'No stock transfers have been created yet'}
               </p>
+              {canManageStock && (
               <button
                 onClick={() => setShowTransferForm(true)}
                 className="inline-flex items-center gap-2 px-5 py-2.5 bg-accent-gold text-white font-semibold text-sm rounded-lg hover:bg-accent-goldDark transition-colors"
               >
                 <Plus className="w-4 h-4" /> Create Transfer
               </button>
+              )}
             </div>
           ) : viewMode === 'grid' ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -387,9 +395,9 @@ const StockTransfers = () => {
                   key={transfer.id}
                   transferData={transfer}
                   onView={setDetailTransfer}
-                  onApprove={openApproval}
-                  onReject={openApproval}
-                  onComplete={openCompletion}
+                  onApprove={canApproveTransfers ? openApproval : undefined}
+                  onReject={canApproveTransfers ? openApproval : undefined}
+                  onComplete={canApproveTransfers ? openCompletion : undefined}
                 />
               ))}
             </div>
@@ -400,9 +408,9 @@ const StockTransfers = () => {
                   key={transfer.id}
                   transferData={transfer}
                   onView={setDetailTransfer}
-                  onApprove={openApproval}
-                  onReject={openApproval}
-                  onComplete={openCompletion}
+                  onApprove={canApproveTransfers ? openApproval : undefined}
+                  onReject={canApproveTransfers ? openApproval : undefined}
+                  onComplete={canApproveTransfers ? openCompletion : undefined}
                 />
               ))}
             </div>
