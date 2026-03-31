@@ -5,6 +5,7 @@ const AuthContext = createContext({});
 
 const ACTIVITY_EVENTS = ['mousedown', 'keydown', 'scroll', 'touchstart', 'pointermove'];
 const WARNING_BEFORE_MS = 60_000; // show warning 1 minute before timeout
+const REFRESH_TOKEN_KEY = 'bms_refresh_token';
 
 export const AuthProvider = ({ children }) => {
     const [auth, setAuth] = useState({});
@@ -33,6 +34,7 @@ export const AuthProvider = ({ children }) => {
             clearTimers();
             timeoutMsRef.current = null;
             try { await api.post('/auth/logout', {}, { withCredentials: true }); } catch { /* ignore */ }
+            localStorage.removeItem(REFRESH_TOKEN_KEY);
             setAccessTokenGetter(() => null);
             setAuth({});
         }, ms);
@@ -60,6 +62,7 @@ export const AuthProvider = ({ children }) => {
     // Register session-expired handler for the axios interceptor
     useEffect(() => {
         setSessionExpiredHandler(() => {
+            localStorage.removeItem(REFRESH_TOKEN_KEY);
             setAccessTokenGetter(() => null);
             setAuth({});
             stopIdleTimer();
@@ -77,7 +80,12 @@ export const AuthProvider = ({ children }) => {
 
         (async () => {
             try {
-                const response = await api.post('/auth/refresh', {}, {
+                const storedRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+                if (!storedRefreshToken) {
+                    if (myMountId === mountIdRef.current) setLoading(false);
+                    return;
+                }
+                const response = await api.post('/auth/refresh', { refreshToken: storedRefreshToken }, {
                     withCredentials: true,
                     signal: controller.signal,
                 });
@@ -91,6 +99,7 @@ export const AuthProvider = ({ children }) => {
                 }
             } catch {
                 if (myMountId !== mountIdRef.current) return; // stale mount — don't clear auth
+                localStorage.removeItem(REFRESH_TOKEN_KEY);
                 setAccessTokenGetter(() => null);
             }
             if (myMountId === mountIdRef.current) setLoading(false);
@@ -102,13 +111,15 @@ export const AuthProvider = ({ children }) => {
 
     const refreshAccessToken = useCallback(async () => {
         try {
-            const response = await api.post('/auth/refresh', {}, { withCredentials: true });
+            const storedRefreshToken = localStorage.getItem(REFRESH_TOKEN_KEY);
+            const response = await api.post('/auth/refresh', { refreshToken: storedRefreshToken }, { withCredentials: true });
             const { accessToken, user, sessionTimeout } = response.data;
             setAccessTokenGetter(() => accessToken);
             setAuth({ accessToken, user });
             startIdleTimer(sessionTimeout);
             return accessToken;
         } catch {
+            localStorage.removeItem(REFRESH_TOKEN_KEY);
             setAccessTokenGetter(() => null);
             setAuth({});
             stopIdleTimer();
@@ -118,7 +129,8 @@ export const AuthProvider = ({ children }) => {
 
     const login = async (email, password) => {
         const response = await api.post('/auth/login', { email, password }, { withCredentials: true });
-        const { accessToken, user, sessionTimeout } = response.data;
+        const { accessToken, refreshToken, user, sessionTimeout } = response.data;
+        if (refreshToken) localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
         setAccessTokenGetter(() => accessToken);
         setAuth({ accessToken, user });
         startIdleTimer(sessionTimeout);
@@ -127,6 +139,7 @@ export const AuthProvider = ({ children }) => {
     const logout = async () => {
         stopIdleTimer();
         try { await api.post('/auth/logout', {}, { withCredentials: true }); } catch { /* ignore */ }
+        localStorage.removeItem(REFRESH_TOKEN_KEY);
         setAccessTokenGetter(() => null);
         setAuth({});
     };

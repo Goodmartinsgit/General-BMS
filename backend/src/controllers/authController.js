@@ -9,30 +9,6 @@ const REFRESH_TOKEN_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 
 const generateRefreshToken = () => crypto.randomBytes(40).toString('hex');
 
-/** Extract a short prefix from a refresh token for fast DB lookup. */
-const tokenFamily = (token) => token.substring(0, 16);
-
-/** Ensure token_family column exists (self-healing migration). */
-let _tokenFamilyReady = null; // null = unknown, true/false = cached
-const ensureTokenFamilyColumn = async () => {
-  if (_tokenFamilyReady !== null) return _tokenFamilyReady;
-  try {
-    const chk = await pool.query(
-      `SELECT 1 FROM information_schema.columns WHERE table_name = 'refresh_tokens' AND column_name = 'token_family' LIMIT 1`
-    );
-    if (chk.rows.length === 0) {
-      await pool.query(`ALTER TABLE refresh_tokens ADD COLUMN IF NOT EXISTS token_family VARCHAR(16)`);
-      await pool.query(`CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token_family ON refresh_tokens(token_family) WHERE revoked_at IS NULL`);
-      console.log('[AUTH] Auto-created token_family column on refresh_tokens');
-    }
-    _tokenFamilyReady = true;
-  } catch (e) {
-    console.error('[AUTH] Could not ensure token_family column:', e.message);
-    _tokenFamilyReady = false;
-  }
-  return _tokenFamilyReady;
-};
-
 /** Fetch session_timeout (minutes) from the security settings row. */
 const getSessionTimeout = async () => {
   try {
@@ -205,23 +181,14 @@ const login = async (req, res) => {
     // Generate refresh token (long-lived)
     const refreshToken = generateRefreshToken();
     const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
-    const family = tokenFamily(refreshToken);
     const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_MS);
 
-    const hasFamily = await ensureTokenFamilyColumn();
-    if (hasFamily) {
-      await query(
-        `INSERT INTO refresh_tokens (user_id, token_hash, token_family, expires_at) VALUES ($1, $2, $3, $4)`,
-        [user.id, refreshTokenHash, family, expiresAt]
-      );
-    } else {
-      await query(
-        `INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
-        [user.id, refreshTokenHash, expiresAt]
-      );
-    }
+    await query(
+      `INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
+      [user.id, refreshTokenHash, expiresAt]
+    );
 
-    // Set refresh token as httpOnly cookie
+    // Set refresh token as httpOnly cookie (works for same-origin deployments)
     res.cookie('refreshToken', refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
@@ -234,6 +201,7 @@ const login = async (req, res) => {
 
     res.json({
       accessToken,
+      refreshToken,  // Also send in body for cross-origin (localStorage) clients
       sessionTimeout,
       user: {
         id: user.id,
@@ -253,103 +221,35 @@ const login = async (req, res) => {
 
 const refresh = async (req, res) => {
   try {
-    const refreshToken = req.cookies?.refreshToken;
+    // Accept refresh token from body (cross-origin) or cookie (same-origin)
+    const refreshToken = req.body?.refreshToken || req.cookies?.refreshToken;
     if (!refreshToken) {
       return res.status(401).json({ message: 'No refresh token provided' });
     }
 
-    const family = tokenFamily(refreshToken);
-    const hasFamily = await ensureTokenFamilyColumn();
+    // Find all non-revoked, non-expired refresh tokens
+    const tokensRes = await query(
+      `SELECT rt.*, u.email, u.full_name, u.org_id, u.role_id, r.role_name, r.role_level, r.permissions
+       FROM refresh_tokens rt
+       JOIN users u ON rt.user_id = u.id
+       LEFT JOIN roles r ON u.role_id = r.id
+       WHERE rt.revoked_at IS NULL AND rt.expires_at > NOW()
+         AND u.deleted_at IS NULL AND (u.status IS NULL OR u.status = 'ACTIVE')
+       ORDER BY rt.created_at DESC`
+    );
 
     let matchedToken = null;
-
-    if (hasFamily) {
-      // Fast lookup: use token_family prefix to narrow candidates
-      const tokensRes = await query(
-        `SELECT rt.*, u.email, u.full_name, u.org_id, u.role_id, r.role_name, r.role_level, r.permissions
-         FROM refresh_tokens rt
-         JOIN users u ON rt.user_id = u.id
-         LEFT JOIN roles r ON u.role_id = r.id
-         WHERE rt.token_family = $1
-           AND rt.revoked_at IS NULL AND rt.expires_at > NOW()
-           AND u.deleted_at IS NULL AND (u.status IS NULL OR u.status = 'ACTIVE')
-         ORDER BY rt.created_at DESC`,
-        [family]
-      );
-      for (const tokenRow of tokensRes.rows) {
-        const isMatch = await bcrypt.compare(refreshToken, tokenRow.token_hash);
-        if (isMatch) { matchedToken = tokenRow; break; }
-      }
-
-      // Fallback for tokens created before migration (token_family IS NULL)
-      if (!matchedToken) {
-        const fallbackRes = await query(
-          `SELECT rt.*, u.email, u.full_name, u.org_id, u.role_id, r.role_name, r.role_level, r.permissions
-           FROM refresh_tokens rt
-           JOIN users u ON rt.user_id = u.id
-           LEFT JOIN roles r ON u.role_id = r.id
-           WHERE rt.token_family IS NULL
-             AND rt.revoked_at IS NULL AND rt.expires_at > NOW()
-             AND u.deleted_at IS NULL AND (u.status IS NULL OR u.status = 'ACTIVE')
-           ORDER BY rt.created_at DESC`
-        );
-        for (const tokenRow of fallbackRes.rows) {
-          const isMatch = await bcrypt.compare(refreshToken, tokenRow.token_hash);
-          if (isMatch) { matchedToken = tokenRow; break; }
-        }
-      }
-    } else {
-      // Column doesn't exist yet — full scan (original behaviour)
-      const tokensRes = await query(
-        `SELECT rt.*, u.email, u.full_name, u.org_id, u.role_id, r.role_name, r.role_level, r.permissions
-         FROM refresh_tokens rt
-         JOIN users u ON rt.user_id = u.id
-         LEFT JOIN roles r ON u.role_id = r.id
-         WHERE rt.revoked_at IS NULL AND rt.expires_at > NOW()
-           AND u.deleted_at IS NULL AND (u.status IS NULL OR u.status = 'ACTIVE')
-         ORDER BY rt.created_at DESC`
-      );
-      for (const tokenRow of tokensRes.rows) {
-        const isMatch = await bcrypt.compare(refreshToken, tokenRow.token_hash);
-        if (isMatch) { matchedToken = tokenRow; break; }
+    for (const tokenRow of tokensRes.rows) {
+      const isMatch = await bcrypt.compare(refreshToken, tokenRow.token_hash);
+      if (isMatch) {
+        matchedToken = tokenRow;
+        break;
       }
     }
 
     if (!matchedToken) {
       return res.status(401).json({ message: 'Invalid or expired refresh token' });
     }
-
-    // ── Token rotation: revoke old, issue new ──────────────────────
-    await query(
-      `UPDATE refresh_tokens SET revoked_at = NOW() WHERE id = $1`,
-      [matchedToken.id]
-    );
-
-    const newRefreshToken = generateRefreshToken();
-    const newHash = await bcrypt.hash(newRefreshToken, 10);
-    const newFamily = tokenFamily(newRefreshToken);
-    const newExpiry = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_MS);
-
-    if (hasFamily) {
-      await query(
-        `INSERT INTO refresh_tokens (user_id, token_hash, token_family, expires_at) VALUES ($1, $2, $3, $4)`,
-        [matchedToken.user_id, newHash, newFamily, newExpiry]
-      );
-    } else {
-      await query(
-        `INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
-        [matchedToken.user_id, newHash, newExpiry]
-      );
-    }
-
-    // Send rotated refresh token in cookie
-    res.cookie('refreshToken', newRefreshToken, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      maxAge: REFRESH_TOKEN_EXPIRY_MS,
-      path: '/'
-    });
 
     const accessToken = jwt.sign(
       {
@@ -385,17 +285,16 @@ const refresh = async (req, res) => {
 
 const logout = async (req, res) => {
   try {
-    const refreshToken = req.cookies?.refreshToken;
-    if (refreshToken) {
-      const userId = req.user?.id;
-      if (userId) {
-        await query(
-          `UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL`,
-          [userId]
-        );
-      }
+    const userId = req.user?.id;
+    if (userId) {
+      // Revoke all refresh tokens for this user
+      await query(
+        `UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL`,
+        [userId]
+      );
     }
 
+    // Clear cookie (for same-origin clients)
     res.clearCookie('refreshToken', {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',

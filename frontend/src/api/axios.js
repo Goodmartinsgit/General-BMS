@@ -72,13 +72,15 @@ api.interceptors.response.use(
             isRefreshing = true;
 
             try {
-                const response = await api.post('/auth/refresh', {}, { withCredentials: true });
+                const storedRefreshToken = localStorage.getItem('bms_refresh_token');
+                const response = await api.post('/auth/refresh', { refreshToken: storedRefreshToken }, { withCredentials: true });
                 const { accessToken } = response.data;
                 setAccessTokenGetter(() => accessToken);
                 originalRequest.headers['Authorization'] = `Bearer ${accessToken}`;
                 processQueue(null, accessToken);
                 return api(originalRequest);
             } catch (refreshError) {
+                localStorage.removeItem('bms_refresh_token');
                 setAccessTokenGetter(() => null);
                 processQueue(refreshError, null);
                 // Refresh token is invalid/expired – force full logout
