@@ -10,67 +10,44 @@ export const AuthProvider = ({ children }) => {
     const [auth, setAuth] = useState({});
     const [loading, setLoading] = useState(true);
     const [sessionWarning, setSessionWarning] = useState(false);
-    const mountedRef = useRef(true);
 
-    // Session timeout refs (avoid re-renders on every activity event)
-    const timeoutMsRef = useRef(null);          // null = no timer active
-    const lastActivityRef = useRef(Date.now());
+    // Session timeout refs — all timer logic uses refs to avoid re-render cascades
+    const timeoutMsRef = useRef(null);
     const logoutTimerRef = useRef(null);
     const warningTimerRef = useRef(null);
 
-    // ── Idle timer helpers ────────────────────────────────────────
     const clearTimers = useCallback(() => {
-        if (logoutTimerRef.current) clearTimeout(logoutTimerRef.current);
-        if (warningTimerRef.current) clearTimeout(warningTimerRef.current);
-        logoutTimerRef.current = null;
-        warningTimerRef.current = null;
+        if (logoutTimerRef.current) { clearTimeout(logoutTimerRef.current); logoutTimerRef.current = null; }
+        if (warningTimerRef.current) { clearTimeout(warningTimerRef.current); warningTimerRef.current = null; }
         setSessionWarning(false);
     }, []);
 
-    const doIdleLogout = useCallback(async () => {
+    const resetIdleTimers = useCallback(() => {
+        if (!timeoutMsRef.current) return;
         clearTimers();
-        timeoutMsRef.current = null;
-        try {
-            await api.post('/auth/logout', {}, { withCredentials: true });
-        } catch { /* ignore */ }
-        setAccessTokenGetter(() => null);
-        setAuth({});
+
+        const ms = timeoutMsRef.current;
+
+        warningTimerRef.current = setTimeout(() => setSessionWarning(true), Math.max(ms - WARNING_BEFORE_MS, 0));
+        logoutTimerRef.current = setTimeout(async () => {
+            clearTimers();
+            timeoutMsRef.current = null;
+            try { await api.post('/auth/logout', {}, { withCredentials: true }); } catch { /* ignore */ }
+            setAccessTokenGetter(() => null);
+            setAuth({});
+        }, ms);
     }, [clearTimers]);
 
-    const resetIdleTimers = useCallback(() => {
-        if (!timeoutMsRef.current) return;        // not logged in or no timeout
-        lastActivityRef.current = Date.now();
-        clearTimers();
-
-        const timeoutMs = timeoutMsRef.current;
-        const warningMs = Math.max(timeoutMs - WARNING_BEFORE_MS, 0);
-
-        warningTimerRef.current = setTimeout(() => {
-            setSessionWarning(true);
-        }, warningMs);
-
-        logoutTimerRef.current = setTimeout(() => {
-            doIdleLogout();
-        }, timeoutMs);
-    }, [clearTimers, doIdleLogout]);
-
-    // Activity listener
+    // Listen for user activity to reset the idle timer
     useEffect(() => {
-        const onActivity = () => {
-            if (!timeoutMsRef.current) return;
-            resetIdleTimers();
-        };
-
+        const onActivity = () => { if (timeoutMsRef.current) resetIdleTimers(); };
         ACTIVITY_EVENTS.forEach(e => window.addEventListener(e, onActivity, { passive: true }));
-        return () => {
-            ACTIVITY_EVENTS.forEach(e => window.removeEventListener(e, onActivity));
-        };
+        return () => ACTIVITY_EVENTS.forEach(e => window.removeEventListener(e, onActivity));
     }, [resetIdleTimers]);
 
-    // Start or stop idle timer when auth changes
-    const startIdleTimer = useCallback((sessionTimeout) => {
-        if (sessionTimeout && sessionTimeout > 0) {
-            timeoutMsRef.current = sessionTimeout * 60_000;
+    const startIdleTimer = useCallback((minutes) => {
+        if (minutes && minutes > 0) {
+            timeoutMsRef.current = minutes * 60_000;
             resetIdleTimers();
         }
     }, [resetIdleTimers]);
@@ -80,7 +57,49 @@ export const AuthProvider = ({ children }) => {
         clearTimers();
     }, [clearTimers]);
 
-    // ── Refresh ───────────────────────────────────────────────────
+    // Register session-expired handler for the axios interceptor
+    useEffect(() => {
+        setSessionExpiredHandler(() => {
+            setAccessTokenGetter(() => null);
+            setAuth({});
+            stopIdleTimer();
+        });
+        return () => setSessionExpiredHandler(null);
+    }, [stopIdleTimer]);
+
+    // ── Bootstrap: try to refresh token on mount ──────────────────
+    // Uses a mount-id so StrictMode double-mount doesn't race.
+    const mountIdRef = useRef(0);
+
+    useEffect(() => {
+        const myMountId = ++mountIdRef.current;
+        const controller = new AbortController();
+
+        (async () => {
+            try {
+                const response = await api.post('/auth/refresh', {}, {
+                    withCredentials: true,
+                    signal: controller.signal,
+                });
+                if (myMountId !== mountIdRef.current) return; // stale mount
+                const { accessToken, user, sessionTimeout } = response.data;
+                setAccessTokenGetter(() => accessToken);
+                setAuth({ accessToken, user });
+                if (sessionTimeout && sessionTimeout > 0) {
+                    timeoutMsRef.current = sessionTimeout * 60_000;
+                    resetIdleTimers();
+                }
+            } catch {
+                if (myMountId !== mountIdRef.current) return; // stale mount — don't clear auth
+                setAccessTokenGetter(() => null);
+            }
+            if (myMountId === mountIdRef.current) setLoading(false);
+        })();
+
+        return () => { controller.abort(); };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
     const refreshAccessToken = useCallback(async () => {
         try {
             const response = await api.post('/auth/refresh', {}, { withCredentials: true });
@@ -97,48 +116,6 @@ export const AuthProvider = ({ children }) => {
         }
     }, [startIdleTimer, stopIdleTimer]);
 
-    // Register the session-expired handler so the axios interceptor can
-    // trigger a full React-level logout when the refresh token is dead.
-    useEffect(() => {
-        setSessionExpiredHandler(() => {
-            setAccessTokenGetter(() => null);
-            setAuth({});
-            stopIdleTimer();
-        });
-        return () => setSessionExpiredHandler(null);
-    }, [stopIdleTimer]);
-
-    useEffect(() => {
-        mountedRef.current = true;
-
-        // On mount, try to refresh the token from httpOnly cookie
-        const controller = new AbortController();
-
-        const initAuth = async () => {
-            try {
-                const response = await api.post('/auth/refresh', {}, {
-                    withCredentials: true,
-                    signal: controller.signal
-                });
-                if (!mountedRef.current) return;
-                const { accessToken, user, sessionTimeout } = response.data;
-                setAccessTokenGetter(() => accessToken);
-                setAuth({ accessToken, user });
-                startIdleTimer(sessionTimeout);
-            } catch {
-                if (!mountedRef.current) return;
-                setAccessTokenGetter(() => null);
-            }
-            if (mountedRef.current) setLoading(false);
-        };
-        initAuth();
-
-        return () => {
-            mountedRef.current = false;
-            controller.abort();
-        };
-    }, [startIdleTimer]);
-
     const login = async (email, password) => {
         const response = await api.post('/auth/login', { email, password }, { withCredentials: true });
         const { accessToken, user, sessionTimeout } = response.data;
@@ -149,11 +126,7 @@ export const AuthProvider = ({ children }) => {
 
     const logout = async () => {
         stopIdleTimer();
-        try {
-            await api.post('/auth/logout', {}, { withCredentials: true });
-        } catch {
-            // Logout even if the server call fails
-        }
+        try { await api.post('/auth/logout', {}, { withCredentials: true }); } catch { /* ignore */ }
         setAccessTokenGetter(() => null);
         setAuth({});
     };
@@ -166,7 +139,7 @@ export const AuthProvider = ({ children }) => {
     return (
         <AuthContext.Provider value={{
             auth, setAuth, login, logout, loading, refreshAccessToken,
-            sessionWarning, dismissSessionWarning
+            sessionWarning, dismissSessionWarning,
         }}>
             {children}
         </AuthContext.Provider>
