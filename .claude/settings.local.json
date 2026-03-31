@@ -126,7 +126,13 @@
       "Bash(find '/c/Users/DELL XPS/Desktop/BMS/Eldaved-BMS/frontend/src/pages' -type f -iname *staff* -o -iname *user* -o -iname *admin*)",
       "Bash(find 'c:\\\\Users\\\\DELL XPS\\\\Desktop\\\\BMS\\\\General-BMS\\\\backend\\\\src\\\\routes' -type f -name *.js)",
       "Bash(find /c/Users/DELL XPS/Desktop/BMS/General-BMS/frontend/src -type f \\\\\\(-name *.jsx -o -name *.js -o -name *.tsx \\\\\\))",
-      "Bash(sort -t_ -k1 -n)"
+      "Bash(sort -t_ -k1 -n)",
+      "Bash(find c:/Users/DELL XPS/Desktop/BMS/General-BMS/backend -type f -name *migration* -o -name *migrate*)",
+      "Bash(find c:/Users/DELL XPS/Desktop/BMS/General-BMS/backend/migrations -type f -name *.js)",
+      "Bash(find c:/Users/DELL XPS/Desktop/BMS/General-BMS/backend/database/migrations -name *user* -o -name *auth*)",
+      "Bash(find 'c:/Users/DELL XPS/Desktop/BMS/General-BMS/backend' -name init* -o -name schema* -o -name seed*)",
+      "Bash(PGPASSWORD=npg_YZA3cqtGof4e psql \"postgresql://neondb_owner:npg_YZA3cqtGof4e@ep-long-field-ah819j3l-pooler.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require\" -f backend/database/migrations/055_granular_permissions.sql)",
+      "Bash(find 'c:\\\\Users\\\\DELL XPS\\\\Desktop\\\\BMS\\\\General-BMS\\\\backend\\\\src' -name *.js -type f)"
     ],
     "additionalDirectories": [
       "C:\\Users\\DELL XPS\\Desktop\\One Manager\\platform\\apps\\store",

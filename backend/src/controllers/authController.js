@@ -5,7 +5,12 @@ const { query, pool } = require('../config/db');
 
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^()_\-+=])[A-Za-z\d@$!%*?&#^()_\-+=]{8,}$/;
 
+const REFRESH_TOKEN_EXPIRY_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
+
 const generateRefreshToken = () => crypto.randomBytes(40).toString('hex');
+
+/** Extract a short prefix from a refresh token for fast DB lookup. */
+const tokenFamily = (token) => token.substring(0, 16);
 
 /** Fetch session_timeout (minutes) from the security settings row. */
 const getSessionTimeout = async () => {
@@ -179,11 +184,12 @@ const login = async (req, res) => {
     // Generate refresh token (long-lived)
     const refreshToken = generateRefreshToken();
     const refreshTokenHash = await bcrypt.hash(refreshToken, 10);
-    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+    const family = tokenFamily(refreshToken);
+    const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_MS);
 
     await query(
-      `INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
-      [user.id, refreshTokenHash, expiresAt]
+      `INSERT INTO refresh_tokens (user_id, token_hash, token_family, expires_at) VALUES ($1, $2, $3, $4)`,
+      [user.id, refreshTokenHash, family, expiresAt]
     );
 
     // Set refresh token as httpOnly cookie
@@ -191,7 +197,7 @@ const login = async (req, res) => {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000,
+      maxAge: REFRESH_TOKEN_EXPIRY_MS,
       path: '/'
     });
 
@@ -223,15 +229,19 @@ const refresh = async (req, res) => {
       return res.status(401).json({ message: 'No refresh token provided' });
     }
 
-    // Find all non-revoked, non-expired refresh tokens
+    const family = tokenFamily(refreshToken);
+
+    // Fast lookup: use token_family prefix to narrow candidates instead of scanning all tokens
     const tokensRes = await query(
       `SELECT rt.*, u.email, u.full_name, u.org_id, u.role_id, r.role_name, r.role_level, r.permissions
        FROM refresh_tokens rt
        JOIN users u ON rt.user_id = u.id
        LEFT JOIN roles r ON u.role_id = r.id
-       WHERE rt.revoked_at IS NULL AND rt.expires_at > NOW()
+       WHERE rt.token_family = $1
+         AND rt.revoked_at IS NULL AND rt.expires_at > NOW()
          AND u.deleted_at IS NULL AND (u.status IS NULL OR u.status = 'ACTIVE')
-       ORDER BY rt.created_at DESC`
+       ORDER BY rt.created_at DESC`,
+      [family]
     );
 
     let matchedToken = null;
@@ -244,8 +254,54 @@ const refresh = async (req, res) => {
     }
 
     if (!matchedToken) {
+      // Fallback: try without token_family filter for tokens created before migration
+      const fallbackRes = await query(
+        `SELECT rt.*, u.email, u.full_name, u.org_id, u.role_id, r.role_name, r.role_level, r.permissions
+         FROM refresh_tokens rt
+         JOIN users u ON rt.user_id = u.id
+         LEFT JOIN roles r ON u.role_id = r.id
+         WHERE rt.token_family IS NULL
+           AND rt.revoked_at IS NULL AND rt.expires_at > NOW()
+           AND u.deleted_at IS NULL AND (u.status IS NULL OR u.status = 'ACTIVE')
+         ORDER BY rt.created_at DESC`
+      );
+      for (const tokenRow of fallbackRes.rows) {
+        const isMatch = await bcrypt.compare(refreshToken, tokenRow.token_hash);
+        if (isMatch) {
+          matchedToken = tokenRow;
+          break;
+        }
+      }
+    }
+
+    if (!matchedToken) {
       return res.status(401).json({ message: 'Invalid or expired refresh token' });
     }
+
+    // ── Token rotation: revoke old, issue new ──────────────────────
+    await query(
+      `UPDATE refresh_tokens SET revoked_at = NOW() WHERE id = $1`,
+      [matchedToken.id]
+    );
+
+    const newRefreshToken = generateRefreshToken();
+    const newHash = await bcrypt.hash(newRefreshToken, 10);
+    const newFamily = tokenFamily(newRefreshToken);
+    const newExpiry = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_MS);
+
+    await query(
+      `INSERT INTO refresh_tokens (user_id, token_hash, token_family, expires_at) VALUES ($1, $2, $3, $4)`,
+      [matchedToken.user_id, newHash, newFamily, newExpiry]
+    );
+
+    // Send rotated refresh token in cookie
+    res.cookie('refreshToken', newRefreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+      maxAge: REFRESH_TOKEN_EXPIRY_MS,
+      path: '/'
+    });
 
     const accessToken = jwt.sign(
       {
