@@ -12,6 +12,27 @@ const generateRefreshToken = () => crypto.randomBytes(40).toString('hex');
 /** Extract a short prefix from a refresh token for fast DB lookup. */
 const tokenFamily = (token) => token.substring(0, 16);
 
+/** Ensure token_family column exists (self-healing migration). */
+let _tokenFamilyReady = null; // null = unknown, true/false = cached
+const ensureTokenFamilyColumn = async () => {
+  if (_tokenFamilyReady !== null) return _tokenFamilyReady;
+  try {
+    const chk = await pool.query(
+      `SELECT 1 FROM information_schema.columns WHERE table_name = 'refresh_tokens' AND column_name = 'token_family' LIMIT 1`
+    );
+    if (chk.rows.length === 0) {
+      await pool.query(`ALTER TABLE refresh_tokens ADD COLUMN IF NOT EXISTS token_family VARCHAR(16)`);
+      await pool.query(`CREATE INDEX IF NOT EXISTS idx_refresh_tokens_token_family ON refresh_tokens(token_family) WHERE revoked_at IS NULL`);
+      console.log('[AUTH] Auto-created token_family column on refresh_tokens');
+    }
+    _tokenFamilyReady = true;
+  } catch (e) {
+    console.error('[AUTH] Could not ensure token_family column:', e.message);
+    _tokenFamilyReady = false;
+  }
+  return _tokenFamilyReady;
+};
+
 /** Fetch session_timeout (minutes) from the security settings row. */
 const getSessionTimeout = async () => {
   try {
@@ -187,10 +208,18 @@ const login = async (req, res) => {
     const family = tokenFamily(refreshToken);
     const expiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_MS);
 
-    await query(
-      `INSERT INTO refresh_tokens (user_id, token_hash, token_family, expires_at) VALUES ($1, $2, $3, $4)`,
-      [user.id, refreshTokenHash, family, expiresAt]
-    );
+    const hasFamily = await ensureTokenFamilyColumn();
+    if (hasFamily) {
+      await query(
+        `INSERT INTO refresh_tokens (user_id, token_hash, token_family, expires_at) VALUES ($1, $2, $3, $4)`,
+        [user.id, refreshTokenHash, family, expiresAt]
+      );
+    } else {
+      await query(
+        `INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
+        [user.id, refreshTokenHash, expiresAt]
+      );
+    }
 
     // Set refresh token as httpOnly cookie
     res.cookie('refreshToken', refreshToken, {
@@ -230,47 +259,59 @@ const refresh = async (req, res) => {
     }
 
     const family = tokenFamily(refreshToken);
-
-    // Fast lookup: use token_family prefix to narrow candidates instead of scanning all tokens
-    const tokensRes = await query(
-      `SELECT rt.*, u.email, u.full_name, u.org_id, u.role_id, r.role_name, r.role_level, r.permissions
-       FROM refresh_tokens rt
-       JOIN users u ON rt.user_id = u.id
-       LEFT JOIN roles r ON u.role_id = r.id
-       WHERE rt.token_family = $1
-         AND rt.revoked_at IS NULL AND rt.expires_at > NOW()
-         AND u.deleted_at IS NULL AND (u.status IS NULL OR u.status = 'ACTIVE')
-       ORDER BY rt.created_at DESC`,
-      [family]
-    );
+    const hasFamily = await ensureTokenFamilyColumn();
 
     let matchedToken = null;
-    for (const tokenRow of tokensRes.rows) {
-      const isMatch = await bcrypt.compare(refreshToken, tokenRow.token_hash);
-      if (isMatch) {
-        matchedToken = tokenRow;
-        break;
-      }
-    }
 
-    if (!matchedToken) {
-      // Fallback: try without token_family filter for tokens created before migration
-      const fallbackRes = await query(
+    if (hasFamily) {
+      // Fast lookup: use token_family prefix to narrow candidates
+      const tokensRes = await query(
         `SELECT rt.*, u.email, u.full_name, u.org_id, u.role_id, r.role_name, r.role_level, r.permissions
          FROM refresh_tokens rt
          JOIN users u ON rt.user_id = u.id
          LEFT JOIN roles r ON u.role_id = r.id
-         WHERE rt.token_family IS NULL
+         WHERE rt.token_family = $1
            AND rt.revoked_at IS NULL AND rt.expires_at > NOW()
+           AND u.deleted_at IS NULL AND (u.status IS NULL OR u.status = 'ACTIVE')
+         ORDER BY rt.created_at DESC`,
+        [family]
+      );
+      for (const tokenRow of tokensRes.rows) {
+        const isMatch = await bcrypt.compare(refreshToken, tokenRow.token_hash);
+        if (isMatch) { matchedToken = tokenRow; break; }
+      }
+
+      // Fallback for tokens created before migration (token_family IS NULL)
+      if (!matchedToken) {
+        const fallbackRes = await query(
+          `SELECT rt.*, u.email, u.full_name, u.org_id, u.role_id, r.role_name, r.role_level, r.permissions
+           FROM refresh_tokens rt
+           JOIN users u ON rt.user_id = u.id
+           LEFT JOIN roles r ON u.role_id = r.id
+           WHERE rt.token_family IS NULL
+             AND rt.revoked_at IS NULL AND rt.expires_at > NOW()
+             AND u.deleted_at IS NULL AND (u.status IS NULL OR u.status = 'ACTIVE')
+           ORDER BY rt.created_at DESC`
+        );
+        for (const tokenRow of fallbackRes.rows) {
+          const isMatch = await bcrypt.compare(refreshToken, tokenRow.token_hash);
+          if (isMatch) { matchedToken = tokenRow; break; }
+        }
+      }
+    } else {
+      // Column doesn't exist yet — full scan (original behaviour)
+      const tokensRes = await query(
+        `SELECT rt.*, u.email, u.full_name, u.org_id, u.role_id, r.role_name, r.role_level, r.permissions
+         FROM refresh_tokens rt
+         JOIN users u ON rt.user_id = u.id
+         LEFT JOIN roles r ON u.role_id = r.id
+         WHERE rt.revoked_at IS NULL AND rt.expires_at > NOW()
            AND u.deleted_at IS NULL AND (u.status IS NULL OR u.status = 'ACTIVE')
          ORDER BY rt.created_at DESC`
       );
-      for (const tokenRow of fallbackRes.rows) {
+      for (const tokenRow of tokensRes.rows) {
         const isMatch = await bcrypt.compare(refreshToken, tokenRow.token_hash);
-        if (isMatch) {
-          matchedToken = tokenRow;
-          break;
-        }
+        if (isMatch) { matchedToken = tokenRow; break; }
       }
     }
 
@@ -289,10 +330,17 @@ const refresh = async (req, res) => {
     const newFamily = tokenFamily(newRefreshToken);
     const newExpiry = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_MS);
 
-    await query(
-      `INSERT INTO refresh_tokens (user_id, token_hash, token_family, expires_at) VALUES ($1, $2, $3, $4)`,
-      [matchedToken.user_id, newHash, newFamily, newExpiry]
-    );
+    if (hasFamily) {
+      await query(
+        `INSERT INTO refresh_tokens (user_id, token_hash, token_family, expires_at) VALUES ($1, $2, $3, $4)`,
+        [matchedToken.user_id, newHash, newFamily, newExpiry]
+      );
+    } else {
+      await query(
+        `INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3)`,
+        [matchedToken.user_id, newHash, newExpiry]
+      );
+    }
 
     // Send rotated refresh token in cookie
     res.cookie('refreshToken', newRefreshToken, {
