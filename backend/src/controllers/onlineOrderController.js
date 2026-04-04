@@ -10,24 +10,97 @@ const { sendOrderReceipt } = require('../services/orderReceiptService');
 // ---------------------------------------------------------------------------
 async function deductInventory(client, orderId) {
   const items = await client.query(
-    `SELECT * FROM online_order_items WHERE order_id = $1`,
+    `SELECT ooi.*, oo.order_number
+     FROM online_order_items ooi
+     JOIN online_orders oo ON oo.id = ooi.order_id
+     WHERE ooi.order_id = $1`,
     [orderId]
   );
   const productTotals = {};
   for (const item of items.rows) {
     if (!item.product_id) continue;
-    await client.query(
-      `UPDATE inventory
-       SET quantity_on_hand = GREATEST(0, quantity_on_hand - $1),
-           quantity_reserved = GREATEST(0, quantity_reserved - $1)
-       WHERE product_id = $2`,
-      [item.quantity, item.product_id]
-    );
+
+    let quantity_before = 0;
+    let quantity_after = 0;
+
+    if (item.category_id) {
+      // Category-based stock: deduct from product_category_assignments
+      const pcaResult = await client.query(
+        `SELECT stock_allocated FROM product_category_assignments
+         WHERE product_id = $1 AND category_id = $2 FOR UPDATE`,
+        [item.product_id, item.category_id]
+      );
+      if (pcaResult.rows.length > 0) {
+        quantity_before = parseInt(pcaResult.rows[0].stock_allocated) || 0;
+        quantity_after = Math.max(0, quantity_before - item.quantity);
+        await client.query(
+          `UPDATE product_category_assignments SET stock_allocated = $1, updated_at = NOW()
+           WHERE product_id = $2 AND category_id = $3`,
+          [quantity_after, item.product_id, item.category_id]
+        );
+      }
+    } else if (item.variant_id) {
+      // Variant-based stock
+      const varResult = await client.query(
+        `SELECT quantity_on_hand FROM variant_inventory
+         WHERE variant_id = $1 ORDER BY id LIMIT 1 FOR UPDATE`,
+        [item.variant_id]
+      );
+      if (varResult.rows.length > 0) {
+        quantity_before = parseInt(varResult.rows[0].quantity_on_hand) || 0;
+        quantity_after = Math.max(0, quantity_before - item.quantity);
+        await client.query(
+          `UPDATE variant_inventory SET quantity_on_hand = $1, updated_at = NOW()
+           WHERE variant_id = $2`,
+          [quantity_after, item.variant_id]
+        );
+      }
+    } else {
+      // Plain inventory
+      await client.query(
+        `UPDATE inventory
+         SET quantity_on_hand = GREATEST(0, quantity_on_hand - $1),
+             quantity_reserved = GREATEST(0, quantity_reserved - $1)
+         WHERE product_id = $2`,
+        [item.quantity, item.product_id]
+      );
+      const invRes = await client.query(
+        `SELECT quantity_on_hand FROM inventory WHERE product_id = $1 ORDER BY id LIMIT 1`,
+        [item.product_id]
+      );
+      quantity_before = (invRes.rows[0]?.quantity_on_hand || 0) + item.quantity;
+      quantity_after = invRes.rows[0]?.quantity_on_hand || 0;
+    }
+
+    // Compute total product stock after deduction
+    let totalStockAfter = null;
+    if (item.category_id) {
+      const totalRes = await client.query(
+        `SELECT COALESCE(SUM(stock_allocated), 0) AS total FROM product_category_assignments WHERE product_id = $1 AND is_leaf = true`,
+        [item.product_id]
+      );
+      totalStockAfter = parseInt(totalRes.rows[0].total);
+    } else {
+      const totalRes = await client.query(
+        `SELECT COALESCE(SUM(quantity_on_hand), 0) AS total FROM inventory WHERE product_id = $1`,
+        [item.product_id]
+      );
+      totalStockAfter = parseInt(totalRes.rows[0].total);
+    }
+
+    const orderRef = item.order_number || `#${orderId}`;
     await client.query(
       `INSERT INTO stock_movements
-         (product_id, movement_type, quantity, reference_type, reference_id, notes, created_at)
-       VALUES ($1, 'online_sale', $2, 'online_order', $3, $4, NOW())`,
-      [item.product_id, -item.quantity, orderId, `Online order ${orderId}`]
+         (product_id, movement_type, quantity, quantity_before, quantity_after,
+          reference_type, reference_id, notes,
+          category_id, variant_id, variant_name, total_stock_after, created_at)
+       VALUES ($1, 'online_sale', $2, $3, $4, 'online_order', $5, $6, $7, $8, $9, $10, NOW())`,
+      [
+        item.product_id, -item.quantity, quantity_before, quantity_after,
+        String(orderId), `Online ${orderRef}`,
+        item.category_id || null, item.variant_id || null,
+        item.category_name || null, totalStockAfter
+      ]
     );
     productTotals[item.product_id] = (productTotals[item.product_id] || 0) + item.quantity;
   }

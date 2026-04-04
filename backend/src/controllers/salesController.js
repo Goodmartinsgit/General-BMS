@@ -267,7 +267,7 @@ const createSale = async (req, res) => {
             let totalStockAfter = null;
             if (item.category_id) {
                 const totalRes = await client.query(
-                    `SELECT COALESCE(SUM(stock_allocated), 0) AS total FROM product_category_assignments WHERE product_id = $1`,
+                    `SELECT COALESCE(SUM(stock_allocated), 0) AS total FROM product_category_assignments WHERE product_id = $1 AND is_leaf = true`,
                     [item.product_id]
                 );
                 totalStockAfter = parseInt(totalRes.rows[0].total);
@@ -760,7 +760,7 @@ const reverseSale = async (req, res) => {
             let totalStockAfterRev = null;
             if (item.category_id) {
                 const totalRes = await client.query(
-                    `SELECT COALESCE(SUM(stock_allocated), 0) AS total FROM product_category_assignments WHERE product_id = $1`,
+                    `SELECT COALESCE(SUM(stock_allocated), 0) AS total FROM product_category_assignments WHERE product_id = $1 AND is_leaf = true`,
                     [item.product_id]
                 );
                 totalStockAfterRev = parseInt(totalRes.rows[0].total);
@@ -992,7 +992,7 @@ const unreverseSale = async (req, res) => {
             let totalStockAfterUnrev = null;
             if (item.category_id) {
                 const totalRes = await client.query(
-                    `SELECT COALESCE(SUM(stock_allocated), 0) AS total FROM product_category_assignments WHERE product_id = $1`,
+                    `SELECT COALESCE(SUM(stock_allocated), 0) AS total FROM product_category_assignments WHERE product_id = $1 AND is_leaf = true`,
                     [item.product_id]
                 );
                 totalStockAfterUnrev = parseInt(totalRes.rows[0].total);
@@ -1179,7 +1179,7 @@ const deleteSale = async (req, res) => {
                 let totalStockAfterDel = null;
                 if (item.category_id) {
                     const totalRes = await client.query(
-                        `SELECT COALESCE(SUM(stock_allocated), 0) AS total FROM product_category_assignments WHERE product_id = $1`,
+                        `SELECT COALESCE(SUM(stock_allocated), 0) AS total FROM product_category_assignments WHERE product_id = $1 AND is_leaf = true`,
                         [item.product_id]
                     );
                     totalStockAfterDel = parseInt(totalRes.rows[0].total);

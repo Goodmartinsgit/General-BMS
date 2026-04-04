@@ -10,22 +10,35 @@ const { sendOrderReceipt } = require('../services/orderReceiptService');
 // ---------------------------------------------------------------------------
 async function reserveInventory(client, orderId) {
   const items = await client.query(
-    `SELECT * FROM online_order_items WHERE order_id = $1`,
+    `SELECT ooi.*, oo.order_number
+     FROM online_order_items ooi
+     JOIN online_orders oo ON oo.id = ooi.order_id
+     WHERE ooi.order_id = $1`,
     [orderId]
   );
   for (const item of items.rows) {
     if (!item.product_id) continue;
-    await client.query(
-      `UPDATE inventory
-       SET quantity_reserved = COALESCE(quantity_reserved, 0) + $1
-       WHERE product_id = $2`,
-      [item.quantity, item.product_id]
-    );
+    // Only reserve on plain inventory (category-based stock doesn't use reservations)
+    if (!item.category_id && !item.variant_id) {
+      await client.query(
+        `UPDATE inventory
+         SET quantity_reserved = COALESCE(quantity_reserved, 0) + $1
+         WHERE product_id = $2`,
+        [item.quantity, item.product_id]
+      );
+    }
+    const orderRef = item.order_number || `#${orderId}`;
     await client.query(
       `INSERT INTO stock_movements
-         (product_id, movement_type, quantity, reference_type, reference_id, notes, created_at)
-       VALUES ($1, 'online_order_reserved', $2, 'online_order', $3, $4, NOW())`,
-      [item.product_id, item.quantity, orderId, `Online order ${orderId} reserved`]
+         (product_id, movement_type, quantity, reference_type, reference_id, notes,
+          category_id, variant_id, variant_name, created_at)
+       VALUES ($1, 'online_order_reserved', $2, 'online_order', $3, $4, $5, $6, $7, NOW())`,
+      [
+        item.product_id, item.quantity, String(orderId),
+        `Reserved for ${orderRef}`,
+        item.category_id || null, item.variant_id || null,
+        item.category_name || null
+      ]
     );
   }
 }

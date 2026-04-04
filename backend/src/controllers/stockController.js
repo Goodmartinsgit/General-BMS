@@ -639,7 +639,7 @@ const getStockActivity = async (req, res) => {
                    c.category_name as category_name,
                    COALESCE(sm.variant_name, c.category_name) as display_variant_name
             FROM stock_movements sm
-            JOIN branches b ON sm.branch_id = b.id
+            LEFT JOIN branches b ON sm.branch_id = b.id
             JOIN products p ON sm.product_id = p.id
             LEFT JOIN users u ON sm.performed_by = u.id
             LEFT JOIN categories c ON sm.category_id = c.id

@@ -44,8 +44,12 @@ const MOVEMENT_META = {
   return:       { label: 'Return',         color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300' },
   transfer_in:  { label: 'Transfer In',    color: 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-300' },
   transfer_out: { label: 'Transfer Out',   color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300' },
-  damage:       { label: 'Damage / Loss',  color: 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300' },
-  initial:      { label: 'Initial Stock',  color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300' },
+  damage:                { label: 'Damage / Loss',    color: 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300' },
+  initial:               { label: 'Initial Stock',    color: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300' },
+  online_sale:           { label: 'Online Sale',      color: 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-300' },
+  online_order_reserved: { label: 'Online Reserved',  color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300' },
+  sale_reversal:         { label: 'Sale Reversal',    color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' },
+  sale_deletion:         { label: 'Sale Deleted',     color: 'bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300' },
 };
 const movementMeta = (type) =>
   MOVEMENT_META[type] ?? { label: type ?? 'Unknown', color: 'bg-gray-100 text-gray-600' };
@@ -319,7 +323,7 @@ const StockActivityHistory = ({ productId, refreshKey }) => {
                       <td className="px-4 py-3 text-sm font-bold text-theme-primary">
                         {row.total_stock_after != null ? row.total_stock_after : '—'}
                       </td>
-                      <td className="px-4 py-3 text-xs text-theme-secondary">{row.branch_name ?? '—'}</td>
+                      <td className="px-4 py-3 text-xs text-theme-secondary">{row.branch_name || (row.movement_type?.startsWith('online') ? 'Online' : '—')}</td>
                       <td className="px-4 py-3 text-xs text-theme-secondary max-w-[180px] truncate" title={row.notes}>
                         {row.notes ?? '—'}
                       </td>
