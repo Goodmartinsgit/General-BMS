@@ -5,6 +5,7 @@ const {
     updateReceiptConfig,
     generateReceiptPDF,
     getReceiptData,
+    getOnlineOrderReceiptData,
     emailReceipt,
     whatsappReceipt,
     printReceipt,
@@ -38,6 +39,7 @@ router.get('/templates', authorize('view_receipts'), getReceiptTemplates);
 // ============================================================================
 
 // Get receipt data for preview
+router.get('/online-order/:orderId/data', authorize('view_receipts'), getOnlineOrderReceiptData);
 router.get('/:saleId/data', authorize('view_receipts'), getReceiptData);
 
 // Generate PDF receipt

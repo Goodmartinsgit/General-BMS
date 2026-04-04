@@ -6,10 +6,10 @@ import {
 import WhatsAppIcon from '../icons/WhatsAppIcon';
 import WhatsAppSendModal from './WhatsAppSendModal';
 import ReceiptRenderer, { getContrastTextColor } from './ReceiptRenderer';
-import { getReceiptData } from '../../api/receipts';
+import { getReceiptData, getOnlineOrderReceiptData } from '../../api/receipts';
 
 /**
- * ReceiptPreviewModal — saleId-based
+ * ReceiptPreviewModal — saleId or onlineOrderId based
  * Fetches receipt data from backend, renders via ReceiptRenderer (template-aware),
  * supports Print, Download (Image/PDF), WhatsApp, and Email actions.
  */
@@ -17,6 +17,7 @@ const ReceiptPreviewModal = ({
     isOpen,
     onClose,
     saleId,
+    onlineOrderId,
     receiptNumber,
     customerName,
     customerPhone,
@@ -43,13 +44,18 @@ const ReceiptPreviewModal = ({
 
     const receiptRef = useRef(null);
 
+    const effectiveId = saleId || onlineOrderId;
+    const isOnlineOrder = !saleId && !!onlineOrderId;
+
     // ── Fetch receipt data ──
     const fetchReceiptData = useCallback(async () => {
-        if (!saleId) return;
+        if (!effectiveId) return;
         setLoading(true);
         setError(null);
         try {
-            const res = await getReceiptData(saleId);
+            const res = isOnlineOrder
+                ? await getOnlineOrderReceiptData(effectiveId)
+                : await getReceiptData(effectiveId);
             setReceiptData(res.data);
         } catch (err) {
             console.error('Failed to fetch receipt data:', err);
@@ -57,16 +63,16 @@ const ReceiptPreviewModal = ({
         } finally {
             setLoading(false);
         }
-    }, [saleId]);
+    }, [effectiveId, isOnlineOrder]);
 
     useEffect(() => {
-        if (isOpen && saleId) {
+        if (isOpen && effectiveId) {
             fetchReceiptData();
             setEmailAddress(customerEmail || '');
             setEmailMessage('');
             setEmailSent(false);
         }
-    }, [isOpen, saleId, fetchReceiptData, customerEmail]);
+    }, [isOpen, effectiveId, fetchReceiptData, customerEmail]);
 
     // Close download menu on outside click
     useEffect(() => {

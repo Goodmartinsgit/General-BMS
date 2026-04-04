@@ -411,6 +411,166 @@ const generateReceiptData = async (saleId) => {
 };
 
 /**
+ * Generate receipt data for an online order (same shape as sales receipt)
+ */
+const generateOnlineOrderReceiptData = async (orderId) => {
+    const orderResult = await pool.query(
+        `SELECT oo.*,
+                c.customer_name, c.phone_number as customer_phone, c.email as customer_email
+         FROM online_orders oo
+         LEFT JOIN customers c ON oo.customer_id = c.id
+         WHERE oo.id = $1`,
+        [orderId]
+    );
+
+    if (orderResult.rows.length === 0) {
+        throw new Error('Online order not found');
+    }
+
+    const order = orderResult.rows[0];
+
+    const itemsResult = await pool.query(
+        `SELECT ooi.*, p.product_name, p.product_code,
+                cat.category_name as leaf_category_name,
+                cat.parent_category_id as leaf_parent_id
+         FROM online_order_items ooi
+         JOIN products p ON ooi.product_id = p.id
+         LEFT JOIN categories cat ON ooi.category_id = cat.id
+         WHERE ooi.order_id = $1`,
+        [orderId]
+    );
+
+    // Build category paths
+    const parentCatIds = [...new Set(
+        itemsResult.rows
+            .filter(i => i.category_id && i.leaf_parent_id)
+            .map(i => i.leaf_parent_id)
+    )];
+    let categoryMap = {};
+    if (parentCatIds.length > 0) {
+        const catResult = await pool.query(
+            `WITH RECURSIVE cat_tree AS (
+                SELECT id, category_name, parent_category_id, level
+                FROM categories WHERE id = ANY($1)
+                UNION ALL
+                SELECT c.id, c.category_name, c.parent_category_id, c.level
+                FROM categories c
+                JOIN cat_tree ct ON c.id = ct.parent_category_id
+                WHERE c.level > 1
+            )
+            SELECT * FROM cat_tree`,
+            [parentCatIds]
+        );
+        for (const c of catResult.rows) {
+            categoryMap[c.id] = c;
+        }
+    }
+
+    // Format variant detail for each item
+    itemsResult.rows = itemsResult.rows.map(item => {
+        let detail = item.category_name || '';
+        if (!detail && item.category_id && item.leaf_category_name) {
+            const parts = [item.leaf_category_name];
+            let parentId = item.leaf_parent_id;
+            while (parentId && categoryMap[parentId]) {
+                parts.unshift(categoryMap[parentId].category_name);
+                parentId = categoryMap[parentId].parent_category_id;
+            }
+            detail = parts.join(' / ');
+        }
+        return { ...item, variant_detail: detail || '' };
+    });
+
+    // Map online order into the same "sale" shape the receipt renderer expects
+    const shippingAddr = order.shipping_address || {};
+    const sale = {
+        id: order.id,
+        sale_number: order.order_number,
+        created_at: order.created_at,
+        total_amount: order.total,
+        subtotal: order.subtotal,
+        discount_amount: order.discount_amount || 0,
+        tax_amount: order.tax_amount || 0,
+        payment_method: order.payment_method || 'Online',
+        payment_status: order.payment_status,
+        customer_name: order.customer_name || shippingAddr.name || order.email?.split('@')[0] || 'Online Customer',
+        customer_phone: order.customer_phone || shippingAddr.phone || '',
+        customer_email: order.customer_email || order.email || '',
+        branch_name: 'Online Store',
+        salesperson_name: 'Online',
+        notes: order.notes || '',
+        shipping_cost: order.shipping_cost || 0,
+    };
+
+    // Fetch receipt config (same logic as sales receipt)
+    const configResult = await pool.query(
+        'SELECT * FROM receipt_config ORDER BY updated_at DESC LIMIT 1'
+    );
+    const dbRow = configResult.rows.length > 0
+        ? Object.fromEntries(
+            Object.entries(configResult.rows[0]).filter(([_, v]) => v !== null && v !== undefined)
+          )
+        : {};
+    const config = { ...DEFAULT_CONFIG, ...dbRow };
+
+    if (config.use_company_info) {
+        try {
+            const orgRes = await pool.query('SELECT * FROM organizations LIMIT 1');
+            const org = orgRes.rows[0] || {};
+            const orgId = org.id || null;
+            let generalSettings = {};
+            if (orgId) {
+                const settingsRes = await pool.query(
+                    "SELECT settings FROM settings WHERE organization_id = $1 AND category = 'general'",
+                    [orgId]
+                );
+                generalSettings = settingsRes.rows[0]?.settings || {};
+            }
+            const brandingRes = await pool.query(
+                'SELECT * FROM branding_config ORDER BY updated_at DESC NULLS LAST, id DESC LIMIT 1'
+            );
+            const branding = brandingRes.rows[0] || {};
+            config.company_name = generalSettings.company_name || org.organization_name || config.company_name;
+            config.company_address = generalSettings.company_address || org.address || config.company_address;
+            config.company_phone = generalSettings.company_phone || org.phone || config.company_phone;
+            config.company_email = generalSettings.company_email || org.email || config.company_email;
+            config.company_website = generalSettings.company_website || config.company_website;
+            config.company_logo_url = branding.logo_url || config.company_logo_url;
+            config.tax_number = generalSettings.tax_number || config.tax_number;
+        } catch (err) {
+            console.error('Failed to overlay company info for receipt:', err);
+        }
+    }
+
+    if (config.use_company_branding) {
+        try {
+            const brandingRes = await pool.query(
+                'SELECT * FROM branding_config ORDER BY updated_at DESC NULLS LAST, id DESC LIMIT 1'
+            );
+            const branding = brandingRes.rows[0] || {};
+            config.receipt_accent_color = branding.accent_color || branding.primary_color || config.receipt_accent_color;
+            config.receipt_bg_color = branding.background_color || config.receipt_bg_color || '#ffffff';
+            config.company_primary_color = branding.primary_color || '';
+        } catch (err) {
+            console.error('Failed to overlay branding for receipt:', err);
+        }
+    }
+
+    return { sale, items: itemsResult.rows, config };
+};
+
+const getOnlineOrderReceiptData = async (req, res) => {
+    try {
+        const { orderId } = req.params;
+        const receiptData = await generateOnlineOrderReceiptData(orderId);
+        res.json(receiptData);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ message: 'Server error' });
+    }
+};
+
+/**
  * Generate PDF Receipt
  */
 const generateReceiptPDF = async (req, res) => {
@@ -610,6 +770,7 @@ module.exports = {
     // Generation
     generateReceiptPDF,
     getReceiptData,
+    getOnlineOrderReceiptData,
 
     // Delivery
     emailReceipt,

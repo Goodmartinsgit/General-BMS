@@ -75,6 +75,15 @@ export const getReceiptData = async (saleId) => {
     return response;
 };
 
+/**
+ * Get receipt data for an online order
+ * @param {number} orderId - Online Order ID
+ */
+export const getOnlineOrderReceiptData = async (orderId) => {
+    const response = await api.get(`/receipts/online-order/${orderId}/data`);
+    return response;
+};
+
 // ============================================================================
 // RECEIPT DELIVERY
 // ============================================================================
