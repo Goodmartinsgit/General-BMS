@@ -256,6 +256,14 @@ const OnlineOrderDetailPage = () => {
         setImageViewerOpen(true);
     };
 
+    // Auto-print receipt if navigated with ?receipt=true
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('receipt') === 'true' && order) {
+            setTimeout(() => handlePrintOrderReceipt(), 500);
+        }
+    }, [order]);
+
     if (loading) {
         return (
             <div className="flex items-center justify-center min-h-[60vh]">
@@ -321,14 +329,6 @@ const OnlineOrderDetailPage = () => {
         pw.focus();
         pw.print();
     };
-
-    // Auto-print receipt if navigated with ?receipt=true
-    useEffect(() => {
-        const params = new URLSearchParams(window.location.search);
-        if (params.get('receipt') === 'true' && order) {
-            setTimeout(() => handlePrintOrderReceipt(), 500);
-        }
-    }, [order]);
 
     const orderStatus = order.status || order.order_status;
     const paymentStatus = order.payment_status;
