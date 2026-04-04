@@ -258,10 +258,10 @@ const OnlineOrderDetailPage = () => {
         setImageViewerOpen(true);
     };
 
-    // Auto-open receipt modal if navigated with ?receipt=true
+    // Auto-open receipt modal if navigated with ?receipt=true (only if payment confirmed)
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
-        if (params.get('receipt') === 'true' && order) {
+        if (params.get('receipt') === 'true' && order && order.payment_status === 'PAID') {
             setShowReceipt(true);
         }
     }, [order]);
@@ -293,6 +293,7 @@ const OnlineOrderDetailPage = () => {
     const isSameAddress = JSON.stringify(shippingAddr) === JSON.stringify(billingAddr);
     const canManagePayment = canVerifyPayment && paymentStatus === 'AWAITING_CONFIRMATION' && ['bank_transfer', 'manual'].includes(order.payment_method);
     const isPaymentPending = paymentStatus === 'AWAITING_CONFIRMATION';
+    const isPaymentConfirmed = paymentStatus === 'PAID';
     const items = order.items || order.order_items || [];
     const statusHistory = order.status_history || [];
 
@@ -319,12 +320,18 @@ const OnlineOrderDetailPage = () => {
                     icon={ShoppingBag}
                     badge={<StatusBadge status={orderStatus} config={ORDER_STATUS_CONFIG} />}
                 />
-                <button
-                    onClick={() => setShowReceipt(true)}
-                    className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-accent-gold/10 text-accent-gold hover:bg-accent-gold hover:text-white transition shrink-0"
-                >
-                    <Printer size={14} /> Receipt
-                </button>
+                {isPaymentConfirmed ? (
+                    <button
+                        onClick={() => setShowReceipt(true)}
+                        className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-accent-gold/10 text-accent-gold hover:bg-accent-gold hover:text-white transition shrink-0"
+                    >
+                        <Printer size={14} /> Receipt
+                    </button>
+                ) : (
+                    <span className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-400 dark:bg-gray-800 dark:text-gray-500 cursor-not-allowed shrink-0" title="Payment must be confirmed before generating receipt">
+                        <Printer size={14} /> Receipt
+                    </span>
+                )}
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
