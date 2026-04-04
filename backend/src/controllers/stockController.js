@@ -635,36 +635,40 @@ const getStockActivity = async (req, res) => {
         const { branchId, productId, movementType, startDate, endDate, limit = 100, offset = 0 } = req.query;
         let query = `
             SELECT sm.*, b.branch_name, p.product_name, p.product_code,
-                   u.full_name as performed_by_name
+                   u.full_name as performed_by_name,
+                   c.category_name as category_name,
+                   COALESCE(sm.variant_name, c.category_name) as display_variant_name
             FROM stock_movements sm
             JOIN branches b ON sm.branch_id = b.id
             JOIN products p ON sm.product_id = p.id
             LEFT JOIN users u ON sm.performed_by = u.id
-            WHERE 1=1
+            LEFT JOIN categories c ON sm.category_id = c.id
         `;
+        const conditions = ['1=1'];
         const params = [];
 
         if (branchId) {
             params.push(branchId);
-            query += ` AND sm.branch_id = $${params.length}`;
+            conditions.push(`sm.branch_id = $${params.length}`);
         }
         if (productId) {
             params.push(productId);
-            query += ` AND sm.product_id = $${params.length}`;
+            conditions.push(`sm.product_id = $${params.length}`);
         }
         if (movementType) {
             params.push(movementType);
-            query += ` AND sm.movement_type = $${params.length}`;
+            conditions.push(`sm.movement_type = $${params.length}`);
         }
         if (startDate) {
             params.push(startDate);
-            query += ` AND sm.created_at >= $${params.length}`;
+            conditions.push(`sm.created_at >= $${params.length}`);
         }
         if (endDate) {
             params.push(endDate);
-            query += ` AND sm.created_at <= $${params.length}`;
+            conditions.push(`sm.created_at <= $${params.length}`);
         }
 
+        query += ` WHERE ${conditions.join(' AND ')}`;
         query += ' ORDER BY sm.created_at DESC';
 
         // Add pagination

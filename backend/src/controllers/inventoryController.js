@@ -68,11 +68,18 @@ const updateStock = async (req, res) => {
             [quantity_after, product_id, branch_id]
         );
 
-        // 3. Record movement
+        // 3. Compute total product stock across all branches
+        const totalRes = await client.query(
+            `SELECT COALESCE(SUM(quantity_on_hand), 0) AS total FROM inventory WHERE product_id = $1`,
+            [product_id]
+        );
+        const totalStockAfter = parseInt(totalRes.rows[0].total);
+
+        // 4. Record movement
         await client.query(
-            `INSERT INTO stock_movements (product_id, branch_id, movement_type, quantity, quantity_before, quantity_after, notes, performed_by) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-            [product_id, branch_id, movement_type, quantity_change, quantity_before, quantity_after, notes, performed_by]
+            `INSERT INTO stock_movements (product_id, branch_id, movement_type, quantity, quantity_before, quantity_after, notes, performed_by, total_stock_after)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+            [product_id, branch_id, movement_type, quantity_change, quantity_before, quantity_after, notes, performed_by, totalStockAfter]
         );
 
         await client.query('COMMIT');

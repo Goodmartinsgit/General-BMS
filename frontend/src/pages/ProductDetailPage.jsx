@@ -288,7 +288,7 @@ const StockActivityHistory = ({ productId, refreshKey }) => {
             <table className="w-full text-sm">
               <thead className="bg-theme-tertiary">
                 <tr>
-                  {['Date & Time', 'Activity Type', 'Qty Change', 'Balance After', 'Branch', 'Notes / Reference', 'Performed By'].map(h => (
+                  {['Date & Time', 'Activity Type', 'Qty Change', 'Balance After', 'Stock Balance', 'Branch', 'Notes / Reference', 'Performed By'].map(h => (
                     <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-theme-muted uppercase tracking-wide whitespace-nowrap">
                       {h}
                     </th>
@@ -298,6 +298,7 @@ const StockActivityHistory = ({ productId, refreshKey }) => {
               <tbody className="divide-y divide-theme">
                 {paginated.map((row, i) => {
                   const meta = movementMeta(row.movement_type);
+                  const variantLabel = row.display_variant_name || row.variant_name;
                   return (
                     <tr key={row.id ?? i} className="hover:bg-theme-tertiary/50 transition-colors">
                       <td className="px-4 py-3 text-xs text-theme-secondary whitespace-nowrap">
@@ -309,8 +310,14 @@ const StockActivityHistory = ({ productId, refreshKey }) => {
                         </span>
                       </td>
                       <td className="px-4 py-3"><QtyCell row={row} /></td>
+                      <td className="px-4 py-3">
+                        <span className="text-sm font-bold text-theme-primary">{row.quantity_after ?? '—'}</span>
+                        {variantLabel && (
+                          <span className="block text-[10px] text-theme-muted mt-0.5">{variantLabel}</span>
+                        )}
+                      </td>
                       <td className="px-4 py-3 text-sm font-bold text-theme-primary">
-                        {row.quantity_after ?? '—'}
+                        {row.total_stock_after != null ? row.total_stock_after : '—'}
                       </td>
                       <td className="px-4 py-3 text-xs text-theme-secondary">{row.branch_name ?? '—'}</td>
                       <td className="px-4 py-3 text-xs text-theme-secondary max-w-[180px] truncate" title={row.notes}>
@@ -329,10 +336,16 @@ const StockActivityHistory = ({ productId, refreshKey }) => {
             {paginated.map((row, i) => {
               const meta = movementMeta(row.movement_type);
               const qty  = parseFloat(row.quantity ?? 0);
+              const variantLabel = row.display_variant_name || row.variant_name;
               return (
                 <div key={row.id ?? i} className="p-4 space-y-2">
                   <div className="flex items-start justify-between gap-2">
-                    <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${meta.color}`}>{meta.label}</span>
+                    <div>
+                      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${meta.color}`}>{meta.label}</span>
+                      {variantLabel && (
+                        <span className="ml-2 text-[10px] text-theme-muted">{variantLabel}</span>
+                      )}
+                    </div>
                     <span className="text-xs text-theme-muted whitespace-nowrap">{new Date(row.created_at).toLocaleString()}</span>
                   </div>
                   <div className="flex items-center gap-5">
@@ -345,6 +358,10 @@ const StockActivityHistory = ({ productId, refreshKey }) => {
                     <div>
                       <p className="text-xs text-theme-muted mb-0.5">Balance</p>
                       <p className="text-sm font-bold text-theme-primary">{row.quantity_after ?? '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-theme-muted mb-0.5">Stock Bal.</p>
+                      <p className="text-sm font-bold text-theme-primary">{row.total_stock_after != null ? row.total_stock_after : '—'}</p>
                     </div>
                     {row.branch_name && (
                       <div>
@@ -424,7 +441,7 @@ const ProductDetailPage = () => {
     const next = !product.is_online_available;
     try {
       await api.put(`/products/${id}`, { is_online_available: next });
-      setProduct(p => ({ ...p, is_online_available: next }));
+      await fetchProduct();
       toast.success(next ? 'Product is now available in the online store' : 'Product removed from online store');
     } catch {
       toast.error('Failed to update online availability');

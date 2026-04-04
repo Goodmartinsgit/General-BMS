@@ -263,16 +263,35 @@ const createSale = async (req, res) => {
                 );
             }
 
+            // Compute total product stock after this movement
+            let totalStockAfter = null;
+            if (item.category_id) {
+                const totalRes = await client.query(
+                    `SELECT COALESCE(SUM(stock_allocated), 0) AS total FROM product_category_assignments WHERE product_id = $1`,
+                    [item.product_id]
+                );
+                totalStockAfter = parseInt(totalRes.rows[0].total);
+            } else {
+                const totalRes = await client.query(
+                    `SELECT COALESCE(SUM(quantity_on_hand), 0) AS total FROM inventory WHERE product_id = $1`,
+                    [item.product_id]
+                );
+                totalStockAfter = parseInt(totalRes.rows[0].total);
+            }
+
             // Record Stock Movement
             await client.query(
                 `INSERT INTO stock_movements (
                     product_id, branch_id, movement_type, quantity,
-                    quantity_before, quantity_after, notes, performed_by
+                    quantity_before, quantity_after, notes, performed_by,
+                    category_id, variant_id, variant_name, total_stock_after
                 )
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
                 [
                     item.product_id, branch_id, 'sale', -item.quantity,
-                    quantity_before, quantity_after, `Sale #${saleNumber}`, performed_by
+                    quantity_before, quantity_after, `Sale #${saleNumber}`, performed_by,
+                    item.category_id || null, item.variant_id || null,
+                    item.variant_name || null, totalStockAfter
                 ]
             );
 
@@ -737,17 +756,36 @@ const reverseSale = async (req, res) => {
                 );
             }
 
+            // Compute total product stock after reversal
+            let totalStockAfterRev = null;
+            if (item.category_id) {
+                const totalRes = await client.query(
+                    `SELECT COALESCE(SUM(stock_allocated), 0) AS total FROM product_category_assignments WHERE product_id = $1`,
+                    [item.product_id]
+                );
+                totalStockAfterRev = parseInt(totalRes.rows[0].total);
+            } else {
+                const totalRes = await client.query(
+                    `SELECT COALESCE(SUM(quantity_on_hand), 0) AS total FROM inventory WHERE product_id = $1`,
+                    [item.product_id]
+                );
+                totalStockAfterRev = parseInt(totalRes.rows[0].total);
+            }
+
             // Record stock movement for reversal
             await client.query(
                 `INSERT INTO stock_movements (
                     product_id, branch_id, movement_type, quantity,
-                    quantity_before, quantity_after, notes, performed_by
+                    quantity_before, quantity_after, notes, performed_by,
+                    category_id, variant_id, variant_name, total_stock_after
                 )
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
                 [
                     item.product_id, sale.branch_id, 'sale_reversal', item.quantity,
                     quantity_before, quantity_after,
-                    `Reversal of Sale #${sale.sale_number} - ${reversal_reason}`, reversed_by
+                    `Reversal of Sale #${sale.sale_number} - ${reversal_reason}`, reversed_by,
+                    item.category_id || null, item.variant_id || null,
+                    item.variant_name || null, totalStockAfterRev
                 ]
             );
 
@@ -950,17 +988,36 @@ const unreverseSale = async (req, res) => {
                 );
             }
 
+            // Compute total product stock after unreversal
+            let totalStockAfterUnrev = null;
+            if (item.category_id) {
+                const totalRes = await client.query(
+                    `SELECT COALESCE(SUM(stock_allocated), 0) AS total FROM product_category_assignments WHERE product_id = $1`,
+                    [item.product_id]
+                );
+                totalStockAfterUnrev = parseInt(totalRes.rows[0].total);
+            } else {
+                const totalRes = await client.query(
+                    `SELECT COALESCE(SUM(quantity_on_hand), 0) AS total FROM inventory WHERE product_id = $1`,
+                    [item.product_id]
+                );
+                totalStockAfterUnrev = parseInt(totalRes.rows[0].total);
+            }
+
             // Record stock movement for unreversal
             await client.query(
                 `INSERT INTO stock_movements (
                     product_id, branch_id, movement_type, quantity,
-                    quantity_before, quantity_after, notes, performed_by
+                    quantity_before, quantity_after, notes, performed_by,
+                    category_id, variant_id, variant_name, total_stock_after
                 )
-                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
                 [
                     item.product_id, sale.branch_id, 'sale', -item.quantity,
                     quantity_before, quantity_after,
-                    `Unreversal of Sale #${sale.sale_number}`, unreversed_by
+                    `Unreversal of Sale #${sale.sale_number}`, unreversed_by,
+                    item.category_id || null, item.variant_id || null,
+                    item.variant_name || null, totalStockAfterUnrev
                 ]
             );
 
@@ -1118,16 +1175,35 @@ const deleteSale = async (req, res) => {
                     );
                 }
 
+                // Compute total product stock after deletion
+                let totalStockAfterDel = null;
+                if (item.category_id) {
+                    const totalRes = await client.query(
+                        `SELECT COALESCE(SUM(stock_allocated), 0) AS total FROM product_category_assignments WHERE product_id = $1`,
+                        [item.product_id]
+                    );
+                    totalStockAfterDel = parseInt(totalRes.rows[0].total);
+                } else {
+                    const totalRes = await client.query(
+                        `SELECT COALESCE(SUM(quantity_on_hand), 0) AS total FROM inventory WHERE product_id = $1`,
+                        [item.product_id]
+                    );
+                    totalStockAfterDel = parseInt(totalRes.rows[0].total);
+                }
+
                 // Record stock movement
                 await client.query(
                     `INSERT INTO stock_movements (
                         product_id, branch_id, movement_type, quantity,
-                        notes, performed_by
+                        notes, performed_by,
+                        category_id, variant_id, variant_name, total_stock_after
                     )
-                     VALUES ($1, $2, $3, $4, $5, $6)`,
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
                     [
                         item.product_id, sale.branch_id, 'sale_deletion', item.quantity,
-                        `Deletion of Sale #${sale.sale_number}`, deleted_by
+                        `Deletion of Sale #${sale.sale_number}`, deleted_by,
+                        item.category_id || null, item.variant_id || null,
+                        item.variant_name || null, totalStockAfterDel
                     ]
                 );
 

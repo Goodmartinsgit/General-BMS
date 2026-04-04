@@ -771,8 +771,10 @@ const updateProduct = async (req, res) => {
       : existingProduct.category_id;
 
     // Check if this product's category is a root category that has listing-level children
+    // Only run expansion when category_id is explicitly being changed
     let listingLevelCategories = [];
-    if (effectiveCatId) {
+    const categoryIsBeingChanged = updates.category_id !== undefined && updates.category_id !== '';
+    if (categoryIsBeingChanged && effectiveCatId) {
       const catCheck = await query('SELECT id, path, parent_category_id, is_listing_category FROM categories WHERE id = $1', [effectiveCatId]);
       if (catCheck.rows.length > 0) {
         const cat = catCheck.rows[0];
