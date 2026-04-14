@@ -208,15 +208,15 @@ const getDashboardStats = async (req, res) => {
                 (() => {
                     const isSingleDay = start_date && end_date && start_date === end_date;
                     if (isSingleDay) {
-                        return `SELECT TO_CHAR(sale_date, 'HH24:00') as date, COALESCE(SUM(total_amount), 0) as amount, COUNT(*) as count
+                        return `SELECT TO_CHAR(sale_date, 'HH24:00') as date, COALESCE(SUM(total_amount), 0) as amount, COUNT(*)::int as count
                                FROM sales WHERE status NOT IN ('cancelled', 'reversed', 'pending', 'awaiting_confirmation') AND sale_date >= $1 AND sale_date < ($2::date + INTERVAL '1 day')
                                GROUP BY TO_CHAR(sale_date, 'HH24:00') ORDER BY date`;
                     }
                     return start_date && end_date
-                        ? `SELECT DATE(sale_date) as date, COALESCE(SUM(total_amount), 0) as amount, COUNT(*) as count
+                        ? `SELECT DATE(sale_date)::TEXT as date, COALESCE(SUM(total_amount), 0) as amount, COUNT(*)::int as count
                            FROM sales WHERE status NOT IN ('cancelled', 'reversed', 'pending', 'awaiting_confirmation') AND sale_date >= $1 AND sale_date < ($2::date + INTERVAL '1 day')
                            GROUP BY DATE(sale_date) ORDER BY date`
-                        : `SELECT DATE(sale_date) as date, COALESCE(SUM(total_amount), 0) as amount, COUNT(*) as count
+                        : `SELECT DATE(sale_date)::TEXT as date, COALESCE(SUM(total_amount), 0) as amount, COUNT(*)::int as count
                            FROM sales WHERE status NOT IN ('cancelled', 'reversed', 'pending', 'awaiting_confirmation') AND sale_date >= NOW() - INTERVAL '14 days'
                            GROUP BY DATE(sale_date) ORDER BY date`;
                 })(),

@@ -7,15 +7,23 @@ import { TrendingUp, BarChart3 } from 'lucide-react';
 import { useCurrency } from '../../context/CurrencyContext';
 import { format, parseISO } from 'date-fns';
 
-const formatTrendDate = (dateStr) => {
-  if (!dateStr) return '';
-  // Check if it's hourly (HH:mm)
+const formatTrendDate = (dateVal) => {
+  if (!dateVal) return '';
+  
+  // Convert to string safely (handles Date objects or other types)
+  const dateStr = String(dateVal);
+  
+  // Check if it's hourly (HH:mm) from the backend
   if (dateStr.includes(':') && dateStr.length === 5) {
-    return dateStr; // Keep HH:mm layout for today's view
+    return dateStr;
   }
+  
   try {
-    return format(parseISO(dateStr), 'MMM d, yyyy');
+    // If it's already a Date object, use it directly; else parse if it looks like ISO
+    const dateObj = dateVal instanceof Date ? dateVal : parseISO(dateStr);
+    return format(dateObj, 'MMM d, yyyy');
   } catch (e) {
+    console.error('Trend date formatting error:', e, dateVal);
     return dateStr;
   }
 };
