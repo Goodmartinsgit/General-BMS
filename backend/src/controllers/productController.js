@@ -1336,7 +1336,7 @@ const getProductStatistics = async (req, res) => {
               ) as total_cost,
               (
                   COALESCE((SELECT SUM(quantity_on_hand * p.retail_price) FROM inventory WHERE product_id = p.id), 0) +
-                  COALESCE((SELECT SUM(vi.quantity_on_hand * COALESCE(pv.price, p.retail_price)) FROM variant_inventory vi JOIN product_variants pv ON vi.variant_id = pv.id WHERE pv.product_id = p.id), 0) +
+                  COALESCE((SELECT SUM(vi.quantity_on_hand * COALESCE(pv.retail_price, p.retail_price)) FROM variant_inventory vi JOIN product_variants pv ON vi.variant_id = pv.id WHERE pv.product_id = p.id), 0) +
                   COALESCE((SELECT SUM(stock_allocated * COALESCE(price_override, p.retail_price)) FROM product_category_assignments WHERE product_id = p.id AND is_leaf = true), 0)
               ) as total_value,
               p.is_active,
