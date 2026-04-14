@@ -104,7 +104,8 @@ const updateSettings = async (req, res) => {
 };
 
 /**
- * Get company information
+ * Get company information (public)
+ * Also returns regional settings (timezone, date_format) for the frontend.
  */
 const getCompanyInfo = async (req, res) => {
     try {
@@ -115,15 +116,39 @@ const getCompanyInfo = async (req, res) => {
                 email: '',
                 phone: '',
                 address: '',
-                logo_url: null
+                logo_url: null,
+                timezone: 'Africa/Lagos',
+                date_format: 'DD/MM/YYYY'
             });
         }
-        res.json(result.rows[0]);
+
+        const org = result.rows[0];
+
+        // Fetch regional prefs (timezone, date_format) from settings table
+        let timezone = 'Africa/Lagos';
+        let date_format = 'DD/MM/YYYY';
+        try {
+            const settingsRes = await pool.query(
+                `SELECT settings FROM settings WHERE organization_id = $1 AND category = 'general' LIMIT 1`,
+                [org.id]
+            );
+            if (settingsRes.rows.length > 0) {
+                const gs = settingsRes.rows[0].settings || {};
+                if (gs.timezone) timezone = gs.timezone;
+                if (gs.date_format) date_format = gs.date_format;
+            }
+        } catch (e) {
+            // settings table may not exist yet — fall back to defaults
+            console.warn('Could not fetch general settings for company info:', e.message);
+        }
+
+        res.json({ ...org, timezone, date_format });
     } catch (err) {
         console.error(err);
         res.status(500).json({ message: 'Server error' });
     }
 };
+
 
 /**
  * Update company information

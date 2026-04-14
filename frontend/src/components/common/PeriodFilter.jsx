@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useFiscalPeriod } from '../../context/FiscalPeriodContext';
+import { useTimezone } from '../../context/TimezoneContext';
 
 const PERIOD_OPTIONS = [
   { value: 'global', label: 'Use Global Period', icon: '🌐' },
@@ -15,9 +16,9 @@ const PERIOD_OPTIONS = [
   { value: 'custom', label: 'Custom Range', icon: '🔧' },
 ];
 
-function calculateDateRange(option) {
+function calculateDateRange(option, fmt) {
+  // fmt(date) → 'YYYY-MM-DD' in the company's configured timezone
   const today = new Date();
-  const fmt = (d) => d.toISOString().split('T')[0];
 
   switch (option) {
     case 'today':
@@ -88,6 +89,7 @@ function calculateDateRange(option) {
 
 export default function PeriodFilter({ onChange, storageKey = 'periodFilter', className = '' }) {
   const { periodRange, settings } = useFiscalPeriod();
+  const { fmt } = useTimezone();
   const [isOpen, setIsOpen] = useState(false);
   const [selected, setSelected] = useState('global');
   const [customStart, setCustomStart] = useState('');
@@ -119,7 +121,7 @@ export default function PeriodFilter({ onChange, storageKey = 'periodFilter', cl
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  // Compute active date range
+  // Compute active date range — always re-evaluated when timezone changes
   const activeDateRange = useMemo(() => {
     if (selected === 'global') {
       return {
@@ -135,9 +137,9 @@ export default function PeriodFilter({ onChange, storageKey = 'periodFilter', cl
         : 'Custom Range';
       return { start_date: customStart || null, end_date: customEnd || null, label, isGlobal: false };
     }
-    const range = calculateDateRange(selected);
+    const range = calculateDateRange(selected, fmt);
     return { ...range, isGlobal: false };
-  }, [selected, customStart, customEnd, periodRange]);
+  }, [selected, customStart, customEnd, periodRange, fmt]);
 
   // Emit change
   useEffect(() => {

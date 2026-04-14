@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useBranding } from '../context/BrandingContext';
 import { useTheme, themes as themeList } from '../context/ThemeContext';
 import { useCurrency } from '../context/CurrencyContext';
+import { useTimezone } from '../context/TimezoneContext';
 import { CURRENCIES, getCurrencySymbol } from '../utils/currency';
 import {
     Settings as SettingsIcon, Building2, CreditCard, Bell, Shield, Palette,
@@ -1700,7 +1701,7 @@ const NAV_GROUPS = [
 ];
 
 const SYSTEM_DEFAULTS = {
-    general:       { company_name: '', company_email: '', company_phone: '', company_address: '', currency: 'USD', timezone: 'UTC', date_format: 'MM/DD/YYYY', fiscal_year_start: '01' },
+    general:       { company_name: '', company_email: '', company_phone: '', company_address: '', currency: 'USD', timezone: 'Africa/Lagos', date_format: 'DD/MM/YYYY', fiscal_year_start: '01' },
     payment:       { cash_enabled: true, card_enabled: true, bank_transfer_enabled: true, mobile_money_enabled: false, default_payment_method: 'cash' },
     notifications: { email_notifications: true, low_stock_alerts: true, low_stock_threshold: 10, daily_summary: false, order_notifications: true },
     security:      { session_timeout: 30, require_password_change: false, password_expiry_days: 90, two_factor_enabled: false },
@@ -1713,6 +1714,7 @@ const SYSTEM_DEFAULTS = {
 const Settings = () => {
     const { updateCompanyName } = useBranding();
     const { setCurrency } = useCurrency();
+    const { refreshTimezone } = useTimezone();
     const [active, setActive] = useState('general');
     const [mobileNavOpen, setMobileNavOpen] = useState(false);
     // Track which sections have been visited so we mount them lazily
@@ -1758,6 +1760,8 @@ const Settings = () => {
             if (category === 'general') {
                 updateCompanyName(system.general.company_name);
                 setCurrency(system.general.currency);
+                // Reload timezone so PeriodFilter re-computes dates in the new timezone immediately
+                refreshTimezone();
             }
         } catch { toast.error('Failed to save settings'); }
         finally { setSystemSaving(false); }

@@ -35,16 +35,20 @@ const getDashboardStats = async (req, res) => {
             || role_level <= 2;
 
         // Date filtering
+        // NOTE: We filter on sale_date (the business date) not created_at.
+        // End-date uses < (end + 1 day) so the full end day is included,
+        // because comparing a TIMESTAMP against a bare DATE string truncates
+        // to midnight and would exclude all records from that day.
         const { start_date, end_date } = req.query;
         let dateParams = [];
 
         // For staff queries: userId is $1, so date params start at $2
         // For admin queries: no userId prefix, so date params start at $1
         const staffDateFilter = (start_date && end_date)
-            ? ` AND created_at >= $2 AND created_at <= $3`
+            ? ` AND sale_date >= $2 AND sale_date < ($3::date + INTERVAL '1 day')`
             : '';
         const adminDateFilter = (start_date && end_date)
-            ? ` AND created_at >= $1 AND created_at <= $2`
+            ? ` AND sale_date >= $1 AND sale_date < ($2::date + INTERVAL '1 day')`
             : '';
 
         if (start_date && end_date) {
@@ -57,23 +61,23 @@ const getDashboardStats = async (req, res) => {
                 pool.query(
                     `SELECT
                         COUNT(*) as my_sales_count,
-                        COUNT(*) FILTER (WHERE DATE(created_at) = CURRENT_DATE) as today_sales,
+                        COUNT(*) FILTER (WHERE DATE(sale_date) = CURRENT_DATE) as today_sales,
                         COALESCE(SUM(total_amount), 0) as my_total_revenue
                      FROM sales
-                     WHERE processed_by = $1 AND status != 'cancelled'${staffDateFilter}`,
+                     WHERE processed_by = $1 AND status NOT IN ('cancelled', 'reversed')${staffDateFilter}`,
                     [userId, ...dateParams]
                 ),
                 pool.query(
                     `SELECT COALESCE(SUM(si.quantity), 0) as total_items_sold
                      FROM sale_items si
                      JOIN sales s ON si.sale_id = s.id
-                     WHERE s.processed_by = $1 AND s.status != 'cancelled'${staffDateFilter.replace(/created_at/g, 's.created_at')}`,
+                     WHERE s.processed_by = $1 AND s.status NOT IN ('cancelled', 'reversed')${staffDateFilter.replace(/sale_date/g, 's.sale_date')}`,
                     [userId, ...dateParams]
                 ),
                 pool.query(
                     `SELECT COUNT(DISTINCT customer_id) as unique_customers
                      FROM sales
-                     WHERE processed_by = $1 AND status != 'cancelled' AND customer_id IS NOT NULL${staffDateFilter}`,
+                     WHERE processed_by = $1 AND status NOT IN ('cancelled', 'reversed') AND customer_id IS NOT NULL${staffDateFilter}`,
                     [userId, ...dateParams]
                 ),
                 pool.query(
@@ -83,8 +87,8 @@ const getDashboardStats = async (req, res) => {
                             c.customer_name
                      FROM sales s
                      LEFT JOIN customers c ON s.customer_id = c.id
-                     WHERE s.processed_by = $1 AND s.status != 'cancelled'${staffDateFilter.replace(/created_at/g, 's.created_at')}
-                     ORDER BY s.created_at DESC LIMIT 10`,
+                     WHERE s.processed_by = $1 AND s.status NOT IN ('cancelled', 'reversed')${staffDateFilter.replace(/sale_date/g, 's.sale_date')}
+                     ORDER BY s.sale_date DESC LIMIT 10`,
                     [userId, ...dateParams]
                 )
             ]);
@@ -125,7 +129,7 @@ const getDashboardStats = async (req, res) => {
             // Total sales
             pool.query(
                 `SELECT COUNT(*) as total_sales_count, COALESCE(SUM(total_amount), 0) as total_revenue
-                 FROM sales WHERE status != 'cancelled'${adminDateFilter}`,
+                 FROM sales WHERE status NOT IN ('cancelled', 'reversed')${adminDateFilter}`,
                 [...dateParams]
             ),
             // Today's sales
@@ -153,29 +157,34 @@ const getDashboardStats = async (req, res) => {
                  JOIN products p ON i.product_id = p.id
                  WHERE i.quantity_on_hand <= COALESCE(p.reorder_level, 5)`
             ),
-            // Expenses
+            // Expenses — respect the selected date range; fall back to current month
             pool.query(
-                `SELECT COALESCE(SUM(amount), 0) as total_expenses
-                 FROM expenses
-                 WHERE expense_date >= DATE_TRUNC('month', CURRENT_DATE)`
+                start_date && end_date
+                    ? `SELECT COALESCE(SUM(amount), 0) as total_expenses
+                       FROM expenses
+                       WHERE expense_date >= $1 AND expense_date < ($2::date + INTERVAL '1 day')`
+                    : `SELECT COALESCE(SUM(amount), 0) as total_expenses
+                       FROM expenses
+                       WHERE expense_date >= DATE_TRUNC('month', CURRENT_DATE)`,
+                start_date && end_date ? [start_date, end_date] : []
             ),
-            // Profit calculation
+            // Profit calculation (mirrors the sales query filter exactly)
             pool.query(
                 `SELECT
                     COALESCE(SUM(total_amount), 0) as gross_revenue,
                     COALESCE(SUM(profit_total), 0) as gross_profit
-                 FROM sales WHERE status != 'cancelled'${adminDateFilter}`,
+                 FROM sales WHERE status NOT IN ('cancelled', 'reversed')${adminDateFilter}`,
                 [...dateParams]
             ),
             // Sales trend (last 14 days or date range)
             pool.query(
                 start_date && end_date
-                    ? `SELECT DATE(created_at) as date, COALESCE(SUM(total_amount), 0) as amount, COUNT(*) as count
-                       FROM sales WHERE status != 'cancelled' AND created_at >= $1 AND created_at <= $2
-                       GROUP BY DATE(created_at) ORDER BY date`
-                    : `SELECT DATE(created_at) as date, COALESCE(SUM(total_amount), 0) as amount, COUNT(*) as count
-                       FROM sales WHERE status != 'cancelled' AND created_at >= NOW() - INTERVAL '14 days'
-                       GROUP BY DATE(created_at) ORDER BY date`,
+                    ? `SELECT DATE(sale_date) as date, COALESCE(SUM(total_amount), 0) as amount, COUNT(*) as count
+                       FROM sales WHERE status NOT IN ('cancelled', 'reversed') AND sale_date >= $1 AND sale_date < ($2::date + INTERVAL '1 day')
+                       GROUP BY DATE(sale_date) ORDER BY date`
+                    : `SELECT DATE(sale_date) as date, COALESCE(SUM(total_amount), 0) as amount, COUNT(*) as count
+                       FROM sales WHERE status NOT IN ('cancelled', 'reversed') AND sale_date >= NOW() - INTERVAL '14 days'
+                       GROUP BY DATE(sale_date) ORDER BY date`,
                 start_date && end_date ? [start_date, end_date] : []
             ),
             // Top products
@@ -186,7 +195,7 @@ const getDashboardStats = async (req, res) => {
                  FROM sale_items si
                  JOIN products p ON si.product_id = p.id
                  JOIN sales s ON si.sale_id = s.id
-                 WHERE s.status != 'cancelled'${adminDateFilter.replace(/created_at/g, 's.created_at')}
+                 WHERE s.status NOT IN ('cancelled', 'reversed')${adminDateFilter.replace(/sale_date/g, 's.sale_date')}
                  GROUP BY p.id, p.product_name, p.product_code
                  ORDER BY total_sold DESC LIMIT 10`,
                 [...dateParams]
@@ -199,7 +208,7 @@ const getDashboardStats = async (req, res) => {
                  JOIN products p ON si.product_id = p.id
                  LEFT JOIN categories c ON p.category_id = c.id
                  JOIN sales s ON si.sale_id = s.id
-                 WHERE s.status != 'cancelled'${adminDateFilter.replace(/created_at/g, 's.created_at')}
+                 WHERE s.status NOT IN ('cancelled', 'reversed')${adminDateFilter.replace(/sale_date/g, 's.sale_date')}
                  GROUP BY c.id, c.category_name
                  ORDER BY revenue DESC LIMIT 8`,
                 [...dateParams]
