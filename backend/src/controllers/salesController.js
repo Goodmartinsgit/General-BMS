@@ -869,6 +869,16 @@ const reverseSale = async (req, res) => {
             );
         }
 
+        // Hook to update online_orders table if this sale originated from an online order
+        if (sale.sale_source === 'online' || (sale.sale_number && sale.sale_number.startsWith('ORD-'))) {
+            await client.query(
+                `UPDATE online_orders 
+                 SET status = 'CANCELLED', updated_at = NOW(), cancellation_reason = $1 
+                 WHERE order_number = $2 AND status != 'CANCELLED'`,
+                [reversal_reason, sale.sale_number]
+            );
+        }
+
         await client.query('COMMIT');
 
         res.json({
