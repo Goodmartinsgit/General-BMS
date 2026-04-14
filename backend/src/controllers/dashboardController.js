@@ -160,9 +160,10 @@ const getDashboardStats = async (req, res) => {
                         FROM variant_inventory vi
                         JOIN product_variants v ON vi.variant_id = v.id), 0
                      ) + COALESCE(
-                       (SELECT SUM(stock_allocated * p.cost_price)
+                       (SELECT SUM(pca.stock_allocated * COALESCE(pca.cost_price_override, p.cost_price))
                         FROM product_category_assignments pca
-                        JOIN products p ON pca.product_id = p.id), 0
+                        JOIN products p ON pca.product_id = p.id
+                        WHERE pca.is_leaf = true), 0
                      )
                    ) as total_inventory_value`
             ),
