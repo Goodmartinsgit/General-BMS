@@ -64,20 +64,20 @@ const getDashboardStats = async (req, res) => {
                         COUNT(*) FILTER (WHERE DATE(sale_date) = CURRENT_DATE) as today_sales,
                         COALESCE(SUM(total_amount), 0) as my_total_revenue
                      FROM sales
-                     WHERE processed_by = $1 AND status = 'completed'${staffDateFilter}`,
+                     WHERE processed_by = $1 AND status NOT IN ('cancelled', 'reversed', 'pending', 'awaiting_confirmation')${staffDateFilter}`,
                     [userId, ...dateParams]
                 ),
                 pool.query(
                     `SELECT COALESCE(SUM(si.quantity), 0) as total_items_sold
                      FROM sale_items si
                      JOIN sales s ON si.sale_id = s.id
-                     WHERE s.processed_by = $1 AND s.status = 'completed'${staffDateFilter.replace(/sale_date/g, 's.sale_date')}`,
+                     WHERE s.processed_by = $1 AND s.status NOT IN ('cancelled', 'reversed', 'pending', 'awaiting_confirmation')${staffDateFilter.replace(/sale_date/g, 's.sale_date')}`,
                     [userId, ...dateParams]
                 ),
                 pool.query(
                     `SELECT COUNT(DISTINCT customer_id) as unique_customers
                      FROM sales
-                     WHERE processed_by = $1 AND status = 'completed' AND customer_id IS NOT NULL${staffDateFilter}`,
+                     WHERE processed_by = $1 AND status NOT IN ('cancelled', 'reversed', 'pending', 'awaiting_confirmation') AND customer_id IS NOT NULL${staffDateFilter}`,
                     [userId, ...dateParams]
                 ),
                 pool.query(
@@ -87,7 +87,7 @@ const getDashboardStats = async (req, res) => {
                             c.customer_name
                      FROM sales s
                      LEFT JOIN customers c ON s.customer_id = c.id
-                     WHERE s.processed_by = $1 AND s.status = 'completed'${staffDateFilter.replace(/sale_date/g, 's.sale_date')}
+                     WHERE s.processed_by = $1 AND s.status NOT IN ('cancelled', 'reversed', 'pending', 'awaiting_confirmation')${staffDateFilter.replace(/sale_date/g, 's.sale_date')}
                      ORDER BY s.sale_date DESC LIMIT 10`,
                     [userId, ...dateParams]
                 )
@@ -129,13 +129,13 @@ const getDashboardStats = async (req, res) => {
             // Total sales — only count completed sales for accurate revenue
             pool.query(
                 `SELECT COUNT(*) as total_sales_count, COALESCE(SUM(total_amount), 0) as total_revenue
-                 FROM sales WHERE status = 'completed'${adminDateFilter}`,
+                 FROM sales WHERE status NOT IN ('cancelled', 'reversed', 'pending', 'awaiting_confirmation')${adminDateFilter}`,
                 [...dateParams]
             ),
             // Today's sales (always today regardless of date filter)
             pool.query(
                 `SELECT COUNT(*) as sales_count, COALESCE(SUM(total_amount), 0) as revenue
-                 FROM sales WHERE DATE(sale_date) = CURRENT_DATE AND status = 'completed'`
+                 FROM sales WHERE DATE(sale_date) = CURRENT_DATE AND status NOT IN ('cancelled', 'reversed', 'pending', 'awaiting_confirmation')`
             ),
             // Total customers
             pool.query('SELECT COUNT(*) as total_customers FROM customers'),
@@ -197,17 +197,17 @@ const getDashboardStats = async (req, res) => {
                 `SELECT
                     COALESCE(SUM(total_amount), 0) as gross_revenue,
                     COALESCE(SUM(profit_total), 0) as gross_profit
-                 FROM sales WHERE status = 'completed'${adminDateFilter}`,
+                 FROM sales WHERE status NOT IN ('cancelled', 'reversed', 'pending', 'awaiting_confirmation')${adminDateFilter}`,
                 [...dateParams]
             ),
             // Sales trend (last 14 days or date range)
             pool.query(
                 start_date && end_date
                     ? `SELECT DATE(sale_date) as date, COALESCE(SUM(total_amount), 0) as amount, COUNT(*) as count
-                       FROM sales WHERE status = 'completed' AND sale_date >= $1 AND sale_date < ($2::date + INTERVAL '1 day')
+                       FROM sales WHERE status NOT IN ('cancelled', 'reversed', 'pending', 'awaiting_confirmation') AND sale_date >= $1 AND sale_date < ($2::date + INTERVAL '1 day')
                        GROUP BY DATE(sale_date) ORDER BY date`
                     : `SELECT DATE(sale_date) as date, COALESCE(SUM(total_amount), 0) as amount, COUNT(*) as count
-                       FROM sales WHERE status = 'completed' AND sale_date >= NOW() - INTERVAL '14 days'
+                       FROM sales WHERE status NOT IN ('cancelled', 'reversed', 'pending', 'awaiting_confirmation') AND sale_date >= NOW() - INTERVAL '14 days'
                        GROUP BY DATE(sale_date) ORDER BY date`,
                 start_date && end_date ? [start_date, end_date] : []
             ),
@@ -219,7 +219,7 @@ const getDashboardStats = async (req, res) => {
                  FROM sale_items si
                  JOIN products p ON si.product_id = p.id
                  JOIN sales s ON si.sale_id = s.id
-                 WHERE s.status = 'completed'${adminDateFilter.replace(/sale_date/g, 's.sale_date')}
+                 WHERE s.status NOT IN ('cancelled', 'reversed', 'pending', 'awaiting_confirmation')${adminDateFilter.replace(/sale_date/g, 's.sale_date')}
                  GROUP BY p.id, p.product_name, p.product_code
                  ORDER BY total_sold DESC LIMIT 10`,
                 [...dateParams]
@@ -232,7 +232,7 @@ const getDashboardStats = async (req, res) => {
                  JOIN products p ON si.product_id = p.id
                  LEFT JOIN categories c ON p.category_id = c.id
                  JOIN sales s ON si.sale_id = s.id
-                 WHERE s.status = 'completed'${adminDateFilter.replace(/sale_date/g, 's.sale_date')}
+                 WHERE s.status NOT IN ('cancelled', 'reversed', 'pending', 'awaiting_confirmation')${adminDateFilter.replace(/sale_date/g, 's.sale_date')}
                  GROUP BY c.id, c.category_name
                  ORDER BY revenue DESC LIMIT 8`,
                 [...dateParams]
