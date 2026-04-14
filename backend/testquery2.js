@@ -1,48 +1,35 @@
 const { pool } = require('./src/config/db');
 
-async function testStats() {
+async function debugDashboard() {
   try {
-    const stats = await pool.query(`
-      WITH product_stock AS (
-          SELECT 
-              p.id,
-              p.reorder_level,
-              (
-                  COALESCE((SELECT SUM(quantity_on_hand) FROM inventory WHERE product_id = p.id), 0) +
-                  COALESCE((SELECT SUM(vi.quantity_on_hand) FROM variant_inventory vi JOIN product_variants pv ON vi.variant_id = pv.id WHERE pv.product_id = p.id), 0) +
-                  COALESCE((SELECT SUM(stock_allocated) FROM product_category_assignments WHERE product_id = p.id AND is_leaf = true), 0)
-              ) as total_qty,
-              (
-                  COALESCE((SELECT SUM(quantity_on_hand * p.cost_price) FROM inventory WHERE product_id = p.id), 0) +
-                  COALESCE((SELECT SUM(vi.quantity_on_hand * COALESCE(pv.cost_price, p.cost_price)) FROM variant_inventory vi JOIN product_variants pv ON vi.variant_id = pv.id WHERE pv.product_id = p.id), 0) +
-                  COALESCE((SELECT SUM(stock_allocated * COALESCE(cost_price_override, p.cost_price)) FROM product_category_assignments WHERE product_id = p.id AND is_leaf = true), 0)
-              ) as total_cost,
-              (
-                  COALESCE((SELECT SUM(quantity_on_hand * p.retail_price) FROM inventory WHERE product_id = p.id), 0) +
-                  COALESCE((SELECT SUM(vi.quantity_on_hand * COALESCE(pv.retail_price, p.retail_price)) FROM variant_inventory vi JOIN product_variants pv ON vi.variant_id = pv.id WHERE pv.product_id = p.id), 0) +
-                  COALESCE((SELECT SUM(stock_allocated * COALESCE(price_override, p.retail_price)) FROM product_category_assignments WHERE product_id = p.id AND is_leaf = true), 0)
-              ) as total_value,
-              p.is_active,
-              p.is_featured
-          FROM products p
-          WHERE p.deleted_at IS NULL
-      )
+    const dashRes = await pool.query(`
       SELECT 
-          COUNT(*) as total_products,
-          COALESCE(SUM(total_qty), 0)::bigint as total_stock,
-          COUNT(*) FILTER (WHERE total_qty <= reorder_level) as low_stock_count,
-          COALESCE(SUM(total_cost), 0)::numeric as stock_cost,
-          COALESCE(SUM(total_value), 0)::numeric as stock_value,
-          COUNT(*) FILTER (WHERE is_active = true) as active_products,
-          COUNT(*) FILTER (WHERE is_featured = true) as featured_products
-      FROM product_stock
+       (
+         COALESCE(
+           (SELECT SUM(quantity_on_hand * p.cost_price)
+            FROM inventory i
+            JOIN products p ON i.product_id = p.id
+            WHERE (p.has_variants = false OR p.has_variants IS NULL) AND p.deleted_at IS NULL), 0
+         ) + COALESCE(
+           (SELECT SUM(quantity_on_hand * COALESCE(v.cost_price, p.cost_price))
+            FROM variant_inventory vi
+            JOIN product_variants v ON vi.variant_id = v.id
+            JOIN products p ON v.product_id = p.id
+            WHERE p.deleted_at IS NULL), 0
+         ) + COALESCE(
+           (SELECT SUM(pca.stock_allocated * COALESCE(pca.cost_price_override, p.cost_price))
+            FROM product_category_assignments pca
+            JOIN products p ON pca.product_id = p.id
+            WHERE pca.is_leaf = true AND p.deleted_at IS NULL), 0
+         )
+       ) as total_inventory_value
     `);
-    console.log(stats.rows[0]);
+    console.log("NEW DASHBOARD COST:", dashRes.rows[0].total_inventory_value);
   } catch (err) {
-    console.error('Error fetching product statistics:', err.message);
+    console.error(err.message);
   } finally {
     process.exit(0);
   }
 }
 
-testStats();
+debugDashboard();
