@@ -745,34 +745,55 @@ const ProductsPage = () => {
       {/* Statistics Cards */}
       {statistics && (
         <div className="grid grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
-          <div className="p-4 rounded-xl bg-theme-secondary border border-blue-500/50 shadow-theme-sm">
-            <h3 className="text-xs md:text-sm font-medium text-theme-muted mb-1">Total Products</h3>
-            <p className="text-xl md:text-2xl font-bold text-theme-primary">{statistics.total_products || 0}</p>
+          <div className="p-4 rounded-xl bg-theme-secondary border border-blue-500/50 shadow-theme-sm relative overflow-hidden group">
+            <div className="relative z-10">
+              <h3 className="text-xs md:text-sm font-medium text-theme-muted mb-1">Total Products</h3>
+              <p className="text-xl md:text-2xl font-bold text-theme-primary">{statistics.total_products || 0}</p>
+            </div>
+            <Package className="absolute -right-2 -bottom-2 w-12 h-12 text-blue-500/10 group-hover:scale-110 transition-transform" />
           </div>
-          <div className="p-4 rounded-xl bg-theme-secondary border border-green-500/50 shadow-theme-sm">
-            <h3 className="text-xs md:text-sm font-medium text-theme-muted mb-1">Active Products</h3>
-            <p className="text-xl md:text-2xl font-bold text-theme-primary">{statistics.active_products || 0}</p>
+
+          <div className="p-4 rounded-xl bg-theme-secondary border border-green-500/50 shadow-theme-sm relative overflow-hidden group">
+            <div className="relative z-10">
+              <h3 className="text-xs md:text-sm font-medium text-theme-muted mb-1">Total Stock</h3>
+              <p className="text-xl md:text-2xl font-bold text-theme-primary">{Number(statistics.total_stock || 0).toLocaleString()}</p>
+            </div>
+            <Grid2x2 className="absolute -right-2 -bottom-2 w-12 h-12 text-green-500/10 group-hover:scale-110 transition-transform" />
           </div>
+
           <div
             onClick={() => {
               handleFilterChange('low_stock', !filters.low_stock);
               if (!filters.low_stock) setShowFilters(true);
             }}
-            className="p-4 rounded-xl bg-theme-secondary border border-yellow-500/50 shadow-theme-sm cursor-pointer hover:shadow-theme-md transition-shadow"
+            className="p-4 rounded-xl bg-theme-secondary border border-yellow-500/50 shadow-theme-sm cursor-pointer hover:shadow-theme-md transition-all relative overflow-hidden group"
             title="Click to filter low stock products"
           >
-            <h3 className="text-xs md:text-sm font-medium text-theme-muted mb-1">Low Stock</h3>
-            <p className="text-xl md:text-2xl font-bold text-theme-primary">{statistics.low_stock_count || 0}</p>
+            <div className="relative z-10">
+              <h3 className="text-xs md:text-sm font-medium text-theme-muted mb-1">Low Stock</h3>
+              <p className="text-xl md:text-2xl font-bold text-theme-primary">{statistics.low_stock_count || 0}</p>
+            </div>
+            <BarChart3 className="absolute -right-2 -bottom-2 w-12 h-12 text-yellow-500/10 group-hover:scale-110 transition-transform" />
           </div>
-          <div className="p-4 rounded-xl bg-theme-secondary border border-purple-500/50 shadow-theme-sm">
-            <h3 className="text-xs md:text-sm font-medium text-theme-muted mb-1">Featured</h3>
-            <p className="text-xl md:text-2xl font-bold text-theme-primary">{statistics.featured_products || 0}</p>
+
+          <div className="p-4 rounded-xl bg-theme-secondary border border-purple-500/50 shadow-theme-sm relative overflow-hidden group">
+            <div className="relative z-10">
+              <h3 className="text-xs md:text-sm font-medium text-theme-muted mb-1">Stock Cost</h3>
+              <p className="text-lg md:text-xl font-bold text-theme-primary">
+                {formatCurrency(statistics.stock_cost || 0)}
+              </p>
+            </div>
+            <DollarSign className="absolute -right-2 -bottom-2 w-12 h-12 text-purple-500/10 group-hover:scale-110 transition-transform" />
           </div>
-          <div className="p-4 rounded-xl bg-theme-secondary border border-accent-gold/50 shadow-theme-sm">
-            <h3 className="text-xs md:text-sm font-medium text-theme-muted mb-1">Avg Price</h3>
-            <p className="text-base md:text-lg lg:text-xl font-bold text-theme-primary">
-              {formatCurrency(statistics.average_price || 0)}
-            </p>
+
+          <div className="p-4 rounded-xl bg-theme-secondary border border-accent-gold/50 shadow-theme-sm relative overflow-hidden group">
+            <div className="relative z-10">
+              <h3 className="text-xs md:text-sm font-medium text-theme-muted mb-1">Stock Value</h3>
+              <p className="text-lg md:text-xl font-bold text-theme-primary">
+                {formatCurrency(statistics.stock_value || 0)}
+              </p>
+            </div>
+            <BarChart3 className="absolute -right-2 -bottom-2 w-12 h-12 text-accent-gold/10 group-hover:scale-110 transition-transform" />
           </div>
         </div>
       )}

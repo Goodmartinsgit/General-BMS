@@ -5,20 +5,36 @@ import {
 } from 'recharts';
 import { TrendingUp, BarChart3 } from 'lucide-react';
 import { useCurrency } from '../../context/CurrencyContext';
+import { format, parseISO } from 'date-fns';
+
+const formatTrendDate = (dateStr) => {
+  if (!dateStr) return '';
+  // Check if it's hourly (HH:mm)
+  if (dateStr.includes(':') && dateStr.length === 5) {
+    return dateStr; // Keep HH:mm layout for today's view
+  }
+  try {
+    return format(parseISO(dateStr), 'MMM d, yyyy');
+  } catch (e) {
+    return dateStr;
+  }
+};
 
 const CustomTooltip = ({ active, payload, label, formatCurrency }) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-theme-secondary p-3 border border-theme rounded-lg shadow-theme-lg backdrop-blur-md bg-opacity-90">
-        <p className="text-[10px] uppercase tracking-wider text-theme-muted mb-1 font-semibold">{label}</p>
+        <p className="text-[10px] uppercase tracking-wider text-theme-muted mb-1 font-semibold">
+          {formatTrendDate(label)}
+        </p>
         <p className="text-sm font-bold text-accent-gold">
-          {formatCurrency(payload[0].value)}
+          Revenue: {formatCurrency(payload[0].value)}
         </p>
         {payload[0].payload.count !== undefined && (
           <div className="flex items-center gap-1.5 mt-1 pt-1 border-t border-theme border-opacity-30">
             <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
             <p className="text-[10px] text-theme-secondary">
-              {payload[0].payload.count} Sales recorded
+              Sales: {payload[0].payload.count}
             </p>
           </div>
         )}
@@ -32,6 +48,8 @@ const SalesTrendChart = ({ data, loading }) => {
   const { formatCurrency } = useCurrency();
 
   if (loading) {
+// ... existing loading state ...
+
     return (
       <div className="bg-theme-secondary p-6 md:p-8 rounded-lg border border-theme shadow-theme-sm h-[400px] flex flex-col animate-pulse">
         <div className="flex justify-between items-center mb-6">
@@ -104,6 +122,7 @@ const SalesTrendChart = ({ data, loading }) => {
                 axisLine={false}
                 tickLine={false}
                 tick={{ fill: 'var(--color-text-muted, #64748b)', fontSize: 10, fontWeight: 500 }}
+                tickFormatter={formatTrendDate}
                 minTickGap={20}
                 padding={{ left: 10, right: 10 }}
               />
@@ -112,9 +131,9 @@ const SalesTrendChart = ({ data, loading }) => {
                 tickLine={false}
                 tick={{ fill: 'var(--color-text-muted, #64748b)', fontSize: 10, fontWeight: 500 }}
                 tickFormatter={(val) => {
-                  if (val >= 1000000) return `${(val/1000000).toFixed(1)}M`;
-                  if (val >= 1000) return `${(val/1000).toFixed(0)}k`;
-                  return val;
+                  if (val >= 1000000) return `₦${(val/1000000).toFixed(1)}M`;
+                  if (val >= 1000) return `₦${(val/1000).toFixed(0)}K`;
+                  return `₦${val}`;
                 }}
               />
               <Tooltip 
