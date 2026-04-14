@@ -138,11 +138,11 @@ const getDashboardStats = async (req, res) => {
                  FROM sales WHERE DATE(sale_date) = CURRENT_DATE AND status NOT IN ('cancelled', 'reversed', 'pending', 'awaiting_confirmation')`
             ),
             // Total customers
-            pool.query('SELECT COUNT(*) as total_customers FROM customers'),
+            pool.query('SELECT COUNT(*) as total_customers FROM customers WHERE deleted_at IS NULL'),
             // New customers (30 days)
             pool.query(
                 `SELECT COUNT(*) as new_customers FROM customers
-                 WHERE created_at >= NOW() - INTERVAL '30 days'`
+                 WHERE created_at >= NOW() - INTERVAL '30 days' AND deleted_at IS NULL`
             ),
             // Inventory value — combines variant, non-variant, and category assigned products
             // Inventory value — combines variant, non-variant, and category assigned products
@@ -174,14 +174,14 @@ const getDashboardStats = async (req, res) => {
                 `SELECT
                     (SELECT COUNT(*) FROM inventory i
                      JOIN products p ON i.product_id = p.id
-                     WHERE p.is_active = TRUE AND p.has_variants = FALSE
+                     WHERE p.is_active = TRUE AND p.deleted_at IS NULL AND p.has_variants = FALSE
                        AND i.quantity_on_hand >= 0
                        AND i.quantity_on_hand <= COALESCE(p.reorder_level, 5)
                     ) +
                     (SELECT COUNT(*) FROM variant_inventory vi
                      JOIN product_variants pv ON vi.variant_id = pv.id
                      JOIN products p ON pv.product_id = p.id
-                     WHERE p.is_active = TRUE AND pv.is_active = TRUE
+                     WHERE p.is_active = TRUE AND p.deleted_at IS NULL AND pv.is_active = TRUE
                        AND vi.quantity_on_hand >= 0
                        AND vi.quantity_on_hand <= COALESCE(pv.reorder_level, 5)
                     ) as low_stock_count`
@@ -230,11 +230,12 @@ const getDashboardStats = async (req, res) => {
                         SUM(si.quantity) as total_sold,
                         SUM(si.line_total) as total_revenue
                  FROM sale_items si
-                 JOIN products p ON si.product_id = p.id
-                 JOIN sales s ON si.sale_id = s.id
-                 WHERE s.status NOT IN ('cancelled', 'reversed', 'pending', 'awaiting_confirmation')${adminDateFilter.replace(/sale_date/g, 's.sale_date')}
-                 GROUP BY p.id, p.product_name, p.product_code
-                 ORDER BY total_sold DESC LIMIT 10`,
+                  JOIN products p ON si.product_id = p.id
+                  JOIN sales s ON si.sale_id = s.id
+                  WHERE s.status NOT IN ('cancelled', 'reversed', 'pending', 'awaiting_confirmation') 
+                    AND p.deleted_at IS NULL${adminDateFilter.replace(/sale_date/g, 's.sale_date')}
+                  GROUP BY p.id, p.product_name, p.product_code
+                  ORDER BY total_sold DESC LIMIT 10`,
                 [...dateParams]
             ),
             // Revenue by category
@@ -243,11 +244,12 @@ const getDashboardStats = async (req, res) => {
                         SUM(si.line_total) as revenue
                  FROM sale_items si
                  JOIN products p ON si.product_id = p.id
-                 LEFT JOIN categories c ON p.category_id = c.id
-                 JOIN sales s ON si.sale_id = s.id
-                 WHERE s.status NOT IN ('cancelled', 'reversed', 'pending', 'awaiting_confirmation')${adminDateFilter.replace(/sale_date/g, 's.sale_date')}
-                 GROUP BY c.id, c.category_name
-                 ORDER BY revenue DESC LIMIT 8`,
+                  LEFT JOIN categories c ON p.category_id = c.id
+                  JOIN sales s ON si.sale_id = s.id
+                  WHERE s.status NOT IN ('cancelled', 'reversed', 'pending', 'awaiting_confirmation')
+                    AND p.deleted_at IS NULL${adminDateFilter.replace(/sale_date/g, 's.sale_date')}
+                  GROUP BY c.id, c.category_name
+                  ORDER BY revenue DESC LIMIT 8`,
                 [...dateParams]
             )
         ]);
@@ -381,14 +383,14 @@ const getQuickActionCounts = async (req, res) => {
                 `SELECT
                     (SELECT COUNT(*) FROM inventory i
                      JOIN products p ON i.product_id = p.id
-                     WHERE p.is_active = TRUE AND p.has_variants = FALSE
+                     WHERE p.is_active = TRUE AND p.deleted_at IS NULL AND p.has_variants = FALSE
                        AND i.quantity_on_hand >= 0
                        AND i.quantity_on_hand <= COALESCE(p.reorder_level, 5)
                     ) +
                     (SELECT COUNT(*) FROM variant_inventory vi
                      JOIN product_variants pv ON vi.variant_id = pv.id
                      JOIN products p ON pv.product_id = p.id
-                     WHERE p.is_active = TRUE AND pv.is_active = TRUE
+                     WHERE p.is_active = TRUE AND p.deleted_at IS NULL AND pv.is_active = TRUE
                        AND vi.quantity_on_hand >= 0
                        AND vi.quantity_on_hand <= COALESCE(pv.reorder_level, 5)
                     ) as count`

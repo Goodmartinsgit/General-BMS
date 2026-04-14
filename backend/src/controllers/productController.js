@@ -1294,8 +1294,10 @@ const getLowStockProducts = async (req, res) => {
     `;
 
     const params = [];
+    stockQuery += ' WHERE p.deleted_at IS NULL';
+    
     if (branch_id) {
-      stockQuery += ' WHERE i.branch_id = $1';
+      stockQuery += ' AND i.branch_id = $1';
       params.push(branch_id);
     }
 
