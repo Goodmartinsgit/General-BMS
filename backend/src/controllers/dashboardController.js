@@ -203,15 +203,23 @@ const getDashboardStats = async (req, res) => {
                  FROM sales WHERE status NOT IN ('cancelled', 'reversed', 'pending', 'awaiting_confirmation')${adminDateFilter}`,
                 [...dateParams]
             ),
-            // Sales trend (last 14 days or date range)
+            // Sales trend (hourly if single day, else daily)
             pool.query(
-                start_date && end_date
-                    ? `SELECT DATE(sale_date) as date, COALESCE(SUM(total_amount), 0) as amount, COUNT(*) as count
-                       FROM sales WHERE status NOT IN ('cancelled', 'reversed', 'pending', 'awaiting_confirmation') AND sale_date >= $1 AND sale_date < ($2::date + INTERVAL '1 day')
-                       GROUP BY DATE(sale_date) ORDER BY date`
-                    : `SELECT DATE(sale_date) as date, COALESCE(SUM(total_amount), 0) as amount, COUNT(*) as count
-                       FROM sales WHERE status NOT IN ('cancelled', 'reversed', 'pending', 'awaiting_confirmation') AND sale_date >= NOW() - INTERVAL '14 days'
-                       GROUP BY DATE(sale_date) ORDER BY date`,
+                (() => {
+                    const isSingleDay = start_date && end_date && start_date === end_date;
+                    if (isSingleDay) {
+                        return `SELECT TO_CHAR(sale_date, 'HH24:00') as date, COALESCE(SUM(total_amount), 0) as amount, COUNT(*) as count
+                               FROM sales WHERE status NOT IN ('cancelled', 'reversed', 'pending', 'awaiting_confirmation') AND sale_date >= $1 AND sale_date < ($2::date + INTERVAL '1 day')
+                               GROUP BY TO_CHAR(sale_date, 'HH24:00') ORDER BY date`;
+                    }
+                    return start_date && end_date
+                        ? `SELECT DATE(sale_date) as date, COALESCE(SUM(total_amount), 0) as amount, COUNT(*) as count
+                           FROM sales WHERE status NOT IN ('cancelled', 'reversed', 'pending', 'awaiting_confirmation') AND sale_date >= $1 AND sale_date < ($2::date + INTERVAL '1 day')
+                           GROUP BY DATE(sale_date) ORDER BY date`
+                        : `SELECT DATE(sale_date) as date, COALESCE(SUM(total_amount), 0) as amount, COUNT(*) as count
+                           FROM sales WHERE status NOT IN ('cancelled', 'reversed', 'pending', 'awaiting_confirmation') AND sale_date >= NOW() - INTERVAL '14 days'
+                           GROUP BY DATE(sale_date) ORDER BY date`;
+                })(),
                 start_date && end_date ? [start_date, end_date] : []
             ),
             // Top products
