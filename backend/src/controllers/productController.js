@@ -1861,11 +1861,21 @@ const getCategoryGroupInsights = async (req, res) => {
         SELECT
           rc.id AS root_id,
           p.id AS product_id,
-          COALESCE(
-            (SELECT SUM(i.quantity_on_hand) FROM inventory i WHERE i.product_id = p.id),
-            (SELECT SUM(pca2.stock_allocated) FROM product_category_assignments pca2 WHERE pca2.product_id = p.id AND pca2.is_leaf = true),
-            0
+          (
+            COALESCE((SELECT SUM(i.quantity_on_hand) FROM inventory i WHERE i.product_id = p.id), 0) +
+            COALESCE((SELECT SUM(vi.quantity_on_hand) FROM variant_inventory vi JOIN product_variants pv ON vi.variant_id = pv.id WHERE pv.product_id = p.id), 0) +
+            COALESCE((SELECT SUM(pca2.stock_allocated) FROM product_category_assignments pca2 WHERE pca2.product_id = p.id AND pca2.is_leaf = true), 0)
           ) AS stock,
+          (
+            COALESCE((SELECT SUM(i.quantity_on_hand * p.retail_price) FROM inventory i WHERE i.product_id = p.id), 0) +
+            COALESCE((SELECT SUM(vi.quantity_on_hand * COALESCE(pv.retail_price, p.retail_price)) FROM variant_inventory vi JOIN product_variants pv ON vi.variant_id = pv.id WHERE pv.product_id = p.id), 0) +
+            COALESCE((SELECT SUM(pca2.stock_allocated * COALESCE(pca2.price_override, p.retail_price)) FROM product_category_assignments pca2 WHERE pca2.product_id = p.id AND pca2.is_leaf = true), 0)
+          ) AS stock_value_sum,
+          (
+            COALESCE((SELECT SUM(i.quantity_on_hand * p.cost_price) FROM inventory i WHERE i.product_id = p.id), 0) +
+            COALESCE((SELECT SUM(vi.quantity_on_hand * COALESCE(pv.cost_price, p.cost_price)) FROM variant_inventory vi JOIN product_variants pv ON vi.variant_id = pv.id WHERE pv.product_id = p.id), 0) +
+            COALESCE((SELECT SUM(pca2.stock_allocated * COALESCE(pca2.cost_price_override, p.cost_price)) FROM product_category_assignments pca2 WHERE pca2.product_id = p.id AND pca2.is_leaf = true), 0)
+          ) AS stock_cost_sum,
           COALESCE(p.retail_price, 0) AS selling_price,
           COALESCE(p.cost_price, 0) AS cost_price,
           p.is_active,
@@ -1888,10 +1898,8 @@ const getCategoryGroupInsights = async (req, res) => {
         COUNT(DISTINCT pd.product_id) FILTER (WHERE pd.is_active = true)::int AS active_products,
         COUNT(DISTINCT pd.product_id) FILTER (WHERE pd.is_featured = true)::int AS featured_products,
         COALESCE(SUM(pd.stock), 0)::int AS total_stock,
-        COALESCE(SUM(pd.selling_price), 0)::numeric AS total_selling_value,
-        COALESCE(SUM(pd.cost_price), 0)::numeric AS total_cost_value,
-        COALESCE(SUM(pd.stock * pd.selling_price), 0)::numeric AS total_stock_value,
-        COALESCE(SUM(pd.stock * pd.cost_price), 0)::numeric AS total_stock_cost,
+        COALESCE(SUM(pd.stock_value_sum), 0)::numeric AS total_stock_value,
+        COALESCE(SUM(pd.stock_cost_sum), 0)::numeric AS total_stock_cost,
         COALESCE(MIN(pd.selling_price) FILTER (WHERE pd.selling_price > 0), 0)::numeric AS min_price,
         COALESCE(MAX(pd.selling_price), 0)::numeric AS max_price,
         COALESCE(AVG(pd.selling_price) FILTER (WHERE pd.selling_price > 0), 0)::numeric AS avg_price
@@ -1943,25 +1951,19 @@ const getCategoryGroupBreakdown = async (req, res) => {
          COUNT(DISTINCT p.id) FILTER (WHERE p.is_active = true)::int AS active_products,
          COUNT(DISTINCT p.id) FILTER (WHERE p.is_featured = true)::int AS featured_products,
          COALESCE(SUM(
-           COALESCE(
-             (SELECT SUM(i.quantity_on_hand) FROM inventory i WHERE i.product_id = p.id),
-             (SELECT SUM(pca2.stock_allocated) FROM product_category_assignments pca2 WHERE pca2.product_id = p.id AND pca2.category_id = c.id AND pca2.is_leaf = true),
-             0
-           )
+           COALESCE((SELECT SUM(i.quantity_on_hand) FROM inventory i WHERE i.product_id = p.id), 0) +
+           COALESCE((SELECT SUM(vi.quantity_on_hand) FROM variant_inventory vi JOIN product_variants pv ON vi.variant_id = pv.id WHERE pv.product_id = p.id), 0) +
+           COALESCE((SELECT SUM(pca2.stock_allocated) FROM product_category_assignments pca2 WHERE pca2.product_id = p.id AND pca2.category_id = c.id AND pca2.is_leaf = true), 0)
          ), 0)::int AS total_stock,
          COALESCE(SUM(
-           COALESCE(
-             (SELECT SUM(i.quantity_on_hand) FROM inventory i WHERE i.product_id = p.id),
-             (SELECT SUM(pca2.stock_allocated) FROM product_category_assignments pca2 WHERE pca2.product_id = p.id AND pca2.category_id = c.id AND pca2.is_leaf = true),
-             0
-           ) * COALESCE(p.retail_price, 0)
+           COALESCE((SELECT SUM(i.quantity_on_hand * p.retail_price) FROM inventory i WHERE i.product_id = p.id), 0) +
+           COALESCE((SELECT SUM(vi.quantity_on_hand * COALESCE(pv.retail_price, p.retail_price)) FROM variant_inventory vi JOIN product_variants pv ON vi.variant_id = pv.id WHERE pv.product_id = p.id), 0) +
+           COALESCE((SELECT SUM(pca2.stock_allocated * COALESCE(pca2.price_override, p.retail_price)) FROM product_category_assignments pca2 WHERE pca2.product_id = p.id AND pca2.category_id = c.id AND pca2.is_leaf = true), 0)
          ), 0)::numeric AS total_stock_value,
          COALESCE(SUM(
-           COALESCE(
-             (SELECT SUM(i.quantity_on_hand) FROM inventory i WHERE i.product_id = p.id),
-             (SELECT SUM(pca2.stock_allocated) FROM product_category_assignments pca2 WHERE pca2.product_id = p.id AND pca2.category_id = c.id AND pca2.is_leaf = true),
-             0
-           ) * COALESCE(p.cost_price, 0)
+           COALESCE((SELECT SUM(i.quantity_on_hand * p.cost_price) FROM inventory i WHERE i.product_id = p.id), 0) +
+           COALESCE((SELECT SUM(vi.quantity_on_hand * COALESCE(pv.cost_price, p.cost_price)) FROM variant_inventory vi JOIN product_variants pv ON vi.variant_id = pv.id WHERE pv.product_id = p.id), 0) +
+           COALESCE((SELECT SUM(pca2.stock_allocated * COALESCE(pca2.cost_price_override, p.cost_price)) FROM product_category_assignments pca2 WHERE pca2.product_id = p.id AND pca2.category_id = c.id AND pca2.is_leaf = true), 0)
          ), 0)::numeric AS total_stock_cost,
          COALESCE(MIN(p.retail_price) FILTER (WHERE p.retail_price > 0), 0)::numeric AS min_price,
          COALESCE(MAX(p.retail_price), 0)::numeric AS max_price,
@@ -1984,15 +1986,15 @@ const getCategoryGroupBreakdown = async (req, res) => {
          p.is_active, p.is_featured,
          c.category_name AS direct_category,
          COALESCE(
-           (SELECT SUM(i.quantity_on_hand) FROM inventory i WHERE i.product_id = p.id),
-           (SELECT SUM(pca2.stock_allocated) FROM product_category_assignments pca2 WHERE pca2.product_id = p.id AND pca2.is_leaf = true),
-           0
+           COALESCE((SELECT SUM(i.quantity_on_hand) FROM inventory i WHERE i.product_id = p.id), 0) +
+           COALESCE((SELECT SUM(vi.quantity_on_hand) FROM variant_inventory vi JOIN product_variants pv ON vi.variant_id = pv.id WHERE pv.product_id = p.id), 0) +
+           COALESCE((SELECT SUM(pca2.stock_allocated) FROM product_category_assignments pca2 WHERE pca2.product_id = p.id AND pca2.is_leaf = true), 0)
          )::int AS stock,
-         COALESCE(
-           (SELECT SUM(i.quantity_on_hand) FROM inventory i WHERE i.product_id = p.id),
-           (SELECT SUM(pca2.stock_allocated) FROM product_category_assignments pca2 WHERE pca2.product_id = p.id AND pca2.is_leaf = true),
-           0
-         ) * COALESCE(p.retail_price, 0) AS stock_value
+         (
+           COALESCE((SELECT SUM(i.quantity_on_hand * p.retail_price) FROM inventory i WHERE i.product_id = p.id), 0) +
+           COALESCE((SELECT SUM(vi.quantity_on_hand * COALESCE(pv.retail_price, p.retail_price)) FROM variant_inventory vi JOIN product_variants pv ON vi.variant_id = pv.id WHERE pv.product_id = p.id), 0) +
+           COALESCE((SELECT SUM(pca2.stock_allocated * COALESCE(pca2.price_override, p.retail_price)) FROM product_category_assignments pca2 WHERE pca2.product_id = p.id AND pca2.is_leaf = true), 0)
+         )::numeric AS stock_value
        FROM products p
        LEFT JOIN categories c ON p.category_id = c.id
        WHERE p.deleted_at IS NULL
