@@ -826,6 +826,7 @@ const reverseSale = async (req, res) => {
         // Update sale status to reversed
         await client.query(
             `UPDATE sales SET
+                status = 'reversed',
                 reversed_at = NOW(),
                 reversed_by = $1,
                 reversal_reason = $2,
@@ -1070,6 +1071,7 @@ const unreverseSale = async (req, res) => {
         // Update sale to unreversed
         await client.query(
             `UPDATE sales SET
+                status = 'completed',
                 unreversed_at = NOW(),
                 unreversed_by = $1,
                 unreverse_reason = $2,
