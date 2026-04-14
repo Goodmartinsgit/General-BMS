@@ -184,7 +184,7 @@ const Dashboard = () => {
               <KPICard
                 title="Total Expenses"
                 value={formatCurrency(financial_health?.total_expenses || 0)}
-                change="Current month"
+                change="Selected period"
                 changeType="negative"
                 icon={Wallet}
                 iconColor="bg-orange-500"

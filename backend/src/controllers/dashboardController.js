@@ -64,20 +64,20 @@ const getDashboardStats = async (req, res) => {
                         COUNT(*) FILTER (WHERE DATE(sale_date) = CURRENT_DATE) as today_sales,
                         COALESCE(SUM(total_amount), 0) as my_total_revenue
                      FROM sales
-                     WHERE processed_by = $1 AND status NOT IN ('cancelled', 'reversed')${staffDateFilter}`,
+                     WHERE processed_by = $1 AND status = 'completed'${staffDateFilter}`,
                     [userId, ...dateParams]
                 ),
                 pool.query(
                     `SELECT COALESCE(SUM(si.quantity), 0) as total_items_sold
                      FROM sale_items si
                      JOIN sales s ON si.sale_id = s.id
-                     WHERE s.processed_by = $1 AND s.status NOT IN ('cancelled', 'reversed')${staffDateFilter.replace(/sale_date/g, 's.sale_date')}`,
+                     WHERE s.processed_by = $1 AND s.status = 'completed'${staffDateFilter.replace(/sale_date/g, 's.sale_date')}`,
                     [userId, ...dateParams]
                 ),
                 pool.query(
                     `SELECT COUNT(DISTINCT customer_id) as unique_customers
                      FROM sales
-                     WHERE processed_by = $1 AND status NOT IN ('cancelled', 'reversed') AND customer_id IS NOT NULL${staffDateFilter}`,
+                     WHERE processed_by = $1 AND status = 'completed' AND customer_id IS NOT NULL${staffDateFilter}`,
                     [userId, ...dateParams]
                 ),
                 pool.query(
@@ -87,7 +87,7 @@ const getDashboardStats = async (req, res) => {
                             c.customer_name
                      FROM sales s
                      LEFT JOIN customers c ON s.customer_id = c.id
-                     WHERE s.processed_by = $1 AND s.status NOT IN ('cancelled', 'reversed')${staffDateFilter.replace(/sale_date/g, 's.sale_date')}
+                     WHERE s.processed_by = $1 AND s.status = 'completed'${staffDateFilter.replace(/sale_date/g, 's.sale_date')}
                      ORDER BY s.sale_date DESC LIMIT 10`,
                     [userId, ...dateParams]
                 )
@@ -126,16 +126,16 @@ const getDashboardStats = async (req, res) => {
             topProductsResult,
             categoryRevenueResult
         ] = await Promise.all([
-            // Total sales
+            // Total sales — only count completed sales for accurate revenue
             pool.query(
                 `SELECT COUNT(*) as total_sales_count, COALESCE(SUM(total_amount), 0) as total_revenue
-                 FROM sales WHERE status NOT IN ('cancelled', 'reversed')${adminDateFilter}`,
+                 FROM sales WHERE status = 'completed'${adminDateFilter}`,
                 [...dateParams]
             ),
-            // Today's sales
+            // Today's sales (always today regardless of date filter)
             pool.query(
                 `SELECT COUNT(*) as sales_count, COALESCE(SUM(total_amount), 0) as revenue
-                 FROM sales WHERE DATE(created_at) = CURRENT_DATE AND status != 'cancelled'`
+                 FROM sales WHERE DATE(sale_date) = CURRENT_DATE AND status = 'completed'`
             ),
             // Total customers
             pool.query('SELECT COUNT(*) as total_customers FROM customers'),
@@ -144,18 +144,42 @@ const getDashboardStats = async (req, res) => {
                 `SELECT COUNT(*) as new_customers FROM customers
                  WHERE created_at >= NOW() - INTERVAL '30 days'`
             ),
-            // Inventory value
+            // Inventory value — combines variant + non-variant products
+            // Products WITH variants: use variant_inventory × product_variants.cost_price
+            // Products WITHOUT variants: use inventory × products.cost_price
             pool.query(
-                `SELECT COUNT(DISTINCT p.id) as total_products,
-                        COALESCE(SUM(i.quantity_on_hand * p.retail_price), 0) as total_inventory_value
-                 FROM inventory i
-                 JOIN products p ON i.product_id = p.id
-                 WHERE p.is_active = TRUE`
+                `SELECT
+                    (SELECT COUNT(*) FROM products WHERE is_active = TRUE AND deleted_at IS NULL) as total_products,
+                    COALESCE(non_variant.value, 0) + COALESCE(variant.value, 0) as total_inventory_value
+                 FROM
+                    (SELECT SUM(i.quantity_on_hand * COALESCE(p.cost_price, 0)) as value
+                     FROM inventory i
+                     JOIN products p ON i.product_id = p.id
+                     WHERE p.is_active = TRUE AND p.has_variants = FALSE AND i.quantity_on_hand > 0
+                    ) non_variant,
+                    (SELECT SUM(vi.quantity_on_hand * COALESCE(pv.cost_price, 0)) as value
+                     FROM variant_inventory vi
+                     JOIN product_variants pv ON vi.variant_id = pv.id
+                     JOIN products p ON pv.product_id = p.id
+                     WHERE p.is_active = TRUE AND pv.is_active = TRUE AND vi.quantity_on_hand > 0
+                    ) variant`
             ),
+            // Low stock — check both variant and non-variant inventory
             pool.query(
-                `SELECT COUNT(*) as low_stock_count FROM inventory i
-                 JOIN products p ON i.product_id = p.id
-                 WHERE i.quantity_on_hand <= COALESCE(p.reorder_level, 5)`
+                `SELECT
+                    (SELECT COUNT(*) FROM inventory i
+                     JOIN products p ON i.product_id = p.id
+                     WHERE p.is_active = TRUE AND p.has_variants = FALSE
+                       AND i.quantity_on_hand >= 0
+                       AND i.quantity_on_hand <= COALESCE(p.reorder_level, 5)
+                    ) +
+                    (SELECT COUNT(*) FROM variant_inventory vi
+                     JOIN product_variants pv ON vi.variant_id = pv.id
+                     JOIN products p ON pv.product_id = p.id
+                     WHERE p.is_active = TRUE AND pv.is_active = TRUE
+                       AND vi.quantity_on_hand >= 0
+                       AND vi.quantity_on_hand <= COALESCE(pv.reorder_level, 5)
+                    ) as low_stock_count`
             ),
             // Expenses — respect the selected date range; fall back to current month
             pool.query(
@@ -168,22 +192,22 @@ const getDashboardStats = async (req, res) => {
                        WHERE expense_date >= DATE_TRUNC('month', CURRENT_DATE)`,
                 start_date && end_date ? [start_date, end_date] : []
             ),
-            // Profit calculation (mirrors the sales query filter exactly)
+            // Profit calculation (mirrors the sales query — completed only)
             pool.query(
                 `SELECT
                     COALESCE(SUM(total_amount), 0) as gross_revenue,
                     COALESCE(SUM(profit_total), 0) as gross_profit
-                 FROM sales WHERE status NOT IN ('cancelled', 'reversed')${adminDateFilter}`,
+                 FROM sales WHERE status = 'completed'${adminDateFilter}`,
                 [...dateParams]
             ),
             // Sales trend (last 14 days or date range)
             pool.query(
                 start_date && end_date
                     ? `SELECT DATE(sale_date) as date, COALESCE(SUM(total_amount), 0) as amount, COUNT(*) as count
-                       FROM sales WHERE status NOT IN ('cancelled', 'reversed') AND sale_date >= $1 AND sale_date < ($2::date + INTERVAL '1 day')
+                       FROM sales WHERE status = 'completed' AND sale_date >= $1 AND sale_date < ($2::date + INTERVAL '1 day')
                        GROUP BY DATE(sale_date) ORDER BY date`
                     : `SELECT DATE(sale_date) as date, COALESCE(SUM(total_amount), 0) as amount, COUNT(*) as count
-                       FROM sales WHERE status NOT IN ('cancelled', 'reversed') AND sale_date >= NOW() - INTERVAL '14 days'
+                       FROM sales WHERE status = 'completed' AND sale_date >= NOW() - INTERVAL '14 days'
                        GROUP BY DATE(sale_date) ORDER BY date`,
                 start_date && end_date ? [start_date, end_date] : []
             ),
@@ -195,7 +219,7 @@ const getDashboardStats = async (req, res) => {
                  FROM sale_items si
                  JOIN products p ON si.product_id = p.id
                  JOIN sales s ON si.sale_id = s.id
-                 WHERE s.status NOT IN ('cancelled', 'reversed')${adminDateFilter.replace(/sale_date/g, 's.sale_date')}
+                 WHERE s.status = 'completed'${adminDateFilter.replace(/sale_date/g, 's.sale_date')}
                  GROUP BY p.id, p.product_name, p.product_code
                  ORDER BY total_sold DESC LIMIT 10`,
                 [...dateParams]
@@ -208,7 +232,7 @@ const getDashboardStats = async (req, res) => {
                  JOIN products p ON si.product_id = p.id
                  LEFT JOIN categories c ON p.category_id = c.id
                  JOIN sales s ON si.sale_id = s.id
-                 WHERE s.status NOT IN ('cancelled', 'reversed')${adminDateFilter.replace(/sale_date/g, 's.sale_date')}
+                 WHERE s.status = 'completed'${adminDateFilter.replace(/sale_date/g, 's.sale_date')}
                  GROUP BY c.id, c.category_name
                  ORDER BY revenue DESC LIMIT 8`,
                 [...dateParams]
@@ -340,7 +364,22 @@ const getQuickActionCounts = async (req, res) => {
         } catch (e) { console.error('Quick action - tasks query failed:', e.message); }
 
         try {
-            const r = await pool.query(`SELECT COUNT(*) FROM inventory i JOIN products p ON i.product_id = p.id WHERE i.quantity_on_hand <= COALESCE(p.reorder_level, 5)`);
+            const r = await pool.query(
+                `SELECT
+                    (SELECT COUNT(*) FROM inventory i
+                     JOIN products p ON i.product_id = p.id
+                     WHERE p.is_active = TRUE AND p.has_variants = FALSE
+                       AND i.quantity_on_hand >= 0
+                       AND i.quantity_on_hand <= COALESCE(p.reorder_level, 5)
+                    ) +
+                    (SELECT COUNT(*) FROM variant_inventory vi
+                     JOIN product_variants pv ON vi.variant_id = pv.id
+                     JOIN products p ON pv.product_id = p.id
+                     WHERE p.is_active = TRUE AND pv.is_active = TRUE
+                       AND vi.quantity_on_hand >= 0
+                       AND vi.quantity_on_hand <= COALESCE(pv.reorder_level, 5)
+                    ) as count`
+            );
             results.low_stock_items = parseInt(r.rows[0].count);
         } catch (e) { console.error('Quick action - inventory query failed:', e.message); }
 
