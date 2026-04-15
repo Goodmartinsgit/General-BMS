@@ -211,6 +211,14 @@ const GeneralSection = ({ shared, onChange, onSave, onReset, saving }) => {
                     <input type="text" readOnly value={getCurrencySymbol(g.currency)} className={`${inputClass} max-w-[100px] opacity-70 cursor-default`} tabIndex={-1} />
                 </div>
                 <div className="md:col-span-2">
+                    <ToggleSetting
+                        label="Smart Currency Decimals"
+                        description="Hide .00 decimals but show non-zero decimals (e.g. ₦1,000.50 stays, ₦1,000.00 becomes ₦1,000)"
+                        checked={g.smart_decimals === true}
+                        onChange={val => onChange('general', 'smart_decimals', val)}
+                    />
+                </div>
+                <div className="md:col-span-2">
                     <label className={labelClass}>Company Address</label>
                     <textarea value={g.company_address} onChange={e => onChange('general', 'company_address', e.target.value)} rows={3} className={inputClass} placeholder="Enter company address" />
                 </div>

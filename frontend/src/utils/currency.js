@@ -55,9 +55,15 @@ export const getCurrencySymbol = (currencyCode) => {
   return CURRENCIES[currencyCode]?.symbol || '$';
 };
 
-export const formatCurrency = (amount, currencyCode = 'USD') => {
+export const formatCurrency = (amount, currencyCode = 'USD', options = {}) => {
+  const { smartDecimals = false } = options;
   const symbol = getCurrencySymbol(currencyCode);
   const num = Number(amount);
-  if (isNaN(num)) return `${symbol}0.00`;
-  return `${symbol}${num.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  
+  if (isNaN(num)) return `${symbol}${smartDecimals ? '0' : '0.00'}`;
+  
+  return `${symbol}${num.toLocaleString(undefined, { 
+    minimumFractionDigits: smartDecimals ? 0 : 2, 
+    maximumFractionDigits: 2 
+  })}`;
 };

@@ -15,6 +15,7 @@ export const useCurrency = () => {
 
 export const CurrencyProvider = ({ children }) => {
   const [currency, setCurrencyState] = useState('USD');
+  const [smartDecimals, setSmartDecimals] = useState(false);
   const { auth, loading } = useAuth();
 
   useEffect(() => {
@@ -23,10 +24,11 @@ export const CurrencyProvider = ({ children }) => {
       try {
         const res = await api.get('/settings');
         const d = res.data?.settings || res.data || {};
-        const code = d.general?.currency || 'USD';
-        setCurrencyState(code);
+        const g = d.general || {};
+        setCurrencyState(g.currency || 'USD');
+        setSmartDecimals(g.smart_decimals === true);
       } catch {
-        // keep default
+        // keep defaults
       }
     })();
   }, [loading, auth?.accessToken]);
@@ -37,12 +39,14 @@ export const CurrencyProvider = ({ children }) => {
 
   const symbol = getCurrencySymbol(currency);
 
-  const formatCurrency = useCallback((amount) => {
-    return formatCurrencyUtil(amount, currency);
-  }, [currency]);
+  const formatCurrency = useCallback((amount, options = {}) => {
+    // Merge global context setting with manual overrides
+    const mergedOptions = { smartDecimals, ...options };
+    return formatCurrencyUtil(amount, currency, mergedOptions);
+  }, [currency, smartDecimals]);
 
   return (
-    <CurrencyContext.Provider value={{ currency, symbol, setCurrency, formatCurrency }}>
+    <CurrencyContext.Provider value={{ currency, symbol, smartDecimals, setCurrency, formatCurrency }}>
       {children}
     </CurrencyContext.Provider>
   );
