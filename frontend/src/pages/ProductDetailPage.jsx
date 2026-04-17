@@ -62,8 +62,17 @@ const labelCls = 'block text-sm font-medium text-theme-secondary mb-1';
 
 const StockModal = ({ product, mode, branches, onClose, onSuccess }) => {
   const { singleBranchMode, currentBranchId } = useBranch();
-  const [form, setForm] = useState({ branch_id: '', quantity_change: '', notes: '' });
+  const [form, setForm] = useState({
+    branch_id: '', quantity_change: '', notes: '',
+    variant_id: '', category_id: '',
+  });
   const [saving, setSaving] = useState(false);
+
+  // Determine product stock mode
+  const hasVariants = product.has_variants && product.variants?.length > 0;
+  const leafCategories = (product.category_assignments || []).filter(a => a.is_leaf);
+  const hasCategoryStock = !hasVariants && leafCategories.length > 0;
+  const stockMode = hasVariants ? 'variant' : hasCategoryStock ? 'category' : 'simple';
 
   // Pre-fill branch in single-branch mode
   useEffect(() => {
@@ -76,22 +85,66 @@ const StockModal = ({ product, mode, branches, onClose, onSuccess }) => {
   const title = isAdd ? 'Add Stock' : 'Adjust Stock';
   const movementType = isAdd ? 'receipt' : 'adjustment';
 
+  // Compute preview values
+  const qtyChange = parseFloat(form.quantity_change) || 0;
+  let currentStockLabel = '';
+  let previewAfter = null;
+
+  if (stockMode === 'variant' && form.variant_id) {
+    const selectedVariant = product.variants.find(v => String(v.id) === form.variant_id);
+    const currentQty = parseInt(selectedVariant?.quantity_on_hand ?? selectedVariant?.total_stock ?? 0);
+    currentStockLabel = `${selectedVariant?.variant_name}: ${currentQty} units`;
+    previewAfter = currentQty + qtyChange;
+  } else if (stockMode === 'category' && form.category_id) {
+    const selectedCat = leafCategories.find(c => String(c.category_id) === form.category_id);
+    const currentQty = parseInt(selectedCat?.stock_allocated ?? 0);
+    currentStockLabel = `${selectedCat?.category_name}: ${currentQty} units`;
+    previewAfter = currentQty + qtyChange;
+  } else if (stockMode === 'simple') {
+    const currentQty = parseInt(product.total_stock ?? product.inventory_stock ?? 0);
+    currentStockLabel = `Total: ${currentQty} units`;
+    previewAfter = currentQty + qtyChange;
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     const branchId = form.branch_id || currentBranchId;
-    if (!branchId) return toast.error('Please select a branch');
+
+    // Validate based on mode
+    if (stockMode === 'variant') {
+      if (!form.variant_id) return toast.error('Please select a variant');
+      if (!branchId) return toast.error('Please select a branch');
+    } else if (stockMode === 'category') {
+      if (!form.category_id) return toast.error('Please select a category');
+    } else {
+      if (!branchId) return toast.error('Please select a branch');
+    }
+
     const qty = parseFloat(form.quantity_change);
     if (!form.quantity_change || isNaN(qty)) return toast.error('Enter a valid quantity');
     if (isAdd && qty <= 0) return toast.error('Quantity must be positive for stock addition');
+
     setSaving(true);
     try {
-      await api.post('/inventory/update', {
+      const payload = {
         product_id: product.id,
-        branch_id: branchId,
         quantity_change: qty,
         movement_type: movementType,
         notes: form.notes,
-      });
+      };
+
+      if (stockMode === 'variant') {
+        payload.variant_id = parseInt(form.variant_id);
+        payload.branch_id = branchId;
+      } else if (stockMode === 'category') {
+        payload.category_id = parseInt(form.category_id);
+        // category stock is global (not branch-specific), but include branch if available
+        if (branchId) payload.branch_id = branchId;
+      } else {
+        payload.branch_id = branchId;
+      }
+
+      await api.post('/inventory/update', payload);
       toast.success(`Stock ${isAdd ? 'added' : 'adjusted'} successfully`);
       onSuccess();
       onClose();
@@ -125,12 +178,61 @@ const StockModal = ({ product, mode, branches, onClose, onSuccess }) => {
       }
     >
       <form id="stock-modal-form" onSubmit={handleSubmit} className="space-y-4">
-        {/* Branch — hidden in single-branch mode */}
-        {!singleBranchMode && (
+
+        {/* Stock Mode Indicator */}
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-theme-tertiary border border-theme">
+          <div className={`w-2 h-2 rounded-full ${
+            stockMode === 'variant' ? 'bg-purple-500' : stockMode === 'category' ? 'bg-blue-500' : 'bg-green-500'
+          }`} />
+          <span className="text-xs font-medium text-theme-secondary">
+            {stockMode === 'variant' ? 'Variant-level stock' :
+             stockMode === 'category' ? 'Category-attribute stock' :
+             'Branch inventory stock'}
+          </span>
+        </div>
+
+        {/* Variant selector — shown for variant products */}
+        {stockMode === 'variant' && (
           <div>
-            <label className={labelCls}>Branch <span className="text-red-500">*</span></label>
-            <select name="branch_id" value={form.branch_id} onChange={e => setForm(f => ({ ...f, branch_id: e.target.value }))}
+            <label className={labelCls}>Variant <span className="text-red-500">*</span></label>
+            <select value={form.variant_id}
+              onChange={e => setForm(f => ({ ...f, variant_id: e.target.value }))}
               required className={inputCls}>
+              <option value="">Select Variant…</option>
+              {product.variants.map(v => (
+                <option key={v.id} value={v.id}>
+                  {v.variant_name} — Stock: {parseInt(v.quantity_on_hand ?? v.total_stock ?? 0)}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Category selector — shown for category-attribute products */}
+        {stockMode === 'category' && (
+          <div>
+            <label className={labelCls}>Category / Attribute <span className="text-red-500">*</span></label>
+            <select value={form.category_id}
+              onChange={e => setForm(f => ({ ...f, category_id: e.target.value }))}
+              required className={inputCls}>
+              <option value="">Select Category…</option>
+              {leafCategories.map(a => (
+                <option key={a.category_id} value={a.category_id}>
+                  {a.category_name}{a.unit_of_measure ? ` (${a.unit_of_measure})` : ''} — Stock: {parseInt(a.stock_allocated ?? 0)}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {/* Branch — hidden in single-branch mode, not needed for category-only mode */}
+        {(stockMode !== 'category' || !singleBranchMode) && !singleBranchMode && (
+          <div>
+            <label className={labelCls}>
+              Branch {stockMode !== 'category' && <span className="text-red-500">*</span>}
+            </label>
+            <select name="branch_id" value={form.branch_id} onChange={e => setForm(f => ({ ...f, branch_id: e.target.value }))}
+              required={stockMode !== 'category'} className={inputCls}>
               <option value="">Select Branch…</option>
               {branches.map(b => (
                 <option key={b.id} value={b.id}>{b.branch_name}{b.main_branch ? ' (Main)' : ''}</option>
@@ -151,6 +253,25 @@ const StockModal = ({ product, mode, branches, onClose, onSuccess }) => {
             <p className="mt-1 text-xs text-theme-muted">Use a negative number to deduct stock.</p>
           )}
         </div>
+
+        {/* Stock Preview */}
+        {form.quantity_change && previewAfter !== null && (
+          <div className={`p-3 rounded-lg border ${previewAfter >= 0 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
+            <p className="text-xs text-theme-muted mb-1">Stock Preview</p>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="font-medium text-theme-secondary">{currentStockLabel}</span>
+              <span className="text-theme-muted">→</span>
+              <span className={`font-bold ${previewAfter >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
+                {previewAfter} units
+              </span>
+            </div>
+            {previewAfter < 0 && (
+              <p className="text-xs text-red-600 dark:text-red-400 mt-1 font-medium">
+                ⚠ This will result in negative stock
+              </p>
+            )}
+          </div>
+        )}
 
         <div>
           <label className={labelCls}>Notes / Reference</label>
