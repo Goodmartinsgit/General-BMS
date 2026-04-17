@@ -11,7 +11,7 @@ import PageHeader from '../components/common/PageHeader';
 import { useBranch } from '../context/BranchContext';
 import { useAuth } from '../context/AuthContext';
 
-const LOW_STOCK_THRESHOLD = 10;
+const DEFAULT_LOW_STOCK_THRESHOLD = 10;
 
 const InventoryPage = () => {
   const { singleBranchMode, branches, currentBranchId } = useBranch();
@@ -77,7 +77,7 @@ const InventoryPage = () => {
       item.product_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       item.product_code?.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesBranch = branchFilter ? String(item.branch_id) === branchFilter : true;
-    const isLow = item.quantity_on_hand <= LOW_STOCK_THRESHOLD;
+    const isLow = item.quantity_on_hand <= (item.reorder_level || DEFAULT_LOW_STOCK_THRESHOLD);
     const matchesStatus =
       statusFilter === 'all' ||
       (statusFilter === 'low' && isLow) ||
@@ -87,7 +87,7 @@ const InventoryPage = () => {
 
   // Stats
   const totalItems = inventory.length;
-  const lowStockItems = inventory.filter(i => i.quantity_on_hand <= LOW_STOCK_THRESHOLD).length;
+  const lowStockItems = inventory.filter(i => i.quantity_on_hand <= (i.reorder_level || DEFAULT_LOW_STOCK_THRESHOLD)).length;
   const totalUnits = inventory.reduce((s, i) => s + (i.quantity_on_hand || 0), 0);
 
   const stats = [
@@ -267,7 +267,7 @@ const InventoryPage = () => {
               </thead>
               <tbody className="divide-y divide-theme">
                 {filteredInventory.map(item => {
-                  const isLow = item.quantity_on_hand <= LOW_STOCK_THRESHOLD;
+                  const isLow = item.quantity_on_hand <= (item.reorder_level || DEFAULT_LOW_STOCK_THRESHOLD);
                   return (
                     <tr key={item.id} className="hover:bg-theme-tertiary/50 transition-colors">
                       <td className="px-4 sm:px-6 py-3 sm:py-4">
@@ -316,7 +316,7 @@ const InventoryPage = () => {
         // Grid view
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredInventory.map(item => {
-            const isLow = item.quantity_on_hand <= LOW_STOCK_THRESHOLD;
+            const isLow = item.quantity_on_hand <= (item.reorder_level || DEFAULT_LOW_STOCK_THRESHOLD);
             return (
               <div
                 key={item.id}

@@ -202,7 +202,11 @@ const getAllProducts = async (req, res) => {
     `;
 
     // total_stock always included so every view mode shows correct stock
-    const stockSubquery = `(SELECT COALESCE(SUM(quantity_on_hand), 0) FROM inventory WHERE product_id = p.id) as total_stock`;
+    const stockSubquery = `(
+      COALESCE((SELECT SUM(quantity_on_hand) FROM inventory WHERE product_id = p.id), 0) +
+      COALESCE((SELECT SUM(vi.quantity_on_hand) FROM variant_inventory vi JOIN product_variants pv ON vi.variant_id = pv.id WHERE pv.product_id = p.id), 0) +
+      COALESCE((SELECT SUM(pca.stock_allocated) FROM product_category_assignments pca WHERE pca.product_id = p.id AND pca.is_leaf = true), 0)
+    ) as total_stock`;
     const additionalFields = view_mode === 'detailed' ? `,
       b.brand_name,
       c.category_name,
@@ -293,13 +297,7 @@ const getAllProducts = async (req, res) => {
         p.images = imagesMap[p.id] || [];
         p.category_assignments = assignmentsMap[p.id] || [];
 
-        // Compute effective stock from leaf-level category assignments when inventory is 0
-        const invStock = parseInt(p.total_stock) || 0;
-        if (invStock === 0 && p.category_assignments.length > 0) {
-          p.total_stock = p.category_assignments
-            .filter(a => a.is_leaf)
-            .reduce((sum, a) => sum + (parseInt(a.stock_allocated) || 0), 0);
-        }
+        // total_stock is already computed in SQL as sum of inventory + variant + category assignment stock
 
         // Compute effective price from category assignment overrides
         if (p.category_assignments.length > 0) {
@@ -363,7 +361,12 @@ const getProductById = async (req, res) => {
         SELECT p.*,
           b.brand_name,
           c.category_name,
-          (SELECT COALESCE(SUM(quantity_on_hand), 0) FROM inventory WHERE product_id = p.id) as total_stock,
+          (
+            COALESCE((SELECT SUM(quantity_on_hand) FROM inventory WHERE product_id = p.id), 0) +
+            COALESCE((SELECT SUM(vi.quantity_on_hand) FROM variant_inventory vi JOIN product_variants pv ON vi.variant_id = pv.id WHERE pv.product_id = p.id), 0) +
+            COALESCE((SELECT SUM(pca.stock_allocated) FROM product_category_assignments pca WHERE pca.product_id = p.id AND pca.is_leaf = true), 0)
+          ) as total_stock,
+          COALESCE((SELECT SUM(quantity_on_hand) FROM inventory WHERE product_id = p.id), 0) as inventory_stock,
           (SELECT json_agg(json_build_object(
             'branch_id', i.branch_id,
             'branch_name', br.branch_name,
@@ -421,13 +424,9 @@ const getProductById = async (req, res) => {
     product.category_assignments = assignmentsResult.rows;
     product.variants = variantsResult.rows;
 
-    // Compute effective stock from leaf-level category assignments when inventory is 0
-    const invStock = parseInt(product.total_stock) || 0;
-    if (invStock === 0 && product.category_assignments.length > 0) {
-      product.total_stock = product.category_assignments
-        .filter(a => a.is_leaf)
-        .reduce((sum, a) => sum + (parseInt(a.stock_allocated) || 0), 0);
-    }
+    // total_stock is already computed in the SQL query as the sum of:
+    // inventory stock + variant inventory stock + category assignment stock
+    // No need for manual fallback logic here.
 
     // Compute effective price from category assignment overrides
     if (product.category_assignments.length > 0) {

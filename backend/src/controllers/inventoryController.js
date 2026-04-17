@@ -4,10 +4,11 @@ const getInventoryByBranch = async (req, res) => {
     try {
         const { branchId } = req.params;
         const result = await query(
-            `SELECT i.*, p.product_name, p.product_code, p.base_unit 
+            `SELECT i.*, p.product_name, p.product_code, p.base_unit,
+                    p.reorder_level, p.retail_price, p.cost_price
              FROM inventory i 
              JOIN products p ON i.product_id = p.id 
-             WHERE i.branch_id = $1 
+             WHERE i.branch_id = $1 AND p.deleted_at IS NULL
              ORDER BY p.product_name ASC`,
             [branchId]
         );
@@ -21,11 +22,12 @@ const getInventoryByBranch = async (req, res) => {
 const getAllInventory = async (req, res) => {
     try {
         const result = await query(
-            `SELECT i.*, p.product_name, p.product_code, b.branch_name 
+            `SELECT i.*, p.product_name, p.product_code, p.reorder_level,
+                    p.retail_price, p.cost_price, b.branch_name 
              FROM inventory i 
              JOIN products p ON i.product_id = p.id 
              JOIN branches b ON i.branch_id = b.id 
-             WHERE b.deleted_at IS NULL 
+             WHERE b.deleted_at IS NULL AND p.deleted_at IS NULL
              ORDER BY b.branch_name, p.product_name ASC`
         );
         res.json(result.rows);
@@ -51,7 +53,7 @@ const updateStock = async (req, res) => {
 
         let quantity_before = 0;
         if (currentResult.rows.length > 0) {
-            quantity_before = currentResult.rows[0].quantity_on_hand;
+            quantity_before = parseInt(currentResult.rows[0].quantity_on_hand) || 0;
         } else {
             // Initialize inventory if not exists
             await client.query(
