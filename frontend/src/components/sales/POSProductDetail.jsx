@@ -231,7 +231,7 @@ const POSProductDetail = ({ productId, onBack }) => {
         if (selectionLevels.length === 0) return [];
         const deepest = selectionLevels[selectionLevels.length - 1];
         return deepest.items.filter(
-            item => !allLeafIds.has(item.category_id) && (parseInt(item.stock_allocated) > 0 || item.price_override)
+            item => !allLeafIds.has(item.category_id) && parseInt(item.stock_allocated) > 0
         );
     }, [selectionLevels, allLeafIds]);
 
@@ -449,11 +449,12 @@ const POSProductDetail = ({ productId, onBack }) => {
                             <div className="flex flex-wrap gap-1.5">
                                 {variants.map(v => {
                                     const isActive = selectedVariant?.id === v.id;
-                                    const inStock = v.quantity_on_hand > 0 || v.is_active;
+                                    const varStock = parseInt(v.quantity_on_hand) || 0;
+                                    const inStock = varStock > 0;
                                     return (
                                         <button
                                             key={v.id}
-                                            onClick={() => { setSelectedVariant(v); setQuantity(1); }}
+                                            onClick={() => { if (inStock) { setSelectedVariant(v); setQuantity(1); } }}
                                             disabled={!inStock}
                                             className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-all ${
                                                 isActive
@@ -463,12 +464,10 @@ const POSProductDetail = ({ productId, onBack }) => {
                                                         : 'bg-theme-primary border-theme text-theme-muted opacity-50 cursor-not-allowed line-through'
                                             }`}
                                         >
-                                            {v.variant_name}
-                                            {v.selling_price && (
-                                                <span className="ml-1 opacity-75">
-                                                    {formatCurrency(v.selling_price)}
-                                                </span>
-                                            )}
+                                            <span>{v.variant_name}</span>
+                                            <span className={`block text-[10px] mt-0.5 ${isActive ? 'text-white/70' : inStock ? 'text-emerald-500' : 'text-rose-400'}`}>
+                                                {inStock ? `${varStock} in stock` : 'Out of stock'}
+                                            </span>
                                         </button>
                                     );
                                 })}
@@ -503,7 +502,7 @@ const POSProductDetail = ({ productId, onBack }) => {
                                             {visibleItems.map(item => {
                                                 const isSelected = currentSelected === item.category_id;
                                                 const stock = parseInt(item.stock_allocated) || 0;
-                                                const isOOS = stock <= 0 && !item.price_override;
+                                                const isOOS = stock <= 0;
                                                 const displayPrice = parseFloat(item.price_override) || parseFloat(product.retail_price) || 0;
 
                                                 return (
@@ -524,8 +523,11 @@ const POSProductDetail = ({ productId, onBack }) => {
                                                         )}
                                                         <div>
                                                             <span>{item.category_name}</span>
+                                                            <span className={`block text-[10px] mt-0.5 ${isSelected ? 'text-white/70' : isOOS ? 'text-rose-400' : 'text-emerald-500'}`}>
+                                                                {isOOS ? 'Out of stock' : `${stock} in stock`}
+                                                            </span>
                                                             {item.price_override && parseFloat(item.price_override) !== parseFloat(product.retail_price) && (
-                                                                <span className={`block text-[10px] mt-0.5 ${isSelected ? 'text-white/70' : 'text-theme-muted'}`}>
+                                                                <span className={`block text-[10px] ${isSelected ? 'text-white/70' : 'text-theme-muted'}`}>
                                                                     {formatCurrency(displayPrice)}
                                                                 </span>
                                                             )}
@@ -668,35 +670,48 @@ const POSProductDetail = ({ productId, onBack }) => {
                     )}
 
                     {/* Quantity selector (simple / variant products without category assignments) */}
-                    {!hasCategoryAssignments && (
-                        <div>
-                            <p className="text-xs font-medium text-theme-secondary mb-1.5">Quantity</p>
-                            <div className="inline-flex items-center bg-theme-secondary rounded-lg border border-theme">
-                                <button
-                                    onClick={() => setQuantity(q => Math.max(1, q - 1))}
-                                    className="p-2 text-theme-muted hover:text-theme-primary transition"
-                                >
-                                    <Minus className="w-4 h-4" />
-                                </button>
-                                <input
-                                    type="number"
-                                    min={1}
-                                    value={quantity || ''}
-                                    onChange={e => {
-                                        const v = e.target.value === '' ? '' : parseInt(e.target.value);
-                                        if (v === '' || (v >= 1 && !isNaN(v))) setQuantity(v || 1);
-                                    }}
-                                    className="w-10 text-center text-sm font-medium text-theme-primary bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                                />
-                                <button
-                                    onClick={() => setQuantity(q => q + 1)}
-                                    className="p-2 text-theme-muted hover:text-theme-primary transition"
-                                >
-                                    <Plus className="w-4 h-4" />
-                                </button>
+                    {!hasCategoryAssignments && (() => {
+                        const maxStock = parseInt(stockQty) || 0;
+                        const atMax = maxStock > 0 && quantity >= maxStock;
+                        return (
+                            <div>
+                                <div className="flex items-center justify-between mb-1.5">
+                                    <p className="text-xs font-medium text-theme-secondary">Quantity</p>
+                                    {maxStock > 0 && (
+                                        <span className={`text-[10px] font-medium ${atMax ? 'text-amber-500' : 'text-emerald-500'}`}>
+                                            {atMax ? 'Max stock reached' : `${maxStock} available`}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="inline-flex items-center bg-theme-secondary rounded-lg border border-theme">
+                                    <button
+                                        onClick={() => setQuantity(q => Math.max(1, q - 1))}
+                                        className="p-2 text-theme-muted hover:text-theme-primary transition"
+                                    >
+                                        <Minus className="w-4 h-4" />
+                                    </button>
+                                    <input
+                                        type="number"
+                                        min={1}
+                                        max={maxStock > 0 ? maxStock : undefined}
+                                        value={quantity || ''}
+                                        onChange={e => {
+                                            const v = e.target.value === '' ? '' : parseInt(e.target.value);
+                                            if (v === '' || (v >= 1 && !isNaN(v) && (maxStock <= 0 || v <= maxStock))) setQuantity(v || 1);
+                                        }}
+                                        className="w-10 text-center text-sm font-medium text-theme-primary bg-transparent outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                    />
+                                    <button
+                                        onClick={() => setQuantity(q => (maxStock > 0 && q >= maxStock) ? q : q + 1)}
+                                        disabled={atMax}
+                                        className={`p-2 transition ${atMax ? 'text-theme-muted opacity-30 cursor-not-allowed' : 'text-theme-muted hover:text-theme-primary'}`}
+                                    >
+                                        <Plus className="w-4 h-4" />
+                                    </button>
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        );
+                    })()}
 
                     {/* Description (collapsed) */}
                     {product.description && (

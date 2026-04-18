@@ -39,11 +39,24 @@ export const CartProvider = ({ children }) => {
         setCartItems(prev => {
             const matchItem = (item) => _matchItem(item, product.id, variant?.id, categoryId);
 
+            // Determine max stock for this specific item
+            let maxStock = 0;
+            if (categoryId) {
+                const catAssign = product.category_assignments?.find(a => a.category_id === categoryId);
+                maxStock = parseInt(catAssign?.stock_allocated) || 0;
+            } else if (variant) {
+                maxStock = parseInt(variant.quantity_on_hand) || 0;
+            } else {
+                maxStock = parseInt(product.total_stock ?? product.quantity_on_hand) || 0;
+            }
+
             const existingItem = prev.find(matchItem);
 
             if (existingItem) {
+                const newQty = existingItem.quantity + qty;
+                const safeQty = maxStock > 0 ? Math.min(newQty, maxStock) : newQty;
                 return prev.map(item =>
-                    matchItem(item) ? { ...item, quantity: item.quantity + qty } : item
+                    matchItem(item) ? { ...item, quantity: safeQty, maxStock } : item
                 );
             }
 
@@ -59,11 +72,12 @@ export const CartProvider = ({ children }) => {
                 variant,
                 categoryId: categoryId || null,
                 categoryName: categoryName || null,
-                quantity: qty,
+                quantity: maxStock > 0 ? Math.min(qty, maxStock) : qty,
                 price: sellingPrice,
                 originalPrice: sellingPrice,
                 costPrice: costPrice,
                 unitDiscount: 0,
+                maxStock,
             }];
         });
     };
@@ -81,7 +95,9 @@ export const CartProvider = ({ children }) => {
         }
         setCartItems(prev => prev.map(item => {
             if (_matchItem(item, productId, variantId, categoryId)) {
-                return { ...item, quantity };
+                const max = item.maxStock || 0;
+                const safeQty = max > 0 ? Math.min(quantity, max) : quantity;
+                return { ...item, quantity: safeQty };
             }
             return item;
         }));

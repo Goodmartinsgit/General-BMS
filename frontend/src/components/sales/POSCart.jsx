@@ -20,6 +20,8 @@ const POSCartItem = ({ item }) => {
     const isLoss = effectivePrice < costPrice;
     const isPriceModified = item.price !== item.originalPrice;
     const isBelowCost = item.price < costPrice;
+    const maxStock = item.maxStock || 0;
+    const atMaxStock = maxStock > 0 && item.quantity >= maxStock;
 
     return (
         <motion.div
@@ -66,6 +68,13 @@ const POSCartItem = ({ item }) => {
                             <span className="text-[9px] sm:text-[10px] font-medium text-amber-500">Modified</span>
                         </div>
                     )}
+                    {maxStock > 0 && (
+                        <div className="flex items-center gap-1 mt-0.5">
+                            <span className={`text-[9px] sm:text-[10px] font-medium ${atMaxStock ? 'text-amber-500' : 'text-emerald-500'}`}>
+                                {atMaxStock ? `At limit (${maxStock})` : `Stock: ${maxStock}`}
+                            </span>
+                        </div>
+                    )}
                 </div>
 
                 {/* Right side: total + qty + expand toggle */}
@@ -91,6 +100,7 @@ const POSCartItem = ({ item }) => {
                         <input
                             type="number"
                             min={1}
+                            max={maxStock > 0 ? maxStock : undefined}
                             value={item.quantity || ''}
                             onChange={e => {
                                 const v = parseInt(e.target.value);
@@ -104,7 +114,8 @@ const POSCartItem = ({ item }) => {
                         />
                         <button
                             onClick={() => updateQuantity(productId, variantId, item.quantity + 1, categoryId)}
-                            className="p-0.5 sm:p-1 hover:bg-theme-primary hover:text-accent-gold rounded transition text-theme-muted"
+                            disabled={atMaxStock}
+                            className={`p-0.5 sm:p-1 rounded transition ${atMaxStock ? 'text-theme-muted opacity-30 cursor-not-allowed' : 'hover:bg-theme-primary hover:text-accent-gold text-theme-muted'}`}
                         >
                             <Plus className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                         </button>
