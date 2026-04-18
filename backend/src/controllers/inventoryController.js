@@ -202,6 +202,200 @@ const updateStock = async (req, res) => {
     }
 };
 
+/**
+ * Batch stock update — distributes a total quantity across multiple variants or categories
+ * in a single atomic transaction.
+ *
+ * Body: {
+ *   product_id, branch_id (optional for category mode),
+ *   movement_type, notes,
+ *   allocations: [{ variant_id?, category_id?, quantity_change }]
+ * }
+ */
+const updateStockBatch = async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const { product_id, branch_id, movement_type, notes, allocations } = req.body;
+        const performed_by = req.user.id;
+
+        if (!product_id || !Array.isArray(allocations) || allocations.length === 0) {
+            return res.status(400).json({ message: 'product_id and allocations array are required' });
+        }
+
+        // Filter out zero-quantity allocations
+        const nonZero = allocations.filter(a => parseInt(a.quantity_change) !== 0);
+        if (nonZero.length === 0) {
+            return res.status(400).json({ message: 'At least one allocation must have a non-zero quantity' });
+        }
+
+        await client.query('BEGIN');
+
+        const results = [];
+
+        for (const alloc of nonZero) {
+            const qtyChange = parseInt(alloc.quantity_change);
+            const variantId = alloc.variant_id || null;
+            const categoryId = alloc.category_id || null;
+            let quantity_before = 0;
+            let quantity_after = 0;
+            let variant_name_resolved = null;
+
+            // ── Variant stock ──
+            if (variantId) {
+                if (!branch_id) {
+                    await client.query('ROLLBACK');
+                    return res.status(400).json({ message: 'branch_id is required for variant stock updates' });
+                }
+
+                // Get variant name
+                const variantRes = await client.query(
+                    'SELECT variant_name FROM product_variants WHERE id = $1', [variantId]
+                );
+                variant_name_resolved = variantRes.rows[0]?.variant_name || null;
+
+                // Ensure row exists
+                await client.query(
+                    `INSERT INTO variant_inventory (variant_id, branch_id, quantity_on_hand)
+                     VALUES ($1, $2, 0) ON CONFLICT (variant_id, branch_id) DO NOTHING`,
+                    [variantId, branch_id]
+                );
+
+                const cur = await client.query(
+                    'SELECT quantity_on_hand FROM variant_inventory WHERE variant_id = $1 AND branch_id = $2 FOR UPDATE',
+                    [variantId, branch_id]
+                );
+                quantity_before = parseInt(cur.rows[0]?.quantity_on_hand) || 0;
+                quantity_after = quantity_before + qtyChange;
+
+                if (quantity_after < 0) {
+                    await client.query('ROLLBACK');
+                    return res.status(400).json({
+                        message: `Adjustment for variant "${variant_name_resolved}" would result in negative stock (${quantity_before} + ${qtyChange} = ${quantity_after})`
+                    });
+                }
+
+                await client.query(
+                    'UPDATE variant_inventory SET quantity_on_hand = $1, updated_at = NOW() WHERE variant_id = $2 AND branch_id = $3',
+                    [quantity_after, variantId, branch_id]
+                );
+
+            // ── Category stock ──
+            } else if (categoryId) {
+                const cur = await client.query(
+                    'SELECT stock_allocated FROM product_category_assignments WHERE product_id = $1 AND category_id = $2 FOR UPDATE',
+                    [product_id, categoryId]
+                );
+                if (cur.rows.length === 0) {
+                    await client.query('ROLLBACK');
+                    return res.status(404).json({ message: `Product-category assignment not found for category ${categoryId}` });
+                }
+
+                quantity_before = parseInt(cur.rows[0].stock_allocated) || 0;
+                quantity_after = quantity_before + qtyChange;
+
+                if (quantity_after < 0) {
+                    // Get category name for error message
+                    const catName = await client.query('SELECT category_name FROM categories WHERE id = $1', [categoryId]);
+                    await client.query('ROLLBACK');
+                    return res.status(400).json({
+                        message: `Adjustment for "${catName.rows[0]?.category_name || categoryId}" would result in negative stock (${quantity_before} + ${qtyChange} = ${quantity_after})`
+                    });
+                }
+
+                await client.query(
+                    'UPDATE product_category_assignments SET stock_allocated = $1, updated_at = NOW() WHERE product_id = $2 AND category_id = $3',
+                    [quantity_after, product_id, categoryId]
+                );
+
+            // ── Simple inventory ──
+            } else {
+                if (!branch_id) {
+                    await client.query('ROLLBACK');
+                    return res.status(400).json({ message: 'branch_id is required for inventory stock updates' });
+                }
+
+                const cur = await client.query(
+                    'SELECT quantity_on_hand FROM inventory WHERE product_id = $1 AND branch_id = $2 FOR UPDATE',
+                    [product_id, branch_id]
+                );
+
+                if (cur.rows.length > 0) {
+                    quantity_before = parseInt(cur.rows[0].quantity_on_hand) || 0;
+                } else {
+                    await client.query(
+                        'INSERT INTO inventory (product_id, branch_id, quantity_on_hand) VALUES ($1, $2, 0)',
+                        [product_id, branch_id]
+                    );
+                }
+
+                quantity_after = quantity_before + qtyChange;
+
+                if (quantity_after < 0) {
+                    await client.query('ROLLBACK');
+                    return res.status(400).json({ message: 'Adjustment would result in negative stock' });
+                }
+
+                await client.query(
+                    'UPDATE inventory SET quantity_on_hand = $1, updated_at = NOW() WHERE product_id = $2 AND branch_id = $3',
+                    [quantity_after, product_id, branch_id]
+                );
+            }
+
+            results.push({ variant_id: variantId, category_id: categoryId, quantity_before, quantity_after });
+        }
+
+        // ── Compute combined total stock ──
+        const totalRes = await client.query(
+            `SELECT
+                COALESCE((SELECT SUM(quantity_on_hand) FROM inventory WHERE product_id = $1), 0) +
+                COALESCE((SELECT SUM(vi.quantity_on_hand) FROM variant_inventory vi JOIN product_variants pv ON vi.variant_id = pv.id WHERE pv.product_id = $1), 0) +
+                COALESCE((SELECT SUM(pca.stock_allocated) FROM product_category_assignments pca WHERE pca.product_id = $1 AND pca.is_leaf = true), 0)
+             AS total`,
+            [product_id]
+        );
+        const totalStockAfter = parseInt(totalRes.rows[0].total) || 0;
+
+        // ── Record one stock_movements per allocation ──
+        for (let i = 0; i < nonZero.length; i++) {
+            const alloc = nonZero[i];
+            const r = results[i];
+            const qtyChange = parseInt(alloc.quantity_change);
+            let variant_name_resolved = null;
+            if (alloc.variant_id) {
+                const vn = await client.query('SELECT variant_name FROM product_variants WHERE id = $1', [alloc.variant_id]);
+                variant_name_resolved = vn.rows[0]?.variant_name || null;
+            }
+
+            await client.query(
+                `INSERT INTO stock_movements (
+                    product_id, branch_id, movement_type, quantity,
+                    quantity_before, quantity_after, notes, performed_by,
+                    variant_id, variant_name, category_id, total_stock_after
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)`,
+                [
+                    product_id, branch_id || null, movement_type, qtyChange,
+                    r.quantity_before, r.quantity_after, notes, performed_by,
+                    alloc.variant_id || null, variant_name_resolved,
+                    alloc.category_id || null, totalStockAfter
+                ]
+            );
+        }
+
+        await client.query('COMMIT');
+        res.json({
+            message: 'Stock updated successfully',
+            allocations: results,
+            total_stock_after: totalStockAfter
+        });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error('Error in updateStockBatch:', err);
+        res.status(500).json({ message: 'Server error' });
+    } finally {
+        client.release();
+    }
+};
+
 const getStockMovements = async (req, res) => {
     try {
         const { productId, branchId } = req.query;
@@ -232,4 +426,4 @@ const getStockMovements = async (req, res) => {
     }
 };
 
-module.exports = { getInventoryByBranch, getAllInventory, updateStock, getStockMovements };
+module.exports = { getInventoryByBranch, getAllInventory, updateStock, updateStockBatch, getStockMovements };

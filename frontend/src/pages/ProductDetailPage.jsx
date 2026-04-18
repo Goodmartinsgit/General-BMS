@@ -62,89 +62,123 @@ const labelCls = 'block text-sm font-medium text-theme-secondary mb-1';
 
 const StockModal = ({ product, mode, branches, onClose, onSuccess }) => {
   const { singleBranchMode, currentBranchId } = useBranch();
-  const [form, setForm] = useState({
-    branch_id: '', quantity_change: '', notes: '',
-    variant_id: '', category_id: '',
-  });
+  const [branchId, setBranchId] = useState('');
+  const [totalQty, setTotalQty] = useState('');
+  const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
 
   // Determine product stock mode
   const hasVariants = product.has_variants && product.variants?.length > 0;
-  const leafCategories = (product.category_assignments || []).filter(a => a.is_leaf);
+  const leafCategories = useMemo(
+    () => (product.category_assignments || []).filter(a => a.is_leaf),
+    [product.category_assignments]
+  );
   const hasCategoryStock = !hasVariants && leafCategories.length > 0;
   const stockMode = hasVariants ? 'variant' : hasCategoryStock ? 'category' : 'simple';
 
+  // Distribution state: { [id]: quantity_string }
+  const [allocations, setAllocations] = useState(() => {
+    if (stockMode === 'variant') {
+      return Object.fromEntries(product.variants.map(v => [v.id, '']));
+    }
+    if (stockMode === 'category') {
+      return Object.fromEntries(leafCategories.map(c => [c.category_id, '']));
+    }
+    return {};
+  });
+
+  const updateAlloc = (id, val) => setAllocations(a => ({ ...a, [id]: val }));
+
   // Pre-fill branch in single-branch mode
   useEffect(() => {
-    if (singleBranchMode && currentBranchId) {
-      setForm(f => ({ ...f, branch_id: String(currentBranchId) }));
-    }
+    if (singleBranchMode && currentBranchId) setBranchId(String(currentBranchId));
   }, [singleBranchMode, currentBranchId]);
 
   const isAdd = mode === 'add';
   const title = isAdd ? 'Add Stock' : 'Adjust Stock';
   const movementType = isAdd ? 'receipt' : 'adjustment';
+  const totalEntered = parseFloat(totalQty) || 0;
 
-  // Compute preview values
-  const qtyChange = parseFloat(form.quantity_change) || 0;
-  let currentStockLabel = '';
-  let previewAfter = null;
+  // Sum of distributed quantities
+  const allocatedSum = useMemo(() => {
+    return Object.values(allocations).reduce((s, v) => s + (parseFloat(v) || 0), 0);
+  }, [allocations]);
 
-  if (stockMode === 'variant' && form.variant_id) {
-    const selectedVariant = product.variants.find(v => String(v.id) === form.variant_id);
-    const currentQty = parseInt(selectedVariant?.quantity_on_hand ?? selectedVariant?.total_stock ?? 0);
-    currentStockLabel = `${selectedVariant?.variant_name}: ${currentQty} units`;
-    previewAfter = currentQty + qtyChange;
-  } else if (stockMode === 'category' && form.category_id) {
-    const selectedCat = leafCategories.find(c => String(c.category_id) === form.category_id);
-    const currentQty = parseInt(selectedCat?.stock_allocated ?? 0);
-    currentStockLabel = `${selectedCat?.category_name}: ${currentQty} units`;
-    previewAfter = currentQty + qtyChange;
-  } else if (stockMode === 'simple') {
-    const currentQty = parseInt(product.total_stock ?? product.inventory_stock ?? 0);
-    currentStockLabel = `Total: ${currentQty} units`;
-    previewAfter = currentQty + qtyChange;
-  }
+  const isDistributed = stockMode !== 'simple';
+  const isBalanced = isDistributed ? allocatedSum === totalEntered && totalEntered !== 0 : true;
+  const remaining = totalEntered - allocatedSum;
+
+  // Check if any allocation would cause negative stock
+  const negativeWarnings = useMemo(() => {
+    if (stockMode === 'simple') return [];
+    const warnings = [];
+    const items = stockMode === 'variant' ? product.variants : leafCategories;
+    for (const item of items) {
+      const id = stockMode === 'variant' ? item.id : item.category_id;
+      const allocated = parseFloat(allocations[id]) || 0;
+      if (allocated === 0) continue;
+      const currentStock = stockMode === 'variant'
+        ? parseInt(item.quantity_on_hand ?? item.total_stock ?? 0)
+        : parseInt(item.stock_allocated ?? 0);
+      const afterStock = currentStock + allocated;
+      if (afterStock < 0) {
+        const name = stockMode === 'variant' ? item.variant_name : item.category_name;
+        warnings.push(`${name}: ${currentStock} + (${allocated}) = ${afterStock}`);
+      }
+    }
+    return warnings;
+  }, [allocations, stockMode, product.variants, leafCategories]);
+
+  const canSubmit = isDistributed
+    ? isBalanced && negativeWarnings.length === 0
+    : totalEntered !== 0;
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const branchId = form.branch_id || currentBranchId;
+    const resolvedBranch = branchId || currentBranchId;
 
-    // Validate based on mode
-    if (stockMode === 'variant') {
-      if (!form.variant_id) return toast.error('Please select a variant');
-      if (!branchId) return toast.error('Please select a branch');
-    } else if (stockMode === 'category') {
-      if (!form.category_id) return toast.error('Please select a category');
-    } else {
-      if (!branchId) return toast.error('Please select a branch');
+    // Validation
+    if (isDistributed && !isBalanced) {
+      return toast.error('Distribution must exactly match the total quantity');
     }
+    if (isAdd && totalEntered <= 0) return toast.error('Total quantity must be positive');
+    if (!totalEntered || isNaN(totalEntered)) return toast.error('Enter a valid total quantity');
 
-    const qty = parseFloat(form.quantity_change);
-    if (!form.quantity_change || isNaN(qty)) return toast.error('Enter a valid quantity');
-    if (isAdd && qty <= 0) return toast.error('Quantity must be positive for stock addition');
+    if (stockMode !== 'category' && !resolvedBranch) {
+      return toast.error('Please select a branch');
+    }
 
     setSaving(true);
     try {
-      const payload = {
-        product_id: product.id,
-        quantity_change: qty,
-        movement_type: movementType,
-        notes: form.notes,
-      };
+      if (isDistributed) {
+        // Build allocations array for batch endpoint
+        const allocArray = Object.entries(allocations)
+          .filter(([, val]) => parseFloat(val) !== 0 && val !== '')
+          .map(([id, val]) => {
+            const obj = { quantity_change: parseFloat(val) };
+            if (stockMode === 'variant') obj.variant_id = parseInt(id);
+            else obj.category_id = parseInt(id);
+            return obj;
+          });
 
-      if (stockMode === 'variant') {
-        payload.variant_id = parseInt(form.variant_id);
-        payload.branch_id = branchId;
-      } else if (stockMode === 'category') {
-        payload.category_id = parseInt(form.category_id);
-        // category stock is global (not branch-specific), but include branch if available
-        if (branchId) payload.branch_id = branchId;
+        await api.post('/inventory/update-batch', {
+          product_id: product.id,
+          branch_id: resolvedBranch || undefined,
+          movement_type: movementType,
+          notes,
+          allocations: allocArray,
+        });
       } else {
-        payload.branch_id = branchId;
+        // Simple product — single update
+        await api.post('/inventory/update', {
+          product_id: product.id,
+          branch_id: resolvedBranch,
+          quantity_change: totalEntered,
+          movement_type: movementType,
+          notes,
+        });
       }
 
-      await api.post('/inventory/update', payload);
       toast.success(`Stock ${isAdd ? 'added' : 'adjusted'} successfully`);
       onSuccess();
       onClose();
@@ -155,25 +189,54 @@ const StockModal = ({ product, mode, branches, onClose, onSuccess }) => {
     }
   };
 
+  // Build distribution items
+  const distItems = useMemo(() => {
+    if (stockMode === 'variant') {
+      return product.variants.map(v => ({
+        id: v.id,
+        name: v.variant_name,
+        currentStock: parseInt(v.quantity_on_hand ?? v.total_stock ?? 0),
+        sku: v.sku,
+      }));
+    }
+    if (stockMode === 'category') {
+      return leafCategories.map(c => ({
+        id: c.category_id,
+        name: c.category_name + (c.unit_of_measure ? ` (${c.unit_of_measure})` : ''),
+        currentStock: parseInt(c.stock_allocated ?? 0),
+      }));
+    }
+    return [];
+  }, [stockMode, product.variants, leafCategories]);
+
   return (
     <Modal
       isOpen
       onClose={onClose}
       title={title}
       subtitle={`${product.product_name} (${product.product_code})`}
-      size="md"
+      size={isDistributed ? 'lg' : 'md'}
       footer={
-        <div className="flex items-center gap-3">
-          <button type="button" onClick={onClose} disabled={saving}
-            className="px-4 py-2 text-sm font-medium text-theme-secondary bg-theme-primary hover:bg-theme-tertiary border border-theme rounded-lg transition-colors">
-            Cancel
-          </button>
-          <button type="submit" form="stock-modal-form" disabled={saving}
-            className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-accent-gold rounded-lg hover:bg-accent-goldDark transition-colors disabled:opacity-50">
-            {saving && <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
-            {isAdd ? <PlusCircle className="w-4 h-4" /> : <SlidersHorizontal className="w-4 h-4" />}
-            {title}
-          </button>
+        <div className="flex items-center justify-between w-full">
+          {/* Balance indicator in footer */}
+          {isDistributed && totalEntered > 0 && (
+            <div className={`text-xs font-medium ${isBalanced ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'}`}>
+              {isBalanced ? '✓ Balanced' : `${remaining > 0 ? remaining + ' remaining' : Math.abs(remaining) + ' over-allocated'}`}
+            </div>
+          )}
+          {!isDistributed && <div />}
+          <div className="flex items-center gap-3">
+            <button type="button" onClick={onClose} disabled={saving}
+              className="px-4 py-2 text-sm font-medium text-theme-secondary bg-theme-primary hover:bg-theme-tertiary border border-theme rounded-lg transition-colors">
+              Cancel
+            </button>
+            <button type="submit" form="stock-modal-form" disabled={saving || !canSubmit}
+              className="flex items-center gap-2 px-5 py-2 text-sm font-semibold text-white bg-accent-gold rounded-lg hover:bg-accent-goldDark transition-colors disabled:opacity-50">
+              {saving && <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />}
+              {isAdd ? <PlusCircle className="w-4 h-4" /> : <SlidersHorizontal className="w-4 h-4" />}
+              {title}
+            </button>
+          </div>
         </div>
       }
     >
@@ -185,54 +248,18 @@ const StockModal = ({ product, mode, branches, onClose, onSuccess }) => {
             stockMode === 'variant' ? 'bg-purple-500' : stockMode === 'category' ? 'bg-blue-500' : 'bg-green-500'
           }`} />
           <span className="text-xs font-medium text-theme-secondary">
-            {stockMode === 'variant' ? 'Variant-level stock' :
-             stockMode === 'category' ? 'Category-attribute stock' :
+            {stockMode === 'variant' ? `Variant-level stock · ${product.variants.length} variants` :
+             stockMode === 'category' ? `Category-attribute stock · ${leafCategories.length} categories` :
              'Branch inventory stock'}
           </span>
         </div>
 
-        {/* Variant selector — shown for variant products */}
-        {stockMode === 'variant' && (
+        {/* Branch — for variant and simple modes (not category), hidden in single-branch */}
+        {stockMode !== 'category' && !singleBranchMode && (
           <div>
-            <label className={labelCls}>Variant <span className="text-red-500">*</span></label>
-            <select value={form.variant_id}
-              onChange={e => setForm(f => ({ ...f, variant_id: e.target.value }))}
+            <label className={labelCls}>Branch <span className="text-red-500">*</span></label>
+            <select value={branchId} onChange={e => setBranchId(e.target.value)}
               required className={inputCls}>
-              <option value="">Select Variant…</option>
-              {product.variants.map(v => (
-                <option key={v.id} value={v.id}>
-                  {v.variant_name} — Stock: {parseInt(v.quantity_on_hand ?? v.total_stock ?? 0)}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {/* Category selector — shown for category-attribute products */}
-        {stockMode === 'category' && (
-          <div>
-            <label className={labelCls}>Category / Attribute <span className="text-red-500">*</span></label>
-            <select value={form.category_id}
-              onChange={e => setForm(f => ({ ...f, category_id: e.target.value }))}
-              required className={inputCls}>
-              <option value="">Select Category…</option>
-              {leafCategories.map(a => (
-                <option key={a.category_id} value={a.category_id}>
-                  {a.category_name}{a.unit_of_measure ? ` (${a.unit_of_measure})` : ''} — Stock: {parseInt(a.stock_allocated ?? 0)}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {/* Branch — hidden in single-branch mode, not needed for category-only mode */}
-        {(stockMode !== 'category' || !singleBranchMode) && !singleBranchMode && (
-          <div>
-            <label className={labelCls}>
-              Branch {stockMode !== 'category' && <span className="text-red-500">*</span>}
-            </label>
-            <select name="branch_id" value={form.branch_id} onChange={e => setForm(f => ({ ...f, branch_id: e.target.value }))}
-              required={stockMode !== 'category'} className={inputCls}>
               <option value="">Select Branch…</option>
               {branches.map(b => (
                 <option key={b.id} value={b.id}>{b.branch_name}{b.main_branch ? ' (Main)' : ''}</option>
@@ -241,42 +268,157 @@ const StockModal = ({ product, mode, branches, onClose, onSuccess }) => {
           </div>
         )}
 
+        {/* Total Quantity */}
         <div>
           <label className={labelCls}>
-            {isAdd ? 'Quantity to Add' : 'Quantity Change'} <span className="text-red-500">*</span>
+            {isAdd ? 'Total Quantity to Add' : 'Total Quantity Change'} <span className="text-red-500">*</span>
           </label>
-          <input type="number" value={form.quantity_change}
-            onChange={e => setForm(f => ({ ...f, quantity_change: e.target.value }))}
-            placeholder={isAdd ? 'e.g. 50' : 'e.g. 10 or -10'}
+          <input type="number" value={totalQty}
+            onChange={e => setTotalQty(e.target.value)}
+            placeholder={isAdd ? 'e.g. 100' : 'e.g. 50 or -20'}
             required className={inputCls} />
-          {!isAdd && (
+          {!isAdd && stockMode === 'simple' && (
             <p className="mt-1 text-xs text-theme-muted">Use a negative number to deduct stock.</p>
+          )}
+          {isDistributed && totalEntered > 0 && (
+            <p className="mt-1 text-xs text-theme-muted">
+              Distribute this total across the {stockMode === 'variant' ? 'variants' : 'categories'} below.
+            </p>
           )}
         </div>
 
-        {/* Stock Preview */}
-        {form.quantity_change && previewAfter !== null && (
-          <div className={`p-3 rounded-lg border ${previewAfter >= 0 ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'}`}>
-            <p className="text-xs text-theme-muted mb-1">Stock Preview</p>
-            <div className="flex items-center gap-2 text-sm">
-              <span className="font-medium text-theme-secondary">{currentStockLabel}</span>
-              <span className="text-theme-muted">→</span>
-              <span className={`font-bold ${previewAfter >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                {previewAfter} units
+        {/* ── Distribution Table ── */}
+        {isDistributed && totalEntered !== 0 && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className={labelCls + ' mb-0'}>
+                Distribution <span className="text-red-500">*</span>
+              </label>
+              {/* Balance badge */}
+              <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${
+                isBalanced
+                  ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
+                  : remaining > 0
+                    ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300'
+                    : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
+              }`}>
+                {isBalanced ? '✓ Balanced' :
+                 remaining > 0 ? `${remaining} unallocated` :
+                 `${Math.abs(remaining)} over-allocated`}
               </span>
             </div>
-            {previewAfter < 0 && (
-              <p className="text-xs text-red-600 dark:text-red-400 mt-1 font-medium">
-                ⚠ This will result in negative stock
-              </p>
+
+            <div className="border border-theme rounded-lg overflow-hidden">
+              {/* Header */}
+              <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-theme-tertiary text-xs font-medium text-theme-muted uppercase tracking-wide">
+                <div className="col-span-5">{stockMode === 'variant' ? 'Variant' : 'Category'}</div>
+                <div className="col-span-2 text-center">Current</div>
+                <div className="col-span-3 text-center">{isAdd ? 'Add' : 'Change'}</div>
+                <div className="col-span-2 text-center">After</div>
+              </div>
+
+              {/* Rows */}
+              <div className="divide-y divide-theme max-h-[280px] overflow-y-auto">
+                {distItems.map(item => {
+                  const val = parseFloat(allocations[item.id]) || 0;
+                  const afterStock = item.currentStock + val;
+                  const isNeg = afterStock < 0;
+                  return (
+                    <div key={item.id} className="grid grid-cols-12 gap-2 px-3 py-2.5 items-center hover:bg-theme-tertiary/50 transition-colors">
+                      <div className="col-span-5">
+                        <p className="text-sm font-medium text-theme-primary truncate">{item.name}</p>
+                        {item.sku && <p className="text-xs text-theme-muted">{item.sku}</p>}
+                      </div>
+                      <div className="col-span-2 text-center">
+                        <span className="text-sm font-medium text-theme-secondary">{item.currentStock}</span>
+                      </div>
+                      <div className="col-span-3">
+                        <input
+                          type="number"
+                          value={allocations[item.id]}
+                          onChange={e => updateAlloc(item.id, e.target.value)}
+                          placeholder="0"
+                          min={isAdd ? '0' : undefined}
+                          className={`w-full px-2 py-1.5 text-sm text-center rounded-md border transition-all
+                            ${isNeg
+                              ? 'border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300'
+                              : 'border-theme bg-theme-primary text-theme-primary'
+                            }
+                            focus:outline-none focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30`}
+                        />
+                      </div>
+                      <div className="col-span-2 text-center">
+                        <span className={`text-sm font-bold ${
+                          val === 0 ? 'text-theme-muted' :
+                          isNeg ? 'text-red-600 dark:text-red-400' :
+                          'text-green-600 dark:text-green-400'
+                        }`}>
+                          {val === 0 ? '—' : afterStock}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Summary row */}
+              <div className="grid grid-cols-12 gap-2 px-3 py-2 bg-theme-tertiary border-t border-theme">
+                <div className="col-span-5 text-xs font-semibold text-theme-secondary">TOTAL</div>
+                <div className="col-span-2 text-center text-xs font-semibold text-theme-secondary">
+                  {distItems.reduce((s, i) => s + i.currentStock, 0)}
+                </div>
+                <div className={`col-span-3 text-center text-xs font-bold ${
+                  isBalanced ? 'text-green-600 dark:text-green-400' : 'text-amber-600 dark:text-amber-400'
+                }`}>
+                  {allocatedSum} / {totalEntered}
+                </div>
+                <div className="col-span-2 text-center text-xs font-bold text-theme-secondary">
+                  {distItems.reduce((s, i) => s + i.currentStock, 0) + allocatedSum}
+                </div>
+              </div>
+            </div>
+
+            {/* Negative stock warnings */}
+            {negativeWarnings.length > 0 && (
+              <div className="p-2.5 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                <p className="text-xs font-semibold text-red-700 dark:text-red-300 mb-1">⚠ Negative stock warning:</p>
+                {negativeWarnings.map((w, i) => (
+                  <p key={i} className="text-xs text-red-600 dark:text-red-400">{w}</p>
+                ))}
+              </div>
             )}
           </div>
         )}
 
+        {/* Simple mode preview */}
+        {stockMode === 'simple' && totalEntered !== 0 && (
+          <div className={`p-3 rounded-lg border ${
+            (parseInt(product.total_stock ?? 0) + totalEntered) >= 0
+              ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+              : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
+          }`}>
+            <p className="text-xs text-theme-muted mb-1">Stock Preview</p>
+            <div className="flex items-center gap-2 text-sm">
+              <span className="font-medium text-theme-secondary">
+                Current: {parseInt(product.total_stock ?? 0)} units
+              </span>
+              <span className="text-theme-muted">→</span>
+              <span className={`font-bold ${
+                (parseInt(product.total_stock ?? 0) + totalEntered) >= 0
+                  ? 'text-green-600 dark:text-green-400'
+                  : 'text-red-600 dark:text-red-400'
+              }`}>
+                {parseInt(product.total_stock ?? 0) + totalEntered} units
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Notes */}
         <div>
           <label className={labelCls}>Notes / Reference</label>
-          <textarea name="notes" value={form.notes}
-            onChange={e => setForm(f => ({ ...f, notes: e.target.value }))}
+          <textarea value={notes}
+            onChange={e => setNotes(e.target.value)}
             rows={2} placeholder="Invoice number, reason for adjustment…"
             className={`${inputCls} resize-none`} />
         </div>
