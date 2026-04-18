@@ -44,6 +44,13 @@ const POSCheckout = ({ onSaleComplete }) => {
     const grossProfit = total - totalCost;
     const hasAnyCost = cartItems.some(item => item.costPrice > 0);
 
+    // Check for out-of-stock items in cart
+    const oosItems = cartItems.filter(item => {
+        const max = item.maxStock || 0;
+        return max <= 0 || item.quantity > max;
+    });
+    const hasOutOfStock = oosItems.length > 0;
+
     const handleCompleteSale = async () => {
         if (cartItems.length === 0) {
             toast.error('Cart is empty');
@@ -197,8 +204,27 @@ const POSCheckout = ({ onSaleComplete }) => {
                     )}
                 </div>
 
+                {/* Out of stock warning */}
+                {hasOutOfStock && (
+                    <div className="mb-2 sm:mb-3 p-2 sm:p-2.5 bg-rose-500/10 border border-rose-500/30 rounded-lg">
+                        <div className="flex items-center gap-1.5 mb-1">
+                            <AlertCircle className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+                            <span className="text-[10px] sm:text-xs font-semibold text-rose-500">Cannot complete sale</span>
+                        </div>
+                        <div className="space-y-0.5">
+                            {oosItems.map((item, i) => (
+                                <p key={i} className="text-[9px] sm:text-[10px] text-rose-400 pl-5">
+                                    {item.product.product_name}
+                                    {item.categoryName ? ` — ${item.categoryName}` : item.variant ? ` — ${item.variant.variant_name}` : ''}
+                                    {(item.maxStock || 0) <= 0 ? ' (out of stock)' : ` (only ${item.maxStock} available, ${item.quantity} in cart)`}
+                                </p>
+                            ))}
+                        </div>
+                    </div>
+                )}
+
                 <button
-                    disabled={processing || cartItems.length === 0}
+                    disabled={processing || cartItems.length === 0 || hasOutOfStock}
                     onClick={handleCompleteSale}
                     className="w-full py-2 sm:py-2.5 md:py-3 bg-accent-gold hover:bg-accent-goldDark disabled:bg-theme-tertiary disabled:text-theme-muted text-white rounded-lg font-semibold transition-all flex items-center justify-center gap-1.5 sm:gap-2 text-xs sm:text-sm"
                 >
@@ -206,6 +232,11 @@ const POSCheckout = ({ onSaleComplete }) => {
                         <>
                             <RefreshCw className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin" />
                             Processing...
+                        </>
+                    ) : hasOutOfStock ? (
+                        <>
+                            <AlertCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+                            Stock Issue — Review Cart
                         </>
                     ) : (
                         <>

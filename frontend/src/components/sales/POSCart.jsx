@@ -22,6 +22,7 @@ const POSCartItem = ({ item }) => {
     const isBelowCost = item.price < costPrice;
     const maxStock = item.maxStock || 0;
     const atMaxStock = maxStock > 0 && item.quantity >= maxStock;
+    const isOutOfStock = maxStock <= 0 || item.quantity > maxStock;
 
     return (
         <motion.div
@@ -30,12 +31,14 @@ const POSCartItem = ({ item }) => {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20, scale: 0.95 }}
             layout
-            className={`group bg-theme-primary rounded-lg border transition-all relative ${
-                isBelowCost
-                    ? 'border-rose-500/40 bg-rose-500/5'
-                    : isPriceModified
-                        ? 'border-amber-500/40 bg-amber-500/5'
-                        : 'border-theme hover:border-accent-gold/20'
+            className={`group bg-theme-primary rounded-lg border-2 transition-all relative ${
+                isOutOfStock
+                    ? 'border-rose-500 bg-rose-500/10 ring-1 ring-rose-500/20'
+                    : isBelowCost
+                        ? 'border-rose-500/40 bg-rose-500/5'
+                        : isPriceModified
+                            ? 'border-amber-500/40 bg-amber-500/5'
+                            : 'border-theme hover:border-accent-gold/20'
             }`}
         >
             {/* Main row — tap anywhere to expand/collapse */}
@@ -68,7 +71,14 @@ const POSCartItem = ({ item }) => {
                             <span className="text-[9px] sm:text-[10px] font-medium text-amber-500">Modified</span>
                         </div>
                     )}
-                    {maxStock > 0 && (
+                    {isOutOfStock ? (
+                        <div className="flex items-center gap-1 mt-0.5">
+                            <AlertTriangle className="w-2.5 h-2.5 text-rose-500" />
+                            <span className="text-[9px] sm:text-[10px] font-bold text-rose-500 uppercase">
+                                {maxStock <= 0 ? 'Out of stock' : `Exceeds stock (${maxStock} available)`}
+                            </span>
+                        </div>
+                    ) : maxStock > 0 && (
                         <div className="flex items-center gap-1 mt-0.5">
                             <span className={`text-[9px] sm:text-[10px] font-medium ${atMaxStock ? 'text-amber-500' : 'text-emerald-500'}`}>
                                 {atMaxStock ? `At limit (${maxStock})` : `Stock: ${maxStock}`}
