@@ -792,6 +792,30 @@ const deleteCategory = async (req, res) => {
         [catIdsToDelete]
       );
 
+      // Set category_id = NULL for all sale_items referencing these categories
+      await query(
+        'UPDATE sale_items SET category_id = NULL WHERE category_id = ANY($1)',
+        [catIdsToDelete]
+      );
+
+      // Set category_id = NULL for all stock_movements referencing these categories
+      await query(
+        'UPDATE stock_movements SET category_id = NULL WHERE category_id = ANY($1)',
+        [catIdsToDelete]
+      );
+
+      // Set category_id = NULL for all cart_items referencing these categories
+      await query(
+        'UPDATE cart_items SET category_id = NULL WHERE category_id = ANY($1)',
+        [catIdsToDelete]
+      );
+
+      // Set category_id = NULL for all online_order_items referencing these categories
+      await query(
+        'UPDATE online_order_items SET category_id = NULL WHERE category_id = ANY($1)',
+        [catIdsToDelete]
+      );
+
       // Delete the categories (ON DELETE CASCADE will clean up product_category_assignments)
       await query(
         'DELETE FROM categories WHERE id = ANY($1)',
