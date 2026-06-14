@@ -24,16 +24,16 @@ router.get('/category-groups', authenticateToken, authorize('view_products'), ge
 router.get('/category-groups/:id/breakdown', authenticateToken, authorize('view_products'), getCategoryGroupBreakdown);
 
 // Brands
-router.get('/brands', authenticateToken, authorize('view_products'), getBrands);
-router.post('/brands', authenticateToken, authorize('manage_products'), createBrand);
-router.put('/brands/:id', authenticateToken, authorize('manage_products'), updateBrand);
-router.delete('/brands/:id', authenticateToken, authorize('manage_products'), deleteBrand);
+router.get('/brands', authenticateToken, authorize(['view_products', 'view_brands'], { match: 'any' }), getBrands);
+router.post('/brands', authenticateToken, authorize('create_brands'), createBrand);
+router.put('/brands/:id', authenticateToken, authorize('update_brands'), updateBrand);
+router.delete('/brands/:id', authenticateToken, authorize('delete_brands'), deleteBrand);
 
 // Categories
-router.get('/categories', authenticateToken, authorize('view_products'), getCategories);
-router.post('/categories', authenticateToken, authorize('manage_products'), createCategory);
-router.put('/categories/:id', authenticateToken, authorize('manage_products'), updateCategory);
-router.delete('/categories/:id', authenticateToken, authorize('manage_products'), deleteCategory);
+router.get('/categories', authenticateToken, authorize(['view_products', 'view_categories'], { match: 'any' }), getCategories);
+router.post('/categories', authenticateToken, authorize('create_categories'), createCategory);
+router.put('/categories/:id', authenticateToken, authorize('update_categories'), updateCategory);
+router.delete('/categories/:id', authenticateToken, authorize('delete_categories'), deleteCategory);
 
 // Single product CRUD (parameterized routes LAST)
 router.get('/:id', authenticateToken, authorize('view_products'), getProductById);

@@ -180,7 +180,7 @@ const Sidebar = ({ isOpen, onClose, isCollapsed, toggleCollapse }) => {
         { name: 'Catalogue', href: '/product-catalog', icon: ImageIcon, permission: () => hasPerm('view_products') },
         { name: 'Products', href: '/products', icon: Package, permission: () => hasPerm('view_products') },
         { name: 'Stock Levels', href: '/inventory', icon: ClipboardList, permission: () => hasPerm('view_inventory') },
-        { name: 'Categories', href: '/categories', icon: Tags, permission: () => hasPerm('view_products') },
+        { name: 'Categories', href: '/categories', icon: Tags, permission: () => hasPerm('view_categories') || hasPerm('view_brands') },
         { name: 'Transfers', href: '/stock-transfers', icon: ArrowLeftRight, permission: () => hasPerm('view_stock') },
         { name: 'Damages', href: '/stock-damages', icon: AlertTriangle, permission: () => hasPerm('view_stock') },
         { name: 'Activity', href: '/stock-activity', icon: Activity, permission: () => hasPerm('view_stock') },

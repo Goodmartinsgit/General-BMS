@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import api from '../api/axios';
 import { toast } from 'react-toastify';
+import usePermissions from '../hooks/usePermissions';
 
 const inputClass =
   'w-full px-3 py-2.5 bg-theme-primary border border-theme rounded-lg text-sm text-theme-primary placeholder-theme-muted focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none transition-all';
@@ -13,6 +14,7 @@ const labelClass = 'block text-sm font-medium text-theme-secondary mb-1';
 
 const CategoryDetailPage = ({ categoryId, onClose, onUpdate }) => {
   const navigate = useNavigate();
+  const { canCreateCategories, canUpdateCategories, canDeleteCategories } = usePermissions();
   const [category, setCategory] = useState(null);
   const [categoryTree, setCategoryTree] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -207,27 +209,33 @@ const CategoryDetailPage = ({ categoryId, onClose, onUpdate }) => {
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowAddChildModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-semibold hover:bg-emerald-600 transition-colors shadow-sm"
-            >
-              <Plus size={14} />
-              Add Sub-category
-            </button>
-            <button
-              onClick={() => setShowEditModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-accent-gold text-white rounded-lg text-sm font-semibold hover:bg-yellow-600 transition-colors shadow-sm"
-            >
-              <Edit size={14} />
-              Edit
-            </button>
-            <button
-              onClick={handleOpenDeleteModal}
-              className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-semibold hover:bg-red-600 transition-colors shadow-sm"
-            >
-              <Trash2 size={14} />
-              Delete
-            </button>
+            {canCreateCategories && (
+              <button
+                onClick={() => setShowAddChildModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-emerald-500 text-white rounded-lg text-sm font-semibold hover:bg-emerald-600 transition-colors shadow-sm"
+              >
+                <Plus size={14} />
+                Add Sub-category
+              </button>
+            )}
+            {canUpdateCategories && (
+              <button
+                onClick={() => setShowEditModal(true)}
+                className="flex items-center gap-2 px-4 py-2 bg-accent-gold text-white rounded-lg text-sm font-semibold hover:bg-yellow-600 transition-colors shadow-sm"
+              >
+                <Edit size={14} />
+                Edit
+              </button>
+            )}
+            {canDeleteCategories && (
+              <button
+                onClick={handleOpenDeleteModal}
+                className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-semibold hover:bg-red-600 transition-colors shadow-sm"
+              >
+                <Trash2 size={14} />
+                Delete
+              </button>
+            )}
           </div>
         </div>
 

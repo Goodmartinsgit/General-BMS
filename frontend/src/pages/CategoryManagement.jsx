@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   Plus, Edit, Trash2, Tag, Briefcase, RefreshCw, AlertCircle,
@@ -8,6 +8,7 @@ import {
 import api from '../api/axios';
 import { toast } from 'react-toastify';
 import CategoryDetailPage from './CategoryDetailPage';
+import usePermissions from '../hooks/usePermissions';
 
 const inputClass =
   'w-full px-3 py-2.5 bg-theme-primary border border-theme rounded-lg text-sm text-theme-primary placeholder-theme-muted focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none transition-all';
@@ -20,8 +21,34 @@ const TABS = [
 ];
 
 // ── Main Page ───────────────────────────────────────────────────────────────────
+// ── Main Page ───────────────────────────────────────────────────────────────────
 const CategoryManagement = () => {
-  const [activeTab, setActiveTab] = useState('categories');
+  const {
+    canViewCategories,
+    canViewBrands,
+    canCreateCategories,
+    canCreateBrands,
+    canUpdateCategories,
+    canUpdateBrands,
+    canDeleteCategories,
+    canDeleteBrands,
+  } = usePermissions();
+
+  const availableTabs = useMemo(() => {
+    const tabs = [];
+    if (canViewBrands) {
+      tabs.push({ key: 'brands', label: 'Brands', icon: Briefcase, nameField: 'brand_name', singular: 'Brand' });
+    }
+    if (canViewCategories) {
+      tabs.push({ key: 'categories', label: 'Categories', icon: FolderTree, nameField: 'category_name', singular: 'Category' });
+    }
+    return tabs;
+  }, [canViewCategories, canViewBrands]);
+
+  const [activeTab, setActiveTab] = useState(() => {
+    if (!canViewCategories && canViewBrands) return 'brands';
+    return 'categories';
+  });
   const [brands, setBrands] = useState([]);
   const [categoryTree, setCategoryTree] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -40,7 +67,7 @@ const CategoryManagement = () => {
   // Category detail modal
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
 
-  const tab = TABS.find(t => t.key === activeTab);
+  const tab = availableTabs.find(t => t.key === activeTab) || availableTabs[0];
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -147,33 +174,37 @@ const CategoryManagement = () => {
           <p className="text-sm text-theme-muted mt-0.5">Manage product brands and hierarchical categories</p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={activeTab === 'brands' ? () => { setEditItem(null); setShowModal(true); } : handleOpenAddRoot}
-            className="flex items-center gap-2 px-4 py-2 bg-accent-gold text-white rounded-lg text-sm font-semibold hover:bg-yellow-600 transition-colors shadow-sm"
-          >
-            <Plus size={15} />
-            Add {tab.singular}
-          </button>
+          {((activeTab === 'brands' && canCreateBrands) || (activeTab === 'categories' && canCreateCategories)) && (
+            <button
+              onClick={activeTab === 'brands' ? () => { setEditItem(null); setShowModal(true); } : handleOpenAddRoot}
+              className="flex items-center gap-2 px-4 py-2 bg-accent-gold text-white rounded-lg text-sm font-semibold hover:bg-yellow-600 transition-colors shadow-sm"
+            >
+              <Plus size={15} />
+              Add {tab?.singular}
+            </button>
+          )}
         </div>
       </div>
 
       {/* Tab Bar */}
-      <div className="flex gap-1 p-1 bg-theme-tertiary/50 rounded-lg border border-theme w-fit">
-        {TABS.map(t => (
-          <button
-            key={t.key}
-            onClick={() => setActiveTab(t.key)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
-              activeTab === t.key
-                ? 'bg-theme-secondary text-accent-gold shadow-sm'
-                : 'text-theme-muted hover:text-theme-primary'
-            }`}
-          >
-            <t.icon size={14} className={activeTab === t.key ? 'text-accent-gold' : 'opacity-50'} />
-            {t.label}
-          </button>
-        ))}
-      </div>
+      {availableTabs.length > 1 && (
+        <div className="flex gap-1 p-1 bg-theme-tertiary/50 rounded-lg border border-theme w-fit">
+          {availableTabs.map(t => (
+            <button
+              key={t.key}
+              onClick={() => setActiveTab(t.key)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium transition-all ${
+                activeTab === t.key
+                  ? 'bg-theme-secondary text-accent-gold shadow-sm'
+                  : 'text-theme-muted hover:text-theme-primary'
+              }`}
+            >
+              <t.icon size={14} className={activeTab === t.key ? 'text-accent-gold' : 'opacity-50'} />
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Content */}
       <div className="bg-theme-secondary border border-theme rounded-xl shadow-theme-sm overflow-hidden">
@@ -249,6 +280,9 @@ const CategoryManagement = () => {
 
 // ── Brands Table (unchanged from old design) ───────────────────────────────────
 const BrandsTable = ({ brands, onEdit, onDelete }) => {
+  const { canUpdateBrands, canDeleteBrands } = usePermissions();
+  const showActions = canUpdateBrands || canDeleteBrands;
+
   if (brands.length === 0) return (
     <div className="flex flex-col items-center justify-center py-20 gap-4 text-theme-muted">
       <Briefcase size={40} className="opacity-20" />
@@ -262,7 +296,7 @@ const BrandsTable = ({ brands, onEdit, onDelete }) => {
           <th className="px-4 py-3 text-left text-xs font-semibold text-theme-muted uppercase">Name</th>
           <th className="px-4 py-3 text-left text-xs font-semibold text-theme-muted uppercase">Description</th>
           <th className="px-4 py-3 text-center text-xs font-semibold text-theme-muted uppercase">Status</th>
-          <th className="px-4 py-3 text-right text-xs font-semibold text-theme-muted uppercase">Actions</th>
+          {showActions && <th className="px-4 py-3 text-right text-xs font-semibold text-theme-muted uppercase">Actions</th>}
         </tr>
       </thead>
       <tbody className="divide-y divide-theme">
@@ -275,16 +309,22 @@ const BrandsTable = ({ brands, onEdit, onDelete }) => {
                 {b.is_active ? 'Active' : 'Inactive'}
               </span>
             </td>
-            <td className="px-4 py-3 text-right">
-              <div className="flex items-center justify-end gap-1">
-                <button onClick={() => onEdit(b)} className="p-1.5 text-theme-muted hover:text-accent-gold hover:bg-accent-gold/10 rounded-lg transition-colors" title="Edit">
-                  <Edit size={14} />
-                </button>
-                <button onClick={() => onDelete(b)} className="p-1.5 text-theme-muted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors" title="Delete">
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            </td>
+            {showActions && (
+              <td className="px-4 py-3 text-right">
+                <div className="flex items-center justify-end gap-1">
+                  {canUpdateBrands && (
+                    <button onClick={() => onEdit(b)} className="p-1.5 text-theme-muted hover:text-accent-gold hover:bg-accent-gold/10 rounded-lg transition-colors" title="Edit">
+                      <Edit size={14} />
+                    </button>
+                  )}
+                  {canDeleteBrands && (
+                    <button onClick={() => onDelete(b)} className="p-1.5 text-theme-muted hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors" title="Delete">
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
+              </td>
+            )}
           </tr>
         ))}
       </tbody>
@@ -294,16 +334,20 @@ const BrandsTable = ({ brands, onEdit, onDelete }) => {
 
 // ── Category Tree View ──────────────────────────────────────────────────────────
 const CategoryTreeView = ({ tree, onEdit, onDelete, onAddChild, onAddRoot, onViewDetails }) => {
+  const { canCreateCategories } = usePermissions();
+
   if (tree.length === 0) return (
     <div className="flex flex-col items-center justify-center py-20 gap-4 text-theme-muted">
       <FolderTree size={40} className="opacity-20" />
       <div className="text-center">
         <p className="text-sm font-medium text-theme-primary">No categories yet</p>
-        <p className="text-xs mt-1">Click "Add Category" to create the first one.</p>
+        {canCreateCategories && <p className="text-xs mt-1">Click "Add Category" to create the first one.</p>}
       </div>
-      <button onClick={onAddRoot} className="flex items-center gap-2 px-4 py-2 bg-accent-gold text-white rounded-lg text-sm font-semibold hover:bg-yellow-600 transition-colors">
-        <Plus size={14} /> Add Category
-      </button>
+      {canCreateCategories && (
+        <button onClick={onAddRoot} className="flex items-center gap-2 px-4 py-2 bg-accent-gold text-white rounded-lg text-sm font-semibold hover:bg-yellow-600 transition-colors">
+          <Plus size={14} /> Add Category
+        </button>
+      )}
     </div>
   );
 

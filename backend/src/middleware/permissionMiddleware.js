@@ -1,6 +1,6 @@
 const { pool } = require('../config/db');
 
-const authorize = (requiredPermissions) => {
+const authorize = (requiredPermissions, options = { match: 'all' }) => {
     return async (req, res, next) => {
         try {
             // 1. Get user role from DB (as JWT might be stale)
@@ -18,11 +18,16 @@ const authorize = (requiredPermissions) => {
 
             const userPermissions = userRes.rows[0].permissions || {};
 
-            // 2. Check if user has ALL required permissions
+            // 2. Check if user has required permissions
             // Note: requiredPermissions could be a string or an array of strings
             const permissionsToCheck = Array.isArray(requiredPermissions) ? requiredPermissions : [requiredPermissions];
             
-            const hasPermission = permissionsToCheck.every(p => userPermissions[p] === true || userPermissions['admin'] === true);
+            let hasPermission;
+            if (options && options.match === 'any') {
+                hasPermission = permissionsToCheck.some(p => userPermissions[p] === true || userPermissions['admin'] === true);
+            } else {
+                hasPermission = permissionsToCheck.every(p => userPermissions[p] === true || userPermissions['admin'] === true);
+            }
 
             if (!hasPermission) {
                 return res.status(403).json({ message: 'Access denied: Insufficient permissions' });

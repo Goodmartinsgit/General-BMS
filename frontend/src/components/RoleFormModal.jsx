@@ -39,6 +39,19 @@ const PERMISSION_GROUPS = [
     ],
   },
   {
+    group: 'Categories & Brands',
+    permissions: [
+      { key: 'view_categories', label: 'View Categories' },
+      { key: 'create_categories', label: 'Create Categories' },
+      { key: 'update_categories', label: 'Update Categories' },
+      { key: 'delete_categories', label: 'Delete Categories' },
+      { key: 'view_brands', label: 'View Brands' },
+      { key: 'create_brands', label: 'Create Brands' },
+      { key: 'update_brands', label: 'Update Brands' },
+      { key: 'delete_brands', label: 'Delete Brands' },
+    ],
+  },
+  {
     group: 'Inventory & Stock',
     permissions: [
       { key: 'view_inventory', label: 'View Inventory' },

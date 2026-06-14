@@ -153,7 +153,14 @@ const RoleProtectedRoute = ({ children, requiredPermission }) => {
     if (!auth.accessToken) return <Navigate to="/login" />;
 
     const userPermissions = auth.user?.permissions || {};
-    if (requiredPermission && !userPermissions[requiredPermission] && !userPermissions['admin']) {
+    
+    let hasPermission = true;
+    if (requiredPermission) {
+        const permissionsToCheck = Array.isArray(requiredPermission) ? requiredPermission : [requiredPermission];
+        hasPermission = permissionsToCheck.some(p => userPermissions[p] === true || userPermissions['admin'] === true);
+    }
+
+    if (!hasPermission) {
         return <Navigate to="/" />;
     }
     return children;
@@ -241,7 +248,7 @@ function App() {
                             </RoleProtectedRoute>
                         } />
                         <Route path="categories" element={
-                            <RoleProtectedRoute requiredPermission="view_products">
+                            <RoleProtectedRoute requiredPermission={['view_categories', 'view_brands']}>
                                 <CategoryManagement />
                             </RoleProtectedRoute>
                         } />

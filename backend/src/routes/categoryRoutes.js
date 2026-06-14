@@ -19,24 +19,24 @@ const authenticateToken = require('../middleware/authMiddleware');
 const authorize = require('../middleware/permissionMiddleware');
 
 // Static routes first
-router.get('/', authenticateToken, authorize('view_products'), getCategories);
-router.get('/tree', authenticateToken, authorize('view_products'), getCategoryTree);
-router.get('/levels', authenticateToken, authorize('view_products'), getCategoryLevels);
+router.get('/', authenticateToken, authorize(['view_products', 'view_categories'], { match: 'any' }), getCategories);
+router.get('/tree', authenticateToken, authorize(['view_products', 'view_categories'], { match: 'any' }), getCategoryTree);
+router.get('/levels', authenticateToken, authorize(['view_products', 'view_categories'], { match: 'any' }), getCategoryLevels);
 
 // Category assignments (product stock/price per node)
-router.get('/assignments/:productId', authenticateToken, authorize('view_products'), getProductAssignments);
-router.post('/assignments/:productId', authenticateToken, authorize('manage_products'), saveProductAssignments);
+router.get('/assignments/:productId', authenticateToken, authorize(['view_products', 'view_categories'], { match: 'any' }), getProductAssignments);
+router.post('/assignments/:productId', authenticateToken, authorize(['manage_products', 'update_categories'], { match: 'any' }), saveProductAssignments);
 
 // By-level lookup
-router.get('/by-level/:level', authenticateToken, authorize('view_products'), getCategoriesByLevel);
+router.get('/by-level/:level', authenticateToken, authorize(['view_products', 'view_categories'], { match: 'any' }), getCategoriesByLevel);
 
 // Parameterized routes (must be last)
-router.get('/:id/delete-preview', authenticateToken, authorize('manage_products'), getCategoryDeletePreview);
-router.get('/:id', authenticateToken, authorize('view_products'), getCategoryById);
-router.get('/:id/subtree', authenticateToken, authorize('view_products'), getSubcategoryTree);
-router.get('/:id/listing-level', authenticateToken, authorize('view_products'), getListingLevelCategories);
-router.post('/', authenticateToken, authorize('manage_products'), createCategory);
-router.put('/:id', authenticateToken, authorize('manage_products'), updateCategory);
-router.delete('/:id', authenticateToken, authorize('manage_products'), deleteCategory);
+router.get('/:id/delete-preview', authenticateToken, authorize('delete_categories'), getCategoryDeletePreview);
+router.get('/:id', authenticateToken, authorize(['view_products', 'view_categories'], { match: 'any' }), getCategoryById);
+router.get('/:id/subtree', authenticateToken, authorize(['view_products', 'view_categories'], { match: 'any' }), getSubcategoryTree);
+router.get('/:id/listing-level', authenticateToken, authorize(['view_products', 'view_categories'], { match: 'any' }), getListingLevelCategories);
+router.post('/', authenticateToken, authorize('create_categories'), createCategory);
+router.put('/:id', authenticateToken, authorize('update_categories'), updateCategory);
+router.delete('/:id', authenticateToken, authorize('delete_categories'), deleteCategory);
 
 module.exports = router;
