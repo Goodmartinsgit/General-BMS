@@ -10,6 +10,7 @@ import { toast } from 'react-toastify';
 import api from '../api/axios';
 import { useCurrency } from '../context/CurrencyContext';
 import { useAuth } from '../context/AuthContext';
+import usePermissions from '../hooks/usePermissions';
 import { useBranch } from '../context/BranchContext';
 import Modal from '../components/ui/Modal';
 import ColorStockManager from '../components/product/ColorStockManager';
@@ -686,6 +687,7 @@ const ProductDetailPage = () => {
 
   const userPerms = user?.permissions || {};
   const canEdit  = userPerms['manage_products'] === true || userPerms['admin'] === true;
+  const { canViewFinancials } = usePermissions();
 
   useEffect(() => { fetchProduct(); }, [id]);
 
@@ -1114,7 +1116,7 @@ const ProductDetailPage = () => {
                       <div className="grid grid-cols-4 gap-2 px-3 py-2 text-xs font-semibold text-theme-muted border-b border-theme">
                         <span>Category</span>
                         <span className="text-right">Price</span>
-                        <span className="text-right">Cost</span>
+                        {canViewFinancials && <span className="text-right">Cost</span>}
                         <span className="text-right">Stock</span>
                       </div>
                       {selectionPrices.map((sp, idx) => {
@@ -1123,7 +1125,7 @@ const ProductDetailPage = () => {
                           <div key={idx} className="grid grid-cols-4 gap-2 px-3 py-2 text-sm border-b border-theme last:border-0">
                             <span className="text-theme-primary font-medium truncate">{sp.category_name}{sp.unit ? ` (${sp.unit})` : ''}</span>
                             <span className="text-right text-accent-gold font-bold">{formatCurrency(sp.price)}</span>
-                            <span className="text-right text-theme-muted">{sp.cost_price ? formatCurrency(sp.cost_price) : '–'}</span>
+                            {canViewFinancials && <span className="text-right text-theme-muted">{sp.cost_price ? formatCurrency(sp.cost_price) : '–'}</span>}
                             <span className="text-right text-theme-primary">{sp.stock}</span>
                           </div>
                         );
@@ -1132,15 +1134,17 @@ const ProductDetailPage = () => {
                   </>
                 ) : (
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {canViewFinancials && (
                     <div className="bg-theme-tertiary rounded-lg p-3 text-center">
                       <p className="text-xs text-theme-muted mb-1">Cost Price</p>
                       <p className="text-lg font-bold text-theme-primary">{formatCurrency(effectiveCost)}</p>
                     </div>
+                    )}
                     <div className="bg-theme-tertiary rounded-lg p-3 text-center">
                       <p className="text-xs text-theme-muted mb-1">Selling Price</p>
                       <p className="text-lg font-bold text-accent-gold">{formatCurrency(effectivePrice)}</p>
                     </div>
-                    {profitPerUnit !== null && (
+                    {canViewFinancials && profitPerUnit !== null && (
                       <div className="bg-theme-tertiary rounded-lg p-3 text-center">
                         <p className="text-xs text-theme-muted mb-1">Profit / Unit</p>
                         <p className={`text-lg font-bold ${profitPerUnit >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
@@ -1148,7 +1152,7 @@ const ProductDetailPage = () => {
                         </p>
                       </div>
                     )}
-                    {profitMargin !== null && (
+                    {canViewFinancials && profitMargin !== null && (
                       <div className="bg-theme-tertiary rounded-lg p-3 text-center">
                         <p className="text-xs text-theme-muted mb-1">Margin</p>
                         <p className={`text-lg font-bold ${parseFloat(profitMargin) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
@@ -1290,7 +1294,7 @@ const ProductDetailPage = () => {
                       <div className="col-span-4">Attribute</div>
                       <div className="col-span-2 text-right">Stock</div>
                       <div className="col-span-2 text-right">Sell Price</div>
-                      <div className="col-span-2 text-right">Cost Price</div>
+                      {canViewFinancials && <div className="col-span-2 text-right">Cost Price</div>}
                       <div className="col-span-2 text-center">Image</div>
                     </div>
                     <div className="divide-y divide-theme max-h-96 overflow-y-auto">
@@ -1352,9 +1356,11 @@ const ProductDetailPage = () => {
                             <div className="col-span-2 text-right font-medium text-accent-gold">
                               {a.price_override ? formatCurrency(a.price_override) : '—'}
                             </div>
+                            {canViewFinancials && (
                             <div className="col-span-2 text-right font-medium text-theme-secondary">
                               {a.cost_price_override ? formatCurrency(a.cost_price_override) : '—'}
                             </div>
+                            )}
                             <div className="col-span-2 flex justify-center">
                               {a.image_url ? (
                                 <img src={a.image_url} alt={a.category_name} className="w-8 h-8 rounded border border-theme object-cover" />

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Package } from 'lucide-react';
 import ReportLayout, { useBranches, formatCurrency } from '../../components/reports/ReportLayout';
 import { financialReportsAPI } from '../../api/financialReports';
+import usePermissions from '../../hooks/usePermissions';
 import { toast } from 'react-toastify';
 
 const InventoryValuationReportPage = () => {
@@ -9,6 +10,7 @@ const InventoryValuationReportPage = () => {
     const [loading, setLoading] = useState(true);
     const [branchId, setBranchId] = useState('');
     const branches = useBranches();
+    const { canViewFinancials } = usePermissions();
 
     const fetchReport = async () => {
         setLoading(true);
@@ -43,9 +45,9 @@ const InventoryValuationReportPage = () => {
                         {[
                             { label: 'Total Items', value: data.summary.total_items, isNum: true },
                             { label: 'Total Units', value: data.summary.total_units.toLocaleString(), isNum: true },
-                            { label: 'Cost Value', value: data.summary.total_cost_value },
+                            ...(canViewFinancials ? [{ label: 'Cost Value', value: data.summary.total_cost_value }] : []),
                             { label: 'Retail Value', value: data.summary.total_retail_value },
-                            { label: 'Potential Profit', value: data.summary.potential_profit, color: 'text-green-400' },
+                            ...(canViewFinancials ? [{ label: 'Potential Profit', value: data.summary.potential_profit, color: 'text-green-400' }] : []),
                         ].map((item, i) => (
                             <div key={i} className="bg-theme-secondary rounded-xl border border-theme p-4 text-center">
                                 <p className="text-xs text-theme-muted uppercase">{item.label}</p>
@@ -64,9 +66,9 @@ const InventoryValuationReportPage = () => {
                                         <th className="text-left px-4 py-3 text-xs font-medium text-theme-muted uppercase">SKU</th>
                                         <th className="text-left px-4 py-3 text-xs font-medium text-theme-muted uppercase">Branch</th>
                                         <th className="text-right px-4 py-3 text-xs font-medium text-theme-muted uppercase">Qty</th>
-                                        <th className="text-right px-4 py-3 text-xs font-medium text-theme-muted uppercase">Cost Price</th>
+                                        {canViewFinancials && <th className="text-right px-4 py-3 text-xs font-medium text-theme-muted uppercase">Cost Price</th>}
                                         <th className="text-right px-4 py-3 text-xs font-medium text-theme-muted uppercase">Sell Price</th>
-                                        <th className="text-right px-4 py-3 text-xs font-medium text-theme-muted uppercase">Cost Value</th>
+                                        {canViewFinancials && <th className="text-right px-4 py-3 text-xs font-medium text-theme-muted uppercase">Cost Value</th>}
                                         <th className="text-right px-4 py-3 text-xs font-medium text-theme-muted uppercase">Retail Value</th>
                                     </tr>
                                 </thead>
@@ -79,9 +81,9 @@ const InventoryValuationReportPage = () => {
                                             <td className="px-4 py-3 text-sm text-theme-muted">{item.sku || '-'}</td>
                                             <td className="px-4 py-3 text-sm text-theme-secondary">{item.branch_name || '-'}</td>
                                             <td className="px-4 py-3 text-sm text-right text-theme-primary">{item.quantity_on_hand}</td>
-                                            <td className="px-4 py-3 text-sm text-right text-theme-muted">{formatCurrency(item.cost_price)}</td>
+                                            {canViewFinancials && <td className="px-4 py-3 text-sm text-right text-theme-muted">{formatCurrency(item.cost_price)}</td>}
                                             <td className="px-4 py-3 text-sm text-right text-theme-muted">{formatCurrency(item.selling_price)}</td>
-                                            <td className="px-4 py-3 text-sm text-right text-theme-primary">{formatCurrency(item.cost_value)}</td>
+                                            {canViewFinancials && <td className="px-4 py-3 text-sm text-right text-theme-primary">{formatCurrency(item.cost_value)}</td>}
                                             <td className="px-4 py-3 text-sm text-right font-medium text-accent-gold">{formatCurrency(item.retail_value)}</td>
                                         </tr>
                                     ))}

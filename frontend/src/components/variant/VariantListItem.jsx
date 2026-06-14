@@ -1,6 +1,7 @@
 import React from 'react';
 import { Edit, Trash2, Package, Barcode, TrendingUp, AlertCircle } from 'lucide-react';
 import { Badge, Button } from '../ui';
+import usePermissions from '../../hooks/usePermissions';
 
 /**
  * VariantListItem Component
@@ -25,6 +26,8 @@ const VariantListItem = ({
     is_active,
     attributes = [],
   } = variant;
+
+  const { canViewFinancials } = usePermissions();
 
   const isLowStock = quantity_on_hand <= reorder_level;
   const profitMargin = selling_price && cost_price
@@ -97,7 +100,7 @@ const VariantListItem = ({
             <p className={`font-bold text-gray-900 ${compact ? 'text-base' : 'text-lg'}`}>
               ${parseFloat(selling_price || 0).toFixed(2)}
             </p>
-            {profitMargin && !compact && (
+            {canViewFinancials && profitMargin && !compact && (
               <div className="flex items-center justify-end gap-1 text-xs text-green-600">
                 <TrendingUp className="w-3 h-3" />
                 <span>{profitMargin}% margin</span>

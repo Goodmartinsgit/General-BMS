@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { branchesAPI } from '../api/branches';
 import { useCurrency } from '../context/CurrencyContext';
+import usePermissions from '../hooks/usePermissions';
 import { toast } from 'react-toastify';
 import {
   ArrowLeft, TrendingUp, TrendingDown, Package, Users,
@@ -13,6 +14,7 @@ const BranchAnalyticsPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { formatCurrency } = useCurrency();
+  const { canViewFinancials } = usePermissions();
 
   const [branchName, setBranchName] = useState('');
   const [dashboard, setDashboard] = useState(null);
@@ -180,30 +182,38 @@ const BranchAnalyticsPage = () => {
           value={sales.total_sales || 0}
           color="blue"
         />
+        {canViewFinancials && (
         <KPICard
           icon={DollarSign}
           label="Revenue"
           value={formatCurrency(sales.total_revenue || 0)}
           color="green"
         />
+        )}
+        {canViewFinancials && (
         <KPICard
           icon={TrendingUp}
           label="Profit"
           value={formatCurrency(sales.total_profit || 0)}
           color="emerald"
         />
+        )}
+        {canViewFinancials && (
         <KPICard
           icon={Percent}
           label="Margin"
           value={`${sales.profit_margin || 0}%`}
           color="amber"
         />
+        )}
+        {canViewFinancials && (
         <KPICard
           icon={Package}
           label="Inventory Value"
           value={formatCurrency(inv.inventory_value || 0)}
           color="purple"
         />
+        )}
         <KPICard
           icon={Users}
           label="Customers"

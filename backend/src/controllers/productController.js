@@ -1320,6 +1320,18 @@ const getLowStockProducts = async (req, res) => {
  */
 const getProductStatistics = async (req, res) => {
   try {
+    // Check if user has financial permissions
+    const userId = req.user?.id;
+    let canViewFinancials = false;
+    if (userId) {
+      const permRes = await query(
+        `SELECT r.permissions FROM users u JOIN roles r ON u.role_id = r.id WHERE u.id = $1`,
+        [userId]
+      );
+      const perms = permRes.rows[0]?.permissions || {};
+      canViewFinancials = perms.admin === true || perms.view_dashboard_financials === true;
+    }
+
     const stats = await query(`
       WITH product_stock AS (
           SELECT 
@@ -1356,12 +1368,21 @@ const getProductStatistics = async (req, res) => {
       FROM product_stock
     `);
 
-    res.json(stats.rows[0]);
+    const result = stats.rows[0];
+
+    // Strip financial data for users without permission
+    if (!canViewFinancials) {
+      delete result.stock_cost;
+      delete result.stock_value;
+    }
+
+    res.json(result);
   } catch (err) {
     console.error('Error fetching product statistics:', err);
     res.status(500).json({ message: 'Server error' });
   }
 };
+
 
 /**
  * Get products with variants

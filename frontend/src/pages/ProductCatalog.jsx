@@ -4,6 +4,7 @@ import Modal from '../components/ui/Modal';
 import PageHeader from '../components/common/PageHeader';
 import { ProductGrid, ProductListItem, ProductFormModal, ProductDetailView } from '../components/product';
 import { useCurrency } from '../context/CurrencyContext';
+import usePermissions from '../hooks/usePermissions';
 import api from '../api/axios';
 import { toast } from 'react-toastify';
 
@@ -13,6 +14,7 @@ const PAGE_SIZE = 24;
 
 const ProductCatalog = () => {
   const { formatCurrency } = useCurrency();
+  const { canViewFinancials } = usePermissions();
 
   const [products, setProducts]     = useState([]);
   const [loading, setLoading]       = useState(false);
@@ -131,14 +133,25 @@ const ProductCatalog = () => {
 
   const handleExport = () => {
     try {
-      const headers = ['Name', 'Code', 'Type', 'Price', 'Price Min', 'Price Max', 'Cost', 'Stock', 'Brand', 'Category', 'Active'];
-      const rows = products.map(p => [
-        p.product_name, p.product_code, p.product_type,
-        p.effective_price || p.selling_price || '', p.price_min || '', p.price_max || '',
-        p.effective_cost_price || p.cost_price || '', p.total_stock ?? p.quantity_on_hand ?? 0,
-        p.brand_name || '', p.category_name || '',
-        p.is_active ? 'Yes' : 'No',
-      ]);
+      const headers = canViewFinancials
+        ? ['Name', 'Code', 'Type', 'Price', 'Price Min', 'Price Max', 'Cost', 'Stock', 'Brand', 'Category', 'Active']
+        : ['Name', 'Code', 'Type', 'Price', 'Price Min', 'Price Max', 'Stock', 'Brand', 'Category', 'Active'];
+      const rows = products.map(p => canViewFinancials
+        ? [
+            p.product_name, p.product_code, p.product_type,
+            p.effective_price || p.selling_price || '', p.price_min || '', p.price_max || '',
+            p.effective_cost_price || p.cost_price || '', p.total_stock ?? p.quantity_on_hand ?? 0,
+            p.brand_name || '', p.category_name || '',
+            p.is_active ? 'Yes' : 'No',
+          ]
+        : [
+            p.product_name, p.product_code, p.product_type,
+            p.effective_price || p.selling_price || '', p.price_min || '', p.price_max || '',
+            p.total_stock ?? p.quantity_on_hand ?? 0,
+            p.brand_name || '', p.category_name || '',
+            p.is_active ? 'Yes' : 'No',
+          ]
+      );
       const csv = [headers, ...rows].map(r => r.map(c => `"${c ?? ''}"`).join(',')).join('\n');
       const blob = new Blob([csv], { type: 'text/csv' });
       const url  = URL.createObjectURL(blob);
@@ -191,7 +204,7 @@ const ProductCatalog = () => {
           { label: 'Total Products',  value: stats.total_products,  color: 'text-blue-500',   bg: 'bg-blue-500/10',   border: 'border-blue-500/20' },
           { label: 'Active Products', value: stats.active_products, color: 'text-green-500',  bg: 'bg-green-500/10',  border: 'border-green-500/20' },
           { label: 'Low Stock',       value: stats.low_stock_count, color: 'text-red-500',    bg: 'bg-red-500/10',    border: 'border-red-500/20' },
-          { label: 'Total Value',     value: formatCurrency(stats.total_value || 0), color: 'text-accent-gold', bg: 'bg-accent-gold/10', border: 'border-accent-gold/20' },
+          ...(canViewFinancials ? [{ label: 'Total Value',     value: formatCurrency(stats.total_value || 0), color: 'text-accent-gold', bg: 'bg-accent-gold/10', border: 'border-accent-gold/20' }] : []),
         ].map(({ label, value, color, bg, border }) => (
           <div key={label} className="bg-theme-secondary border border-theme rounded-xl p-4">
             <div className="flex items-center justify-between mb-2">

@@ -7,11 +7,13 @@ import {
 import { toast } from 'react-toastify';
 import api from '../api/axios';
 import { useCurrency } from '../context/CurrencyContext';
+import usePermissions from '../hooks/usePermissions';
 import PageHeader from '../components/common/PageHeader';
 
 const CategoryInsightsPage = () => {
   const navigate = useNavigate();
   const { formatCurrency } = useCurrency();
+  const { canViewFinancials } = usePermissions();
   const [categoryInsights, setCategoryInsights] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -117,10 +119,12 @@ const CategoryInsightsPage = () => {
               <p className="text-xs text-theme-muted mb-1">Total Products</p>
               <p className="text-xl font-bold text-theme-primary">{totalProducts}</p>
             </div>
+            {canViewFinancials && (
             <div className="p-4 rounded-xl bg-theme-secondary border border-accent-gold/30 shadow-theme-sm">
               <p className="text-xs text-theme-muted mb-1">Total Stock Value</p>
               <p className="text-lg font-bold text-theme-primary">{formatCurrency(totalStockValue)}</p>
             </div>
+            )}
             <div className="p-4 rounded-xl bg-theme-secondary border border-purple-500/30 shadow-theme-sm">
               <p className="text-xs text-theme-muted mb-1">Total Stock Units</p>
               <p className="text-xl font-bold text-theme-primary">{totalStockUnits}</p>
@@ -159,22 +163,28 @@ const CategoryInsightsPage = () => {
                     <p className="text-[10px] text-theme-muted uppercase tracking-wider">Price Range</p>
                     <p className="text-sm font-bold text-accent-gold">{renderPriceRange(cat.min_price, cat.max_price)}</p>
                   </div>
+                  {canViewFinancials && (
                   <div>
                     <p className="text-[10px] text-theme-muted uppercase tracking-wider">Stock Value</p>
                     <p className="text-sm font-bold text-theme-primary">{formatCurrency(cat.total_stock_value || 0)}</p>
                   </div>
+                  )}
+                  {canViewFinancials && (
                   <div>
                     <p className="text-[10px] text-theme-muted uppercase tracking-wider">Stock Cost</p>
                     <p className="text-sm font-bold text-theme-primary">{formatCurrency(cat.total_stock_cost || 0)}</p>
                   </div>
+                  )}
                   <div>
                     <p className="text-[10px] text-theme-muted uppercase tracking-wider">Avg Price</p>
                     <p className="text-sm font-bold text-theme-primary">{formatCurrency(cat.avg_price || 0)}</p>
                   </div>
+                  {canViewFinancials && (
                   <div>
                     <p className="text-[10px] text-theme-muted uppercase tracking-wider">Margin</p>
                     <p className="text-sm font-bold">{renderMargin(cat.total_stock_value, cat.total_stock_cost)}</p>
                   </div>
+                  )}
                 </div>
 
                 {cat.featured_products > 0 && (
@@ -241,9 +251,9 @@ const CategoryInsightsPage = () => {
                             <th className="text-right px-3 py-3 font-semibold">Stock</th>
                             <th className="text-right px-3 py-3 font-semibold">Price Range</th>
                             <th className="text-right px-3 py-3 font-semibold">Avg Price</th>
-                            <th className="text-right px-3 py-3 font-semibold">Stock Value</th>
-                            <th className="text-right px-3 py-3 font-semibold">Stock Cost</th>
-                            <th className="text-right px-3 py-3 font-semibold">Margin</th>
+                            {canViewFinancials && <th className="text-right px-3 py-3 font-semibold">Stock Value</th>}
+                            {canViewFinancials && <th className="text-right px-3 py-3 font-semibold">Stock Cost</th>}
+                            {canViewFinancials && <th className="text-right px-3 py-3 font-semibold">Margin</th>}
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-theme">
@@ -312,9 +322,9 @@ const CategoryInsightsPage = () => {
                                   <td className="text-right px-3 py-3 text-theme-primary">{sub.total_stock} <span className="text-theme-muted text-[10px]">units</span></td>
                                   <td className="text-right px-3 py-3 text-accent-gold text-xs font-medium">{renderPriceRange(sub.min_price, sub.max_price)}</td>
                                   <td className="text-right px-3 py-3 text-theme-primary">{formatCurrency(sub.avg_price || 0)}</td>
-                                  <td className="text-right px-3 py-3 text-theme-primary font-medium">{formatCurrency(sub.total_stock_value || 0)}</td>
-                                  <td className="text-right px-3 py-3 text-theme-primary">{formatCurrency(sub.total_stock_cost || 0)}</td>
-                                  <td className="text-right px-3 py-3 font-medium">{renderMargin(sub.total_stock_value, sub.total_stock_cost)}</td>
+                                  {canViewFinancials && <td className="text-right px-3 py-3 text-theme-primary font-medium">{formatCurrency(sub.total_stock_value || 0)}</td>}
+                                  {canViewFinancials && <td className="text-right px-3 py-3 text-theme-primary">{formatCurrency(sub.total_stock_cost || 0)}</td>}
+                                  {canViewFinancials && <td className="text-right px-3 py-3 font-medium">{renderMargin(sub.total_stock_value, sub.total_stock_cost)}</td>}
                                 </tr>
                               );
                             });
@@ -334,9 +344,9 @@ const CategoryInsightsPage = () => {
                                 <td className="text-right px-3 py-3 text-theme-primary">{tots.stock} <span className="text-theme-muted text-[10px] font-normal">units</span></td>
                                 <td className="text-right px-3 py-3"></td>
                                 <td className="text-right px-3 py-3"></td>
-                                <td className="text-right px-3 py-3 text-theme-primary">{formatCurrency(tots.stockValue)}</td>
-                                <td className="text-right px-3 py-3 text-theme-primary">{formatCurrency(tots.stockCost)}</td>
-                                <td className="text-right px-3 py-3">{renderMargin(tots.stockValue, tots.stockCost)}</td>
+                                {canViewFinancials && <td className="text-right px-3 py-3 text-theme-primary">{formatCurrency(tots.stockValue)}</td>}
+                                {canViewFinancials && <td className="text-right px-3 py-3 text-theme-primary">{formatCurrency(tots.stockCost)}</td>}
+                                {canViewFinancials && <td className="text-right px-3 py-3">{renderMargin(tots.stockValue, tots.stockCost)}</td>}
                               </tr>
                             );
                           })()}
@@ -360,8 +370,8 @@ const CategoryInsightsPage = () => {
                               <th className="text-left px-3 py-3 font-semibold">Category</th>
                               <th className="text-right px-3 py-3 font-semibold">Stock</th>
                               <th className="text-right px-3 py-3 font-semibold">Retail Price</th>
-                              <th className="text-right px-3 py-3 font-semibold">Cost Price</th>
-                              <th className="text-right px-3 py-3 font-semibold">Stock Value</th>
+                              {canViewFinancials && <th className="text-right px-3 py-3 font-semibold">Cost Price</th>}
+                              {canViewFinancials && <th className="text-right px-3 py-3 font-semibold">Stock Value</th>}
                               <th className="text-center px-3 py-3 font-semibold">Status</th>
                             </tr>
                           </thead>
@@ -375,8 +385,8 @@ const CategoryInsightsPage = () => {
                                 <td className="px-3 py-3 text-theme-muted text-xs">{p.direct_category || '—'}</td>
                                 <td className="text-right px-3 py-3 text-theme-primary">{p.stock} <span className="text-theme-muted text-[10px]">units</span></td>
                                 <td className="text-right px-3 py-3 text-theme-primary">{formatCurrency(p.retail_price || 0)}</td>
-                                <td className="text-right px-3 py-3 text-theme-muted">{formatCurrency(p.cost_price || 0)}</td>
-                                <td className="text-right px-3 py-3 text-theme-primary font-medium">{formatCurrency(p.stock_value || 0)}</td>
+                                {canViewFinancials && <td className="text-right px-3 py-3 text-theme-muted">{formatCurrency(p.cost_price || 0)}</td>}
+                                {canViewFinancials && <td className="text-right px-3 py-3 text-theme-primary font-medium">{formatCurrency(p.stock_value || 0)}</td>}
                                 <td className="text-center px-3 py-3">
                                   <div className="flex items-center justify-center gap-1.5">
                                     {p.is_active ? (

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Edit, Trash2, Eye, Star, AlertCircle, Package } from 'lucide-react';
 import { useCurrency } from '../../context/CurrencyContext';
+import usePermissions from '../../hooks/usePermissions';
 
 const TYPE_BADGE = {
   physical: 'bg-blue-500/10 text-blue-500 border-blue-500/20',
@@ -11,6 +12,7 @@ const TYPE_BADGE = {
 
 const ProductListItem = ({ product, onEdit, onDelete, onView, showActions = true, compact = false }) => {
   const { formatCurrency } = useCurrency();
+  const { canViewFinancials } = usePermissions();
   const {
     product_name, product_code, product_type, cost_price,
     reorder_level, is_active, is_featured, image_url, brand_name, product_images,
@@ -90,7 +92,7 @@ const ProductListItem = ({ product, onEdit, onDelete, onView, showActions = true
           <p className={`font-bold text-accent-gold ${compact ? 'text-base' : 'text-lg'}`}>
             {hasPriceRange ? `${formatCurrency(product.price_min)} – ${formatCurrency(product.price_max)}` : formatCurrency(displayPrice)}
           </p>
-          {profitMargin && !compact && (
+          {canViewFinancials && profitMargin && !compact && (
             <p className="text-[10px] text-green-500">{profitMargin}% margin</p>
           )}
           <p className={`text-xs font-medium ${isLowStock ? 'text-red-500' : 'text-theme-secondary'}`}>

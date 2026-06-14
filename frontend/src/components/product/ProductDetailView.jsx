@@ -5,6 +5,7 @@ import {
   Eye, ChevronLeft, ChevronRight, Globe, Layers,
 } from 'lucide-react';
 import { useCurrency } from '../../context/CurrencyContext';
+import usePermissions from '../../hooks/usePermissions';
 
 /**
  * ProductDetailView Component
@@ -19,6 +20,7 @@ const ProductDetailView = ({
   className = '',
 }) => {
   const { formatCurrency } = useCurrency();
+  const { canViewFinancials } = usePermissions();
 
   const {
     product_name,
@@ -211,7 +213,7 @@ const ProductDetailView = ({
               <div className="grid grid-cols-4 gap-2 px-5 py-2 text-xs font-semibold text-theme-muted">
                 <span>Category</span>
                 <span className="text-right">Price</span>
-                <span className="text-right">Cost</span>
+                {canViewFinancials && <span className="text-right">Cost</span>}
                 <span className="text-right">Stock</span>
               </div>
               {selectionPrices.map((sp, idx) => {
@@ -221,10 +223,10 @@ const ProductDetailView = ({
                   <div key={idx} className="grid grid-cols-4 gap-2 px-5 py-3 text-sm items-center">
                     <span className="text-theme-primary font-medium truncate">{sp.category_name}{sp.unit ? ` (${sp.unit})` : ''}</span>
                     <span className="text-right text-accent-gold font-bold">{formatCurrency(sp.price)}</span>
-                    <span className="text-right text-theme-muted">{sp.cost_price ? formatCurrency(sp.cost_price) : '–'}</span>
+                    {canViewFinancials && <span className="text-right text-theme-muted">{sp.cost_price ? formatCurrency(sp.cost_price) : '–'}</span>}
                     <div className="text-right">
                       <span className="text-theme-primary">{sp.stock}</span>
-                      {spMargin && <span className="block text-[10px] text-green-500">{spMargin}%</span>}
+                      {canViewFinancials && spMargin && <span className="block text-[10px] text-green-500">{spMargin}%</span>}
                     </div>
                   </div>
                 );
@@ -237,7 +239,10 @@ const ProductDetailView = ({
           {/* Single Price Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <PriceCard label="Selling Price" value={formatCurrency(price)} accent="text-accent-gold" bg="bg-accent-gold/10 border-accent-gold/20" />
+            {canViewFinancials && (
             <PriceCard label="Cost Price" value={effectiveCost ? formatCurrency(effectiveCost) : '—'} accent="text-theme-primary" bg="bg-theme-tertiary border-theme" />
+            )}
+            {canViewFinancials && (
             <PriceCard label="Profit / Unit"
               value={profitPerUnit !== null ? formatCurrency(profitPerUnit) : '—'}
               sub={profitMargin ? `${profitMargin}% margin` : null}
@@ -246,10 +251,11 @@ const ProductDetailView = ({
                 ? 'bg-green-500/10 border-green-500/20'
                 : 'bg-red-500/10 border-red-500/20'}
             />
+            )}
           </div>
 
           {/* Profit Breakdown */}
-          {profitMargin && (
+          {canViewFinancials && profitMargin && (
             <div className="rounded-xl border border-theme bg-theme-secondary p-5">
               <h4 className="text-sm font-semibold text-theme-secondary mb-4">Profit Analysis</h4>
               <div className="space-y-3">
@@ -331,7 +337,7 @@ const ProductDetailView = ({
       </div>
 
       {/* Inventory Value */}
-      {effectiveCost > 0 && !hasPriceRange && (
+      {canViewFinancials && effectiveCost > 0 && !hasPriceRange && (
         <div className="rounded-xl border border-theme bg-theme-secondary p-5">
           <h4 className="text-sm font-semibold text-theme-secondary mb-4">Inventory Value</h4>
           <div className="space-y-3">

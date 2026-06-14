@@ -4,6 +4,7 @@ import { branchesAPI } from '../api/branches';
 import { useCurrency } from '../context/CurrencyContext';
 import LoadingSpinner from '../components/ui/LoadingSpinner';
 import { useAuth } from '../context/AuthContext';
+import usePermissions from '../hooks/usePermissions';
 import { toast } from 'react-toastify';
 import BranchFormModal from '../components/BranchFormModal';
 import {
@@ -18,6 +19,7 @@ const BranchDetailPage = () => {
   const navigate = useNavigate();
   const { formatCurrency } = useCurrency();
   const { auth } = useAuth();
+  const { canViewFinancials } = usePermissions();
 
   const [branch, setBranch] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -226,7 +228,7 @@ const BranchDetailPage = () => {
 
       {/* Tab Content */}
       {activeTab === 'overview' && (
-        <OverviewTab branch={branch} dashboard={dashboard} formatCurrency={formatCurrency} loading={loadingAnalytics} />
+        <OverviewTab branch={branch} dashboard={dashboard} formatCurrency={formatCurrency} loading={loadingAnalytics} canViewFinancials={canViewFinancials} />
       )}
       {activeTab === 'products' && (
         <ProductsTab
@@ -236,6 +238,7 @@ const BranchDetailPage = () => {
           setSearch={setProductSearch}
           formatCurrency={formatCurrency}
           loading={loadingAnalytics}
+          canViewFinancials={canViewFinancials}
         />
       )}
       {activeTab === 'staff' && (
@@ -256,7 +259,7 @@ const BranchDetailPage = () => {
 };
 
 // ─── Overview Tab ──────────────────────────────────────────
-const OverviewTab = ({ branch, dashboard, formatCurrency, loading }) => (
+const OverviewTab = ({ branch, dashboard, formatCurrency, loading, canViewFinancials }) => (
   <div className="space-y-6">
     {/* Contact Info */}
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -288,18 +291,22 @@ const OverviewTab = ({ branch, dashboard, formatCurrency, loading }) => (
           value={dashboard.sales_summary?.total_sales || 0}
           color="blue"
         />
+        {canViewFinancials && (
         <QuickStat
           icon={DollarSign}
           label="Revenue"
           value={formatCurrency(dashboard.sales_summary?.total_revenue || 0)}
           color="green"
         />
+        )}
+        {canViewFinancials && (
         <QuickStat
           icon={TrendingUp}
           label="Profit"
           value={formatCurrency(dashboard.sales_summary?.total_profit || 0)}
           color="emerald"
         />
+        )}
         <QuickStat
           icon={Users}
           label="Customers"
@@ -338,23 +345,29 @@ const OverviewTab = ({ branch, dashboard, formatCurrency, loading }) => (
 );
 
 // ─── Products Tab ──────────────────────────────────────────
-const ProductsTab = ({ inventory, totals, search, setSearch, formatCurrency, loading }) => (
+const ProductsTab = ({ inventory, totals, search, setSearch, formatCurrency, loading, canViewFinancials }) => (
   <div className="space-y-4">
     {/* Totals */}
     {totals && (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {canViewFinancials && (
         <div className="bg-gradient-to-br from-blue-500/10 to-blue-600/5 border border-blue-200/30 rounded-2xl p-4">
           <p className="text-xs text-blue-600 dark:text-blue-400 mb-1">Cost Value</p>
           <p className="text-lg font-bold text-blue-700 dark:text-blue-300">{formatCurrency(totals.total_cost_value)}</p>
         </div>
+        )}
+        {canViewFinancials && (
         <div className="bg-gradient-to-br from-emerald-500/10 to-emerald-600/5 border border-emerald-200/30 rounded-2xl p-4">
           <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-1">Selling Value</p>
           <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">{formatCurrency(totals.total_selling_value)}</p>
         </div>
+        )}
+        {canViewFinancials && (
         <div className="bg-gradient-to-br from-purple-500/10 to-purple-600/5 border border-purple-200/30 rounded-2xl p-4">
           <p className="text-xs text-purple-600 dark:text-purple-400 mb-1">Potential Profit</p>
           <p className="text-lg font-bold text-purple-700 dark:text-purple-300">{formatCurrency(totals.total_potential_profit)}</p>
         </div>
+        )}
       </div>
     )}
 
@@ -388,9 +401,9 @@ const ProductsTab = ({ inventory, totals, search, setSearch, formatCurrency, loa
               <tr className="border-b border-default">
                 <th className="text-left py-3 px-4 text-xs font-semibold text-secondary uppercase">Product</th>
                 <th className="text-right py-3 px-4 text-xs font-semibold text-secondary uppercase">On Hand</th>
-                <th className="text-right py-3 px-4 text-xs font-semibold text-secondary uppercase hidden md:table-cell">Cost Price</th>
+                {canViewFinancials && <th className="text-right py-3 px-4 text-xs font-semibold text-secondary uppercase hidden md:table-cell">Cost Price</th>}
                 <th className="text-right py-3 px-4 text-xs font-semibold text-secondary uppercase hidden md:table-cell">Sell Price</th>
-                <th className="text-right py-3 px-4 text-xs font-semibold text-secondary uppercase">Stock Value</th>
+                {canViewFinancials && <th className="text-right py-3 px-4 text-xs font-semibold text-secondary uppercase">Stock Value</th>}
               </tr>
             </thead>
             <tbody>
@@ -409,15 +422,19 @@ const ProductsTab = ({ inventory, totals, search, setSearch, formatCurrency, loa
                       {item.quantity_on_hand}
                     </span>
                   </td>
+                  {canViewFinancials && (
                   <td className="py-3 px-4 text-right text-secondary hidden md:table-cell">
                     {formatCurrency(item.cost_price)}
                   </td>
+                  )}
                   <td className="py-3 px-4 text-right text-secondary hidden md:table-cell">
                     {formatCurrency(item.selling_price)}
                   </td>
+                  {canViewFinancials && (
                   <td className="py-3 px-4 text-right font-semibold text-primary">
                     {formatCurrency(item.selling_value)}
                   </td>
+                  )}
                 </tr>
               ))}
             </tbody>

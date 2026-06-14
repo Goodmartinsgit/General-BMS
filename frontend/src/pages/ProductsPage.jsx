@@ -9,6 +9,7 @@ import { toast } from 'react-toastify';
 import api from '../api/axios';
 import { useCurrency } from '../context/CurrencyContext';
 import { useAuth } from '../context/AuthContext';
+import usePermissions from '../hooks/usePermissions';
 import PageHeader from '../components/common/PageHeader';
 import ProductFormModal from '../components/product/ProductFormModal';
 import BlurredValue from '../components/common/BlurredValue';
@@ -18,6 +19,7 @@ const ProductsPage = () => {
   const { auth } = useAuth();
   const user = auth?.user;
   const navigate = useNavigate();
+  const { canViewFinancials } = usePermissions();
   const [searchParams] = useSearchParams();
 
   const [products, setProducts] = useState([]);
@@ -636,12 +638,14 @@ const ProductsPage = () => {
                     {formatPriceDisplay(product)}
                   </p>
                 </div>
+                {canViewFinancials && (
                 <div>
                   <p className="text-[10px] sm:text-xs text-theme-muted">Cost</p>
                   <p className="text-sm sm:text-base font-semibold text-theme-secondary truncate">
                     {formatCurrency(getCostPrice(product))}
                   </p>
                 </div>
+                )}
                 <div className="text-right">
                   <p className="text-[10px] sm:text-xs text-theme-muted">Stock</p>
                   <p className={`text-base sm:text-lg md:text-xl font-bold ${
@@ -745,7 +749,7 @@ const ProductsPage = () => {
 
       {/* Statistics Cards */}
       {statistics && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 md:gap-4">
+        <div className={`grid grid-cols-1 sm:grid-cols-2 ${canViewFinancials ? 'lg:grid-cols-5' : 'lg:grid-cols-3'} gap-3 md:gap-4`}>
           <div className="p-3 md:p-4 rounded-xl bg-theme-secondary border border-blue-500/50 shadow-theme-sm relative overflow-hidden group">
             <div className="relative z-10">
               <h3 className="text-xs md:text-sm font-medium text-theme-muted mb-1">Total Products</h3>
@@ -777,6 +781,7 @@ const ProductsPage = () => {
             <BarChart3 className="absolute -right-2 -bottom-2 w-12 h-12 text-yellow-500/10 group-hover:scale-110 transition-transform" />
           </div>
 
+          {canViewFinancials && (
           <div className="p-3 md:p-4 rounded-xl bg-theme-secondary border border-purple-500/50 shadow-theme-sm relative overflow-hidden group">
             <div className="relative z-10">
               <h3 className="text-xs md:text-sm font-medium text-theme-muted mb-1">Stock Cost</h3>
@@ -786,7 +791,9 @@ const ProductsPage = () => {
             </div>
             <DollarSign className="absolute -right-2 -bottom-2 w-12 h-12 text-purple-500/10 group-hover:scale-110 transition-transform" />
           </div>
+          )}
 
+          {canViewFinancials && (
           <div className="p-3 md:p-4 rounded-xl bg-theme-secondary border border-accent-gold/50 shadow-theme-sm relative overflow-hidden group">
             <div className="relative z-10">
               <h3 className="text-xs md:text-sm font-medium text-theme-muted mb-1">Stock Value</h3>
@@ -796,6 +803,7 @@ const ProductsPage = () => {
             </div>
             <TrendingUp className="absolute -right-2 -bottom-2 w-12 h-12 text-theme-accent opacity-[0.08] group-hover:scale-110 transition-transform" />
           </div>
+          )}
         </div>
       )}
 
