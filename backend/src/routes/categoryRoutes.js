@@ -8,6 +8,7 @@ const {
   createCategory,
   updateCategory,
   deleteCategory,
+  getCategoryDeletePreview,
   getProductAssignments,
   saveProductAssignments,
   getSubcategoryTree,
@@ -30,6 +31,7 @@ router.post('/assignments/:productId', authenticateToken, authorize('manage_prod
 router.get('/by-level/:level', authenticateToken, authorize('view_products'), getCategoriesByLevel);
 
 // Parameterized routes (must be last)
+router.get('/:id/delete-preview', authenticateToken, authorize('manage_products'), getCategoryDeletePreview);
 router.get('/:id', authenticateToken, authorize('view_products'), getCategoryById);
 router.get('/:id/subtree', authenticateToken, authorize('view_products'), getSubcategoryTree);
 router.get('/:id/listing-level', authenticateToken, authorize('view_products'), getListingLevelCategories);

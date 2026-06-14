@@ -25,6 +25,26 @@ const CategoryDetailPage = ({ categoryId, onClose, onUpdate }) => {
   const [submitting, setSubmitting] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
+  // Delete preview state
+  const [deletePreview, setDeletePreview] = useState(null);
+  const [loadingPreview, setLoadingPreview] = useState(false);
+
+  const handleOpenDeleteModal = async () => {
+    setLoadingPreview(true);
+    setDeletePreview(null);
+    setShowDeleteModal(true);
+    try {
+      const response = await api.get(`/categories/${categoryId}/delete-preview`);
+      setDeletePreview(response.data);
+    } catch (err) {
+      console.error('Failed to load delete preview:', err);
+      toast.error('Failed to load category deletion details.');
+      setShowDeleteModal(false);
+    } finally {
+      setLoadingPreview(false);
+    }
+  };
+
   useEffect(() => {
     if (categoryId) fetchData();
   }, [categoryId]);
@@ -202,7 +222,7 @@ const CategoryDetailPage = ({ categoryId, onClose, onUpdate }) => {
               Edit
             </button>
             <button
-              onClick={() => setShowDeleteModal(true)}
+              onClick={handleOpenDeleteModal}
               className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg text-sm font-semibold hover:bg-red-600 transition-colors shadow-sm"
             >
               <Trash2 size={14} />
@@ -303,6 +323,8 @@ const CategoryDetailPage = ({ categoryId, onClose, onUpdate }) => {
         {showDeleteModal && (
           <DeleteConfirmDialog
             category={category}
+            deletePreview={deletePreview}
+            loadingPreview={loadingPreview}
             onClose={() => setShowDeleteModal(false)}
             onConfirm={handleDelete}
             deleting={deleting}
@@ -537,49 +559,108 @@ const CategoryFormModal = ({ item, parentCategory, onClose, onSubmit, submitting
 };
 
 // ── Delete Confirmation Dialog ──────────────────────────────────────────────
-const DeleteConfirmDialog = ({ category, onClose, onConfirm, deleting }) => (
-  <div className="fixed inset-0 z-60 flex items-center justify-center p-4" onClick={onClose}>
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
-    <div
-      className="relative bg-theme-secondary rounded-xl border border-theme shadow-theme-xl w-full max-w-sm p-6 space-y-4"
-      onClick={e => e.stopPropagation()}
-    >
-      <div className="flex items-start gap-3">
-        <div className="w-9 h-9 rounded-full bg-red-500/10 flex items-center justify-center shrink-0">
-          <Trash2 size={16} className="text-red-500" />
-        </div>
-        <div>
-          <h3 className="text-sm font-semibold text-theme-primary">Delete Category</h3>
-          <p className="text-sm text-theme-muted mt-1">
-            Are you sure you want to delete <span className="font-medium text-theme-primary">{category.category_name}</span>?
-            {category.children_count > 0 && (
-              <span className="block mt-1 text-amber-500 text-xs">
-                This category has {category.children_count} sub-categor{category.children_count !== 1 ? 'ies' : 'y'}.
-              </span>
+const DeleteConfirmDialog = ({ category, deletePreview, loadingPreview, onClose, onConfirm, deleting }) => {
+  const [confirmName, setConfirmName] = useState('');
+
+  const hasDependencies = deletePreview && (
+    deletePreview.subcategories_count > 0 ||
+    deletePreview.active_products_count > 0 ||
+    deletePreview.soft_deleted_products_count > 0
+  );
+
+  const isConfirmed = !hasDependencies || confirmName.trim() === deletePreview?.category_name;
+
+  return (
+    <div className="fixed inset-0 z-60 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" />
+      <div
+        className="relative bg-theme-secondary rounded-xl border border-theme shadow-theme-xl w-full max-w-md p-6 space-y-4"
+        onClick={e => e.stopPropagation()}
+      >
+        {loadingPreview ? (
+          <div className="flex flex-col items-center justify-center py-10 gap-3 text-theme-muted">
+            <RefreshCw size={24} className="animate-spin text-accent-gold" />
+            <span className="text-sm font-medium">Analyzing category relations...</span>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center shrink-0">
+                <Trash2 size={18} className="text-red-500" />
+              </div>
+              <div className="flex-1 space-y-2">
+                <h3 className="text-base font-semibold text-theme-primary">Delete Category</h3>
+                <p className="text-sm text-theme-muted">
+                  Are you sure you want to delete <span className="font-semibold text-theme-primary">{category.category_name}</span>?
+                </p>
+
+                {hasDependencies && (
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-3.5 space-y-2 text-xs text-red-500 font-medium">
+                    <p className="font-bold flex items-center gap-1.5">
+                      <AlertCircle size={14} /> High-Risk Deletion
+                    </p>
+                    <ul className="list-disc list-inside space-y-1 opacity-90">
+                      {deletePreview.subcategories_count > 0 && (
+                        <li>
+                          This will also permanently delete <strong>{deletePreview.subcategories_count} sub-categor{deletePreview.subcategories_count !== 1 ? 'ies' : 'y'}</strong>.
+                        </li>
+                      )}
+                      {(deletePreview.active_products_count > 0 || deletePreview.soft_deleted_products_count > 0) && (
+                        <li>
+                          {deletePreview.active_products_count > 0 && (
+                            <span><strong>{deletePreview.active_products_count} active product{deletePreview.active_products_count !== 1 ? 's' : ''}</strong> </span>
+                          )}
+                          {deletePreview.soft_deleted_products_count > 0 && (
+                            <span>(and <strong>{deletePreview.soft_deleted_products_count} deleted product{deletePreview.soft_deleted_products_count !== 1 ? 's' : ''}</strong>) </span>
+                          )}
+                          will lose this category association and become <strong>uncategorized</strong>.
+                        </li>
+                      )}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {hasDependencies && (
+              <div className="space-y-2 pt-2 border-t border-theme">
+                <label className="block text-xs font-semibold text-theme-secondary">
+                  To confirm, type the category name: <span className="font-bold text-theme-primary select-all">"{deletePreview.category_name}"</span>
+                </label>
+                <input
+                  type="text"
+                  value={confirmName}
+                  onChange={e => setConfirmName(e.target.value)}
+                  className="w-full px-3 py-2 bg-theme-primary border border-theme rounded-lg text-sm text-theme-primary placeholder-theme-muted focus:ring-2 focus:ring-red-500/20 focus:border-red-500/30 outline-none transition-all"
+                  placeholder="Enter category name to verify"
+                  autoFocus
+                />
+              </div>
             )}
-          </p>
-        </div>
-      </div>
-      <div className="flex justify-end gap-3">
-        <button
-          onClick={onClose}
-          disabled={deleting}
-          className="px-4 py-2 text-sm font-medium text-theme-secondary bg-theme-primary hover:bg-theme-tertiary border border-theme rounded-lg transition-colors"
-        >
-          Cancel
-        </button>
-        <button
-          onClick={onConfirm}
-          disabled={deleting}
-          className="flex items-center gap-2 px-4 py-2 text-sm font-semibold bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-60"
-        >
-          {deleting && <RefreshCw size={13} className="animate-spin" />}
-          Delete
-        </button>
+
+            <div className="flex justify-end gap-3 pt-2">
+              <button
+                onClick={onClose}
+                disabled={deleting}
+                className="px-4 py-2 text-sm font-medium text-theme-secondary bg-theme-primary hover:bg-theme-tertiary border border-theme rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={onConfirm}
+                disabled={deleting || !isConfirmed}
+                className="flex items-center gap-2 px-5 py-2 text-sm font-semibold bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+              >
+                {deleting && <RefreshCw size={13} className="animate-spin" />}
+                Delete Category
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 // ── Shared UI Components ────────────────────────────────────────────────────
 const ModalShell = ({ title, onClose, children }) => (

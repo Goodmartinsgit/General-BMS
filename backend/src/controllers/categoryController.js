@@ -710,37 +710,100 @@ const updateCategory = async (req, res) => {
 };
 
 /**
+ * GET /api/categories/:id/delete-preview
+ * Get counts of subcategories and products that will be affected by deleting this category.
+ */
+const getCategoryDeletePreview = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    // 1. Get the category to ensure it exists and get its path
+    const catRes = await query('SELECT path, category_name FROM categories WHERE id = $1', [id]);
+    if (catRes.rows.length === 0) {
+      return res.status(404).json({ message: 'Category not found' });
+    }
+    const { path, category_name } = catRes.rows[0];
+
+    // 2. Find all categories in the subtree (descendants + self)
+    const treeRes = await query(
+      `SELECT id FROM categories WHERE path LIKE $1 || '/%' OR id = $2`,
+      [path, id]
+    );
+    const catIds = treeRes.rows.map(r => r.id);
+
+    // 3. Count sub-categories (descendants)
+    const subcategoriesCount = catIds.length - 1;
+
+    // 4. Count active products
+    const activeProductsRes = await query(
+      'SELECT COUNT(*)::int AS cnt FROM products WHERE category_id = ANY($1) AND deleted_at IS NULL',
+      [catIds]
+    );
+    const activeProductsCount = activeProductsRes.rows[0].cnt;
+
+    // 5. Count soft-deleted products
+    const softDeletedProductsRes = await query(
+      'SELECT COUNT(*)::int AS cnt FROM products WHERE category_id = ANY($1) AND deleted_at IS NOT NULL',
+      [catIds]
+    );
+    const softDeletedProductsCount = softDeletedProductsRes.rows[0].cnt;
+
+    res.json({
+      category_name,
+      subcategories_count: subcategoriesCount,
+      active_products_count: activeProductsCount,
+      soft_deleted_products_count: softDeletedProductsCount
+    });
+  } catch (err) {
+    console.error('Error fetching category delete preview:', err);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+/**
  * DELETE /api/categories/:id
- * Delete a category (blocks if it has children or assigned products).
+ * Delete a category and its descendants, setting product references to NULL.
  */
 const deleteCategory = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // Block deletion if children exist
-    const childCheck = await query(
-      'SELECT COUNT(*)::int AS cnt FROM categories WHERE parent_category_id = $1',
-      [id]
-    );
-    if (childCheck.rows[0].cnt > 0) {
-      return res.status(400).json({
-        message: 'Cannot delete category with sub-categories. Remove children first.',
-      });
+    // 1. Get the category to ensure it exists and get its path
+    const catRes = await query('SELECT path, category_name FROM categories WHERE id = $1', [id]);
+    if (catRes.rows.length === 0) {
+      return res.status(404).json({ message: 'Category not found' });
     }
+    const { path } = catRes.rows[0];
 
-    // Block deletion if products are assigned
-    const productCheck = await query(
-      'SELECT COUNT(*)::int AS cnt FROM products WHERE category_id = $1 AND deleted_at IS NULL',
-      [id]
+    // 2. Find all categories in the subtree (descendants + self)
+    const treeRes = await query(
+      `SELECT id FROM categories WHERE path LIKE $1 || '/%' OR id = $2`,
+      [path, id]
     );
-    if (productCheck.rows[0].cnt > 0) {
-      return res.status(400).json({
-        message: 'Cannot delete category with assigned products.',
-      });
-    }
+    const catIdsToDelete = treeRes.rows.map(r => r.id);
 
-    await query('DELETE FROM categories WHERE id = $1', [id]);
-    res.json({ message: 'Category deleted' });
+    // 3. Begin transaction to safely nullify products and delete categories
+    await query('BEGIN');
+    try {
+      // Set category_id = NULL for all products referencing these categories
+      // (This handles both active and soft-deleted products, preventing foreign key violation 500 errors)
+      await query(
+        'UPDATE products SET category_id = NULL, updated_at = NOW() WHERE category_id = ANY($1)',
+        [catIdsToDelete]
+      );
+
+      // Delete the categories (ON DELETE CASCADE will clean up product_category_assignments)
+      await query(
+        'DELETE FROM categories WHERE id = ANY($1)',
+        [catIdsToDelete]
+      );
+
+      await query('COMMIT');
+      res.json({ message: 'Category and its sub-categories deleted successfully' });
+    } catch (txErr) {
+      await query('ROLLBACK');
+      throw txErr;
+    }
   } catch (err) {
     console.error('Error deleting category:', err);
     res.status(500).json({ message: 'Server error' });
@@ -1017,6 +1080,7 @@ module.exports = {
   createCategory,
   updateCategory,
   deleteCategory,
+  getCategoryDeletePreview,
   getProductAssignments,
   saveProductAssignments,
   getSubcategoryTree,
