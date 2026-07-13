@@ -36,6 +36,7 @@ backend/test-dashboard.js
 # Editor directories and files
 .idea
 .vscode
+.claude/
 *.suo
 *.ntvs*
 *.njsproj
