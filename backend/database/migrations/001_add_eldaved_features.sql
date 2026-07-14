@@ -16,14 +16,10 @@ CREATE EXTENSION IF NOT EXISTS pg_trgm;
 
 -- Enhance products table
 ALTER TABLE products
-  ADD COLUMN IF NOT EXISTS product_type VARCHAR(20) DEFAULT 'tile' CHECK (product_type IN ('tile', 'accessory')),
-  ADD COLUMN IF NOT EXISTS tile_type_id INTEGER,
-  ADD COLUMN IF NOT EXISTS size_id INTEGER,
-  ADD COLUMN IF NOT EXISTS use_case_id INTEGER,
+  ADD COLUMN IF NOT EXISTS product_type VARCHAR(20) DEFAULT 'physical',
   ADD COLUMN IF NOT EXISTS search_vector TSVECTOR,
   ADD COLUMN IF NOT EXISTS commission_amount DECIMAL(15, 2) DEFAULT 0,
   ADD COLUMN IF NOT EXISTS model_images JSONB DEFAULT '[]',
-  ADD COLUMN IF NOT EXISTS calculator_enabled BOOLEAN DEFAULT FALSE,
   ADD COLUMN IF NOT EXISTS is_featured BOOLEAN DEFAULT FALSE,
   ADD COLUMN IF NOT EXISTS view_count INTEGER DEFAULT 0,
   ADD COLUMN IF NOT EXISTS sale_count INTEGER DEFAULT 0;
@@ -69,156 +65,12 @@ ALTER TABLE stock_transfers ADD CONSTRAINT stock_transfers_status_check
   CHECK (status IN ('pending', 'approved', 'in_transit', 'completed', 'cancelled'));
 
 -- ============================================================================
--- PART 3: CREATE NEW CATEGORY TABLES
+-- PART 3: (Tile-specific tables removed - this BMS is general-purpose)
 -- ============================================================================
 
--- Sizes table (for tiles)
-CREATE TABLE IF NOT EXISTS sizes (
-  id SERIAL PRIMARY KEY,
-  size_name VARCHAR(100) NOT NULL,
-  length_mm INTEGER, -- Length in millimeters
-  width_mm INTEGER, -- Width in millimeters
-  thickness_mm INTEGER, -- Thickness in millimeters
-  coverage_per_carton DECIMAL(10, 3), -- Square meters per carton
-  pieces_per_carton INTEGER,
-  description TEXT,
-  display_order INTEGER DEFAULT 0,
-  is_active BOOLEAN DEFAULT TRUE,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Use cases table
-CREATE TABLE IF NOT EXISTS use_cases (
-  id SERIAL PRIMARY KEY,
-  use_case_name VARCHAR(100) NOT NULL,
-  description TEXT,
-  icon VARCHAR(50),
-  display_order INTEGER DEFAULT 0,
-  is_active BOOLEAN DEFAULT TRUE,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Tile types table
-CREATE TABLE IF NOT EXISTS tile_types (
-  id SERIAL PRIMARY KEY,
-  tile_type_name VARCHAR(100) NOT NULL,
-  description TEXT,
-  properties JSONB DEFAULT '{}',
-  display_order INTEGER DEFAULT 0,
-  is_active BOOLEAN DEFAULT TRUE,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Optional categories (flexible categorization)
-CREATE TABLE IF NOT EXISTS optional_categories (
-  id SERIAL PRIMARY KEY,
-  category_name VARCHAR(100) NOT NULL,
-  category_type VARCHAR(50), -- e.g., 'finish', 'style', 'collection'
-  description TEXT,
-  display_order INTEGER DEFAULT 0,
-  is_active BOOLEAN DEFAULT TRUE,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Product optional categories pivot table
-CREATE TABLE IF NOT EXISTS product_optional_categories (
-  id SERIAL PRIMARY KEY,
-  product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
-  optional_category_id INTEGER REFERENCES optional_categories(id) ON DELETE CASCADE,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE(product_id, optional_category_id)
-);
-
--- Accessory categories
-CREATE TABLE IF NOT EXISTS accessory_categories (
-  id SERIAL PRIMARY KEY,
-  category_name VARCHAR(100) NOT NULL,
-  parent_category_id INTEGER REFERENCES accessory_categories(id),
-  description TEXT,
-  display_order INTEGER DEFAULT 0,
-  is_active BOOLEAN DEFAULT TRUE,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Accessory attributes (for flexible accessory properties)
-CREATE TABLE IF NOT EXISTS accessory_attributes (
-  id SERIAL PRIMARY KEY,
-  attribute_name VARCHAR(100) NOT NULL,
-  attribute_type VARCHAR(20) DEFAULT 'text', -- text, number, boolean, select
-  attribute_values JSONB DEFAULT '[]', -- For select type
-  is_required BOOLEAN DEFAULT FALSE,
-  display_order INTEGER DEFAULT 0,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Product accessory attributes values
-CREATE TABLE IF NOT EXISTS product_accessory_attributes (
-  id SERIAL PRIMARY KEY,
-  product_id INTEGER REFERENCES products(id) ON DELETE CASCADE,
-  attribute_id INTEGER REFERENCES accessory_attributes(id) ON DELETE CASCADE,
-  attribute_value TEXT,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  UNIQUE(product_id, attribute_id)
-);
-
 -- ============================================================================
--- PART 4: TILE CALCULATOR TABLES
+-- PART 4: (Tile calculator tables removed - this BMS is general-purpose)
 -- ============================================================================
-
--- Calculator configurations per product
-CREATE TABLE IF NOT EXISTS tile_calculator_configs (
-  id SERIAL PRIMARY KEY,
-  product_id INTEGER REFERENCES products(id) ON DELETE CASCADE UNIQUE,
-  wastage_percentage DECIMAL(5, 2) DEFAULT 10.0,
-  installation_cost_per_sqm DECIMAL(15, 2) DEFAULT 0,
-  grout_cost_per_sqm DECIMAL(15, 2) DEFAULT 0,
-  additional_materials_cost DECIMAL(15, 2) DEFAULT 0,
-  labor_cost_per_sqm DECIMAL(15, 2) DEFAULT 0,
-  notes TEXT,
-  is_active BOOLEAN DEFAULT TRUE,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Saved calculations
-CREATE TABLE IF NOT EXISTS tile_calculations (
-  id SERIAL PRIMARY KEY,
-  calculation_number VARCHAR(50) UNIQUE NOT NULL,
-  customer_id INTEGER REFERENCES customers(id),
-  customer_name VARCHAR(150),
-  customer_phone VARCHAR(20),
-  customer_email VARCHAR(100),
-  customer_address TEXT,
-  room_name VARCHAR(100),
-  room_length_mm INTEGER NOT NULL,
-  room_width_mm INTEGER NOT NULL,
-  room_area_sqm DECIMAL(10, 3),
-  wastage_percentage DECIMAL(5, 2),
-  area_with_wastage DECIMAL(10, 3),
-  products_data JSONB NOT NULL, -- Array of {product_id, quantity, price, etc.}
-  installation_cost DECIMAL(15, 2) DEFAULT 0,
-  grout_cost DECIMAL(15, 2) DEFAULT 0,
-  labor_cost DECIMAL(15, 2) DEFAULT 0,
-  additional_costs DECIMAL(15, 2) DEFAULT 0,
-  subtotal DECIMAL(15, 2) NOT NULL,
-  tax_amount DECIMAL(15, 2) DEFAULT 0,
-  total_amount DECIMAL(15, 2) NOT NULL,
-  notes TEXT,
-  status VARCHAR(20) DEFAULT 'draft', -- draft, quoted, converted_to_sale
-  converted_sale_id INTEGER REFERENCES sales(id),
-  converted_at TIMESTAMP,
-  created_by UUID REFERENCES users(id),
-  branch_id INTEGER REFERENCES branches(id),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  deleted_at TIMESTAMP
-);
 
 -- ============================================================================
 -- PART 5: STOCK MANAGEMENT TABLES
@@ -380,7 +232,7 @@ CREATE TABLE IF NOT EXISTS quotations (
   status VARCHAR(20) DEFAULT 'draft', -- draft, sent, accepted, rejected, expired, converted
   converted_sale_id INTEGER REFERENCES sales(id),
   converted_at TIMESTAMP,
-  source_calculation_id INTEGER REFERENCES tile_calculations(id),
+  source_calculation_id INTEGER, -- legacy field, tile_calculations table removed
   created_by UUID REFERENCES users(id),
   sent_at TIMESTAMP,
   sent_via VARCHAR(20), -- email, whatsapp, print
@@ -492,12 +344,6 @@ CREATE TABLE IF NOT EXISTS purge_logs (
 -- PART 13: ADD FOREIGN KEY CONSTRAINTS
 -- ============================================================================
 
--- Add foreign keys for products table new columns
-ALTER TABLE products
-  ADD CONSTRAINT fk_products_tile_type FOREIGN KEY (tile_type_id) REFERENCES tile_types(id),
-  ADD CONSTRAINT fk_products_size FOREIGN KEY (size_id) REFERENCES sizes(id),
-  ADD CONSTRAINT fk_products_use_case FOREIGN KEY (use_case_id) REFERENCES use_cases(id);
-
 -- Add foreign key for sales referrer
 ALTER TABLE sales
   ADD CONSTRAINT fk_sales_referrer FOREIGN KEY (referrer_id) REFERENCES referrers(id);
@@ -516,9 +362,6 @@ CREATE INDEX IF NOT EXISTS idx_products_is_active ON products(is_active);
 CREATE INDEX IF NOT EXISTS idx_products_is_featured ON products(is_featured);
 CREATE INDEX IF NOT EXISTS idx_products_brand_id ON products(brand_id);
 CREATE INDEX IF NOT EXISTS idx_products_category_id ON products(category_id);
-CREATE INDEX IF NOT EXISTS idx_products_tile_type_id ON products(tile_type_id);
-CREATE INDEX IF NOT EXISTS idx_products_size_id ON products(size_id);
-CREATE INDEX IF NOT EXISTS idx_products_calculator_enabled ON products(calculator_enabled);
 
 -- Sales indexes
 CREATE INDEX IF NOT EXISTS idx_sales_reversed_at ON sales(reversed_at);
@@ -536,10 +379,7 @@ CREATE INDEX IF NOT EXISTS idx_stock_transfers_status ON stock_transfers(status)
 CREATE INDEX IF NOT EXISTS idx_stock_transfers_from_branch ON stock_transfers(from_branch_id);
 CREATE INDEX IF NOT EXISTS idx_stock_transfers_to_branch ON stock_transfers(to_branch_id);
 
--- Calculator indexes
-CREATE INDEX IF NOT EXISTS idx_tile_calculations_customer_id ON tile_calculations(customer_id);
-CREATE INDEX IF NOT EXISTS idx_tile_calculations_status ON tile_calculations(status);
-CREATE INDEX IF NOT EXISTS idx_tile_calculations_created_at ON tile_calculations(created_at);
+-- (Tile calculator indexes removed)
 
 -- Recycle bin indexes
 CREATE INDEX IF NOT EXISTS idx_recycle_bin_entity_type ON recycle_bin(entity_type);
@@ -633,35 +473,7 @@ CREATE TRIGGER trg_branches_updated_at BEFORE UPDATE ON branches
 -- PART 16: INSERT DEFAULT/SEED DATA
 -- ============================================================================
 
--- Insert default sizes
-INSERT INTO sizes (size_name, length_mm, width_mm, coverage_per_carton, pieces_per_carton, display_order)
-VALUES
-  ('30x30 cm', 300, 300, 1.08, 12, 1),
-  ('40x40 cm', 400, 400, 1.28, 8, 2),
-  ('60x60 cm', 600, 600, 1.44, 4, 3),
-  ('30x60 cm', 300, 600, 1.08, 6, 4),
-  ('80x80 cm', 800, 800, 1.28, 2, 5)
-ON CONFLICT DO NOTHING;
-
--- Insert default use cases
-INSERT INTO use_cases (use_case_name, description, icon, display_order)
-VALUES
-  ('Floor', 'Floor tiles for indoor and outdoor use', 'floor', 1),
-  ('Wall', 'Wall tiles for bathrooms, kitchens, etc.', 'wall', 2),
-  ('Outdoor', 'Tiles suitable for outdoor spaces', 'outdoor', 3),
-  ('Kitchen', 'Kitchen-specific tiles', 'kitchen', 4),
-  ('Bathroom', 'Bathroom-specific tiles', 'bathroom', 5)
-ON CONFLICT DO NOTHING;
-
--- Insert default tile types
-INSERT INTO tile_types (tile_type_name, description, display_order)
-VALUES
-  ('Ceramic', 'Ceramic tiles - affordable and versatile', 1),
-  ('Porcelain', 'Porcelain tiles - durable and water-resistant', 2),
-  ('Vitrified', 'Vitrified tiles - high strength and low porosity', 3),
-  ('Granite', 'Granite tiles - natural stone appearance', 4),
-  ('Marble', 'Marble tiles - elegant and luxurious', 5)
-ON CONFLICT DO NOTHING;
+-- (Tile seed data removed)
 
 -- Insert default receipt config (if organization exists)
 INSERT INTO receipt_config (organization_id, business_name, paper_size, template_style)

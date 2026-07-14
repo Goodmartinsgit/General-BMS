@@ -976,7 +976,7 @@ CREATE TABLE IF NOT EXISTS quotations (
   status VARCHAR(20) DEFAULT 'draft',
   converted_sale_id INTEGER REFERENCES sales(id),
   converted_at TIMESTAMP,
-  source_calculation_id INTEGER REFERENCES tile_calculations(id),
+  source_calculation_id INTEGER,  -- legacy field (tile_calculations table removed)
   created_by UUID REFERENCES users(id),
   sent_at TIMESTAMP,
   sent_via VARCHAR(20),
