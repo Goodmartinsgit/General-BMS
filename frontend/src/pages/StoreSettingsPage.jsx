@@ -13,6 +13,8 @@ import { CURRENCIES, getCurrencySymbol } from '../utils/currency';
 import { useTheme, themes as themeList } from '../context/ThemeContext';
 import { getStoreConfig, updateStoreConfig, getCompanySettingsForStore } from '../api/storeConfig';
 import api from '../api/axios';
+import { setFavicon } from '../hooks/useFavicon';
+import { useBranding } from '../context/BrandingContext';
 
 // ── African timezone data ────────────────────────────────────────────────
 const AFRICA_TIMEZONES = [
@@ -303,6 +305,7 @@ const defaultStoreConfig = {
 
 const StoreSettingsPage = () => {
     const { persistTheme } = useTheme();
+    const { config: brandingConfig } = useBranding();
     const [activeTab, setActiveTab] = useState('general');
     const [config, setConfig] = useState(defaultStoreConfig);
     const [companySettings, setCompanySettings] = useState(null);
@@ -312,6 +315,38 @@ const StoreSettingsPage = () => {
     // Extra data for homepage
     const [categories, setCategories] = useState([]);
     const [products, setProducts] = useState([]);
+
+    // ── Store favicon: show the store's own logo (circular) while on the branding tab ──
+    useEffect(() => {
+        if (activeTab === 'branding') {
+            const storeLogo = config.logo_primary || null;
+            const storeName  = config.store_name || brandingConfig.company_name || 'S';
+            const accent     = config.accent_color || brandingConfig.accent_color || '#D4AF37';
+            setFavicon(storeLogo, accent, storeName.charAt(0));
+        } else {
+            // Restore company-level favicon on other tabs
+            const companyName = brandingConfig.organization_name || brandingConfig.company_name || 'BMS';
+            setFavicon(
+                brandingConfig.logo_url,
+                brandingConfig.accent_color || '#D4AF37',
+                companyName.charAt(0)
+            );
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeTab, config.logo_primary, config.store_name, config.accent_color]);
+
+    // Restore company favicon when the page unmounts
+    useEffect(() => {
+        return () => {
+            const companyName = brandingConfig.organization_name || brandingConfig.company_name || 'BMS';
+            setFavicon(
+                brandingConfig.logo_url,
+                brandingConfig.accent_color || '#D4AF37',
+                companyName.charAt(0)
+            );
+        };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const loadData = async () => {
         setLoading(true);

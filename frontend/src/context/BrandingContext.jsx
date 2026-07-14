@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import api from '../api/axios';
 import { useTheme } from './ThemeContext';
+import { setFavicon } from '../hooks/useFavicon';
 
 const BrandingContext = createContext();
 
@@ -141,6 +142,14 @@ export const BrandingProvider = ({ children }) => {
   useEffect(() => {
     applyBrandColors(config, theme, currentTheme);
   }, [config, theme, currentTheme]);
+
+  // Keep the favicon and page title in sync with branding
+  useEffect(() => {
+    const companyName = config.organization_name || config.company_name || 'General-Purpose-BMS';
+    const initial = companyName.charAt(0).toUpperCase();
+    setFavicon(config.logo_url, config.accent_color || '#D4AF37', initial);
+    document.title = companyName;
+  }, [config.logo_url, config.accent_color, config.company_name, config.organization_name]);
 
   // Block rendering until branding is loaded from the database.
   // The localStorage cache makes subsequent loads near-instant.
