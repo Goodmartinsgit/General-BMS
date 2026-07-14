@@ -11,7 +11,7 @@ CREATE TABLE IF NOT EXISTS wholesale_orders (
     payment_terms_days INT DEFAULT 0,
     notes TEXT,
     status VARCHAR(50) DEFAULT 'Pending',
-    created_by INT NOT NULL REFERENCES users(id),
+    created_by UUID REFERENCES users(id),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     deleted_at TIMESTAMP

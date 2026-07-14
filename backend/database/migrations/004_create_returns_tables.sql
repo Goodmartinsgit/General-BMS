@@ -1,7 +1,7 @@
 -- Migration: Create Returns and Exchanges Tables
 -- Description: Creates tables for managing sales returns and product exchanges
 
--- Create return_reasons table
+-- Create return_reasons table (or add missing columns if it already exists)
 CREATE TABLE IF NOT EXISTS return_reasons (
     id SERIAL PRIMARY KEY,
     reason_code VARCHAR(50) UNIQUE NOT NULL,
@@ -12,6 +12,11 @@ CREATE TABLE IF NOT EXISTS return_reasons (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Add description column if it was created by base schema without it
+ALTER TABLE return_reasons ADD COLUMN IF NOT EXISTS description TEXT;
+ALTER TABLE return_reasons ADD COLUMN IF NOT EXISTS display_order INT DEFAULT 0;
+ALTER TABLE return_reasons ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
 
 -- Create sales_returns table
 CREATE TABLE IF NOT EXISTS sales_returns (
