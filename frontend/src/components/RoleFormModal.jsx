@@ -223,10 +223,12 @@ const RoleFormModal = ({ isOpen, onClose, onSuccess, role, currentUserRoleLevel,
   // Initialise form when opening
   useEffect(() => {
     if (!isOpen) return;
-    // Use actual role level from auth context; ?? 1 fallback when genuinely missing
-    const effectiveLvl = myRoleLevel;
-    const levels = [2, 3, 4, 5, 6, 7, 8, 9, 10].filter(l => l > effectiveLvl);
-    const defaultLevel = levels.length > 0 ? levels[0] : 2;
+    // Coerce to number, fall back to 0 if anything weird
+    const lvl = Number(myRoleLevel);
+    const effectiveLvl = (!lvl || isNaN(lvl) || lvl < 1) ? 0 : lvl;
+    let levels = [2, 3, 4, 5, 6, 7, 8, 9, 10].filter(l => l > effectiveLvl);
+    if (levels.length === 0) levels = [2, 3, 4, 5, 6, 7, 8, 9, 10];
+    const defaultLevel = levels[0];
     if (role) {
       setFormData({
         role_name: role.role_name || '',
@@ -288,13 +290,20 @@ const RoleFormModal = ({ isOpen, onClose, onSuccess, role, currentUserRoleLevel,
   };
 
   // ── Available priority levels ────────────────────────────────────────────
-  // Only levels strictly below the current user's own level are allowed.
-  // myRoleLevel comes directly from auth context (never the ?? 99 fallback).
-  const effectiveUserLevel = myRoleLevel;
-  const availableLevels = useMemo(
-    () => [2, 3, 4, 5, 6, 7, 8, 9, 10].filter(l => l > effectiveUserLevel),
-    [effectiveUserLevel]
-  );
+  // Coerce to a valid number. If anything goes wrong, default to 0 (show all levels).
+  const parsedLevel = Number(myRoleLevel);
+  const effectiveUserLevel = (!parsedLevel || isNaN(parsedLevel) || parsedLevel < 1) ? 0 : parsedLevel;
+
+  // Debug: log so we can trace what's happening in production
+  console.log('[RoleFormModal] auth.user:', authUser, '| myRoleLevel:', myRoleLevel, '| parsedLevel:', parsedLevel, '| effectiveUserLevel:', effectiveUserLevel);
+
+  const availableLevels = useMemo(() => {
+    const filtered = [2, 3, 4, 5, 6, 7, 8, 9, 10].filter(l => l > effectiveUserLevel);
+    // Safety net: if somehow nothing passes the filter, show all levels 2-10 anyway.
+    // The backend still enforces hierarchy on submission.
+    if (filtered.length === 0) return [2, 3, 4, 5, 6, 7, 8, 9, 10];
+    return filtered;
+  }, [effectiveUserLevel]);
 
   // ── Stats ────────────────────────────────────────────────────────────────
   const permCount = useMemo(
