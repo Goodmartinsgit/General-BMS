@@ -49,9 +49,36 @@ const register = async (req, res) => {
     if (!roleId) {
         const rolesCount = await query('SELECT COUNT(*) FROM roles');
         if (parseInt(rolesCount.rows[0].count) === 0) {
+             const allPermissions = JSON.stringify({
+               view_dashboard: true, view_analytics: true, view_reports: true, view_dashboard_financials: true,
+               access_pos: true, apply_discounts: true,
+               view_sales: true, view_all_sales: true, create_sales: true, reverse_sales: true,
+               view_products: true, manage_products: true,
+               view_categories: true, create_categories: true, update_categories: true, delete_categories: true,
+               view_brands: true, create_brands: true, update_brands: true, delete_brands: true,
+               view_inventory: true, manage_inventory: true, view_stock: true, manage_stock: true, approve_stock_transfers: true,
+               view_customers: true, create_customers: true, update_customers: true, delete_customers: true,
+               view_users: true, manage_users: true,
+               view_suppliers: true, manage_suppliers: true, view_vendors: true, manage_vendors: true,
+               view_purchase_orders: true, manage_purchase_orders: true,
+               view_invoices: true, manage_invoices: true, view_quotations: true, manage_quotations: true,
+               view_payments: true, manage_payments: true, view_expenses: true, manage_expenses: true, delete_expenses: true,
+               view_bills: true, manage_bills: true, view_banks: true, manage_banks: true,
+               view_budgets: true, manage_budgets: true, view_accounting: true, manage_accounting: true,
+               view_promotions: true, manage_promotions: true, view_price_tiers: true, manage_price_tiers: true,
+               view_wholesale_orders: true, manage_wholesale_orders: true,
+               view_returns: true, manage_returns: true, view_receipts: true, manage_receipts: true,
+               manage_payroll: true, view_performance_tasks: true, manage_performance_tasks: true, view_tasks: true, manage_tasks: true,
+               view_branches: true, manage_branches: true, view_referrers: true, manage_referrers: true,
+               view_online_orders: true, process_online_orders: true, verify_order_payment: true,
+               update_order_tracking: true, edit_order_notes: true, manage_change_requests: true,
+               view_online_store: true, manage_online_store: true,
+               view_settings: true, manage_settings: true, view_audit_logs: true,
+               view_recycle_bin: true, manage_recycle_bin: true, admin: true
+             });
              const newRole = await query(
-               'INSERT INTO roles (role_name, description, role_level, is_system_role) VALUES ($1, $2, 1, true) RETURNING id',
-               ['Super Admin', 'System Administrator']
+               'INSERT INTO roles (role_name, description, role_level, is_system_role, permissions) VALUES ($1, $2, 1, true, $3) RETURNING id',
+               ['Super Admin', 'System Administrator', allPermissions]
              );
              roleId = newRole.rows[0].id;
         } else {
