@@ -214,19 +214,22 @@ const RoleFormModal = ({ isOpen, onClose, onSuccess, role, currentUserRoleLevel 
   // Initialise form when opening
   useEffect(() => {
     if (!isOpen) return;
+    const effectiveLvl = (currentUserRoleLevel == null || currentUserRoleLevel >= 10) ? 1 : currentUserRoleLevel;
+    const levels = [2, 3, 4, 5, 6, 7, 8, 9, 10].filter(l => l > effectiveLvl);
+    const defaultLevel = levels.length > 0 ? levels[0] : 2;
     if (role) {
       setFormData({
         role_name: role.role_name || '',
         description: role.description || '',
-        role_level: role.role_level ?? 4,
+        role_level: role.role_level ?? defaultLevel,
       });
       setPermissions(role.permissions || {});
     } else {
-      setFormData({ role_name: '', description: '', role_level: 4 });
+      setFormData({ role_name: '', description: '', role_level: defaultLevel });
       setPermissions({});
     }
     setExpandedGroups({});
-  }, [isOpen, role]);
+  }, [isOpen, role, currentUserRoleLevel]);
 
   // ── Permission helpers ───────────────────────────────────────────────────
   const togglePermission = (key) => {
@@ -264,6 +267,17 @@ const RoleFormModal = ({ isOpen, onClose, onSuccess, role, currentUserRoleLevel 
   const collapseAll = () => {
     setExpandedGroups({});
   };
+
+  // ── Available priority levels ────────────────────────────────────────────
+  // If currentUserRoleLevel is undefined or unreasonably high (e.g. 99 fallback),
+  // treat as level 1 (super admin) so all levels 2-10 are shown.
+  const effectiveUserLevel = (currentUserRoleLevel == null || currentUserRoleLevel >= 10)
+    ? 1
+    : currentUserRoleLevel;
+  const availableLevels = useMemo(
+    () => [2, 3, 4, 5, 6, 7, 8, 9, 10].filter(l => l > effectiveUserLevel),
+    [effectiveUserLevel]
+  );
 
   // ── Stats ────────────────────────────────────────────────────────────────
   const permCount = useMemo(
@@ -349,17 +363,17 @@ const RoleFormModal = ({ isOpen, onClose, onSuccess, role, currentUserRoleLevel 
                 <label className="block text-sm font-medium text-theme-primary mb-1.5">Priority Level</label>
                 <select
                   value={formData.role_level}
-                  onChange={e => setFormData(prev => ({ ...prev, role_level: e.target.value }))}
+                  onChange={e => setFormData(prev => ({ ...prev, role_level: parseInt(e.target.value, 10) }))}
                   disabled={isSuperAdmin}
                   className="w-full px-3 py-2 border border-theme rounded-lg bg-theme-primary text-theme-primary text-sm focus:ring-2 focus:ring-accent-gold/20 focus:border-accent-gold/30 outline-none disabled:opacity-50"
                 >
-                  {[2, 3, 4, 5, 6, 7, 8, 9, 10].filter(l => l > currentUserRoleLevel).map(level => (
+                  {availableLevels.map(level => (
                     <option key={level} value={level}>
                       Level {level} {level === 2 ? '(Admin)' : level === 3 ? '(Manager)' : level === 4 ? '(Staff)' : ''}
                     </option>
                   ))}
                 </select>
-                <p className="mt-1 text-xs text-theme-muted">Lower number = higher privilege. Must be below your level.</p>
+                <p className="mt-1 text-xs text-theme-muted">Lower number = higher privilege. Higher levels = lower privilege.</p>
               </div>
             </div>
 
