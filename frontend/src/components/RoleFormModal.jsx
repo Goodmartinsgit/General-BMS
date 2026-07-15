@@ -317,7 +317,7 @@ const RoleFormModal = ({ isOpen, onClose, onSuccess, role, currentUserRoleLevel,
     }
 
     if (formData.role_name.trim().toLowerCase().includes('super')) {
-      toast.error('"Super" is a reserved keyword and cannot be used in role names');
+      toast.error('Role names containing "Super" are reserved for the system. Please choose a different name.');
       return;
     }
 
