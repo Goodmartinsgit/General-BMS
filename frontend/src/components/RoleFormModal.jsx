@@ -295,12 +295,18 @@ const RoleFormModal = ({ isOpen, onClose, onSuccess, role, currentUserRoleLevel,
   const effectiveUserLevel = (!parsedLevel || isNaN(parsedLevel) || parsedLevel < 1) ? 0 : parsedLevel;
 
   const availableLevels = useMemo(() => {
-    const filtered = [2, 3, 4, 5, 6, 7, 8, 9, 10].filter(l => l > effectiveUserLevel);
-    // Safety net: if somehow nothing passes the filter, show all levels 2-10 anyway.
-    // The backend still enforces hierarchy on submission.
+    let list = [2, 3, 4, 5, 6, 7, 8, 9, 10];
+    // When editing/viewing a role, ensure its current level is in the dropdown list
+    // so it shows correctly (especially for Level 1 - Super Admin)
+    if (isEdit && role?.role_level && !list.includes(role.role_level)) {
+      list.push(role.role_level);
+      list.sort((a, b) => a - b);
+    }
+    const filtered = list.filter(l => l > effectiveUserLevel || (isEdit && l === role?.role_level));
+    // Safety net
     if (filtered.length === 0) return [2, 3, 4, 5, 6, 7, 8, 9, 10];
     return filtered;
-  }, [effectiveUserLevel]);
+  }, [effectiveUserLevel, isEdit, role?.role_level]);
 
   // ── Stats ────────────────────────────────────────────────────────────────
   const permCount = useMemo(
@@ -397,7 +403,7 @@ const RoleFormModal = ({ isOpen, onClose, onSuccess, role, currentUserRoleLevel,
                 >
                   {availableLevels.map(level => (
                     <option key={level} value={level}>
-                      Level {level} {level === 2 ? '(Admin)' : level === 3 ? '(Manager)' : level === 4 ? '(Staff)' : ''}
+                      Level {level} {level === 1 ? '(Super Admin)' : level === 2 ? '(Admin)' : level === 3 ? '(Manager)' : level === 4 ? '(Staff)' : ''}
                     </option>
                   ))}
                 </select>
