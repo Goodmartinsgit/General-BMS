@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { X, Shield, ChevronDown, ChevronRight, Check, Lock } from 'lucide-react';
 import { toast } from 'react-toastify';
 import usersAPI from '../api/users';
+import { useAuth } from '../context/AuthContext';
 
 // ── Permission catalogue ─────────────────────────────────────────────────────
 // Grouped by module for the checkbox UI.  Each entry: { key, label }
@@ -206,6 +207,14 @@ const ALL_PERMISSION_KEYS = PERMISSION_GROUPS.flatMap(g => g.permissions.map(p =
 const RoleFormModal = ({ isOpen, onClose, onSuccess, role, currentUserRoleLevel, currentUserPermissions }) => {
   const isEdit = !!role;
 
+  // Read current user directly from auth context — avoids fragile prop-passing
+  // and the ?? 99 fallback applied in the parent page.
+  const { auth } = useAuth();
+  const authUser = auth?.user;
+  // Props are accepted as overrides but auth context is the authoritative source.
+  const myRoleLevel = authUser?.role_level ?? currentUserRoleLevel ?? 1;
+  const myPermissions = authUser?.permissions ?? currentUserPermissions ?? null;
+
   const [formData, setFormData] = useState({ role_name: '', description: '', role_level: 4 });
   const [permissions, setPermissions] = useState({});
   const [loading, setLoading] = useState(false);
@@ -214,8 +223,8 @@ const RoleFormModal = ({ isOpen, onClose, onSuccess, role, currentUserRoleLevel,
   // Initialise form when opening
   useEffect(() => {
     if (!isOpen) return;
-    // Use actual role level; only fall back to 1 when genuinely missing
-    const effectiveLvl = currentUserRoleLevel ?? 1;
+    // Use actual role level from auth context; ?? 1 fallback when genuinely missing
+    const effectiveLvl = myRoleLevel;
     const levels = [2, 3, 4, 5, 6, 7, 8, 9, 10].filter(l => l > effectiveLvl);
     const defaultLevel = levels.length > 0 ? levels[0] : 2;
     if (role) {
@@ -230,7 +239,7 @@ const RoleFormModal = ({ isOpen, onClose, onSuccess, role, currentUserRoleLevel,
       setPermissions({});
     }
     setExpandedGroups({});
-  }, [isOpen, role, currentUserRoleLevel]);
+  }, [isOpen, role, myRoleLevel]);
 
   // ── Permission helpers ───────────────────────────────────────────────────
   const togglePermission = (key) => {
@@ -241,7 +250,7 @@ const RoleFormModal = ({ isOpen, onClose, onSuccess, role, currentUserRoleLevel,
     // Only toggle permissions the current user themselves possesses
     const keys = group.permissions
       .map(p => p.key)
-      .filter(k => !currentUserPermissions || currentUserPermissions[k]);
+      .filter(k => !myPermissions || myPermissions[k]);
     if (keys.length === 0) return;
     const allChecked = keys.every(k => permissions[k]);
     const updated = { ...permissions };
@@ -253,7 +262,7 @@ const RoleFormModal = ({ isOpen, onClose, onSuccess, role, currentUserRoleLevel,
     const updated = {};
     // Only select permissions the current user themselves possess
     ALL_PERMISSION_KEYS.forEach(k => {
-      if (!currentUserPermissions || currentUserPermissions[k]) {
+      if (!myPermissions || myPermissions[k]) {
         updated[k] = true;
       }
     });
@@ -280,8 +289,8 @@ const RoleFormModal = ({ isOpen, onClose, onSuccess, role, currentUserRoleLevel,
 
   // ── Available priority levels ────────────────────────────────────────────
   // Only levels strictly below the current user's own level are allowed.
-  // Fall back to 1 only when role_level is genuinely missing from the auth user.
-  const effectiveUserLevel = currentUserRoleLevel ?? 1;
+  // myRoleLevel comes directly from auth context (never the ?? 99 fallback).
+  const effectiveUserLevel = myRoleLevel;
   const availableLevels = useMemo(
     () => [2, 3, 4, 5, 6, 7, 8, 9, 10].filter(l => l > effectiveUserLevel),
     [effectiveUserLevel]
@@ -473,7 +482,7 @@ const RoleFormModal = ({ isOpen, onClose, onSuccess, role, currentUserRoleLevel,
 
                         {/* Group checkbox — only counts unlocked (user-available) permissions */}
                         {(() => {
-                          const unlockedKeys = groupKeys.filter(k => !currentUserPermissions || currentUserPermissions[k]);
+                          const unlockedKeys = groupKeys.filter(k => !myPermissions || myPermissions[k]);
                           const allUnlockedChecked = unlockedKeys.length > 0 && unlockedKeys.every(k => permissions[k]);
                           const someUnlockedChecked = unlockedKeys.some(k => permissions[k]) && !allUnlockedChecked;
                           const groupAllLocked = unlockedKeys.length === 0;
@@ -509,7 +518,7 @@ const RoleFormModal = ({ isOpen, onClose, onSuccess, role, currentUserRoleLevel,
                         <div className="px-3 py-2 grid grid-cols-1 sm:grid-cols-2 gap-1 bg-theme-secondary">
                           {group.permissions.map(perm => {
                             // A permission is locked if the creating user doesn't have it themselves
-                            const userLacksPermission = currentUserPermissions && !currentUserPermissions[perm.key];
+                            const userLacksPermission = myPermissions && !myPermissions[perm.key];
                             const isLocked = isSuperAdmin || userLacksPermission;
                             return (
                               <label
