@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { X, Shield, ChevronDown, ChevronRight, Check } from 'lucide-react';
+import { X, Shield, ChevronDown, ChevronRight, Check, Lock } from 'lucide-react';
 import { toast } from 'react-toastify';
 import usersAPI from '../api/users';
 
@@ -203,7 +203,7 @@ const ALL_PERMISSION_KEYS = PERMISSION_GROUPS.flatMap(g => g.permissions.map(p =
 
 // ── Component ────────────────────────────────────────────────────────────────
 
-const RoleFormModal = ({ isOpen, onClose, onSuccess, role, currentUserRoleLevel }) => {
+const RoleFormModal = ({ isOpen, onClose, onSuccess, role, currentUserRoleLevel, currentUserPermissions }) => {
   const isEdit = !!role;
 
   const [formData, setFormData] = useState({ role_name: '', description: '', role_level: 4 });
@@ -214,7 +214,8 @@ const RoleFormModal = ({ isOpen, onClose, onSuccess, role, currentUserRoleLevel 
   // Initialise form when opening
   useEffect(() => {
     if (!isOpen) return;
-    const effectiveLvl = (currentUserRoleLevel == null || currentUserRoleLevel >= 10) ? 1 : currentUserRoleLevel;
+    // Use actual role level; only fall back to 1 when genuinely missing
+    const effectiveLvl = currentUserRoleLevel ?? 1;
     const levels = [2, 3, 4, 5, 6, 7, 8, 9, 10].filter(l => l > effectiveLvl);
     const defaultLevel = levels.length > 0 ? levels[0] : 2;
     if (role) {
@@ -237,7 +238,11 @@ const RoleFormModal = ({ isOpen, onClose, onSuccess, role, currentUserRoleLevel 
   };
 
   const toggleGroup = (group) => {
-    const keys = group.permissions.map(p => p.key);
+    // Only toggle permissions the current user themselves possesses
+    const keys = group.permissions
+      .map(p => p.key)
+      .filter(k => !currentUserPermissions || currentUserPermissions[k]);
+    if (keys.length === 0) return;
     const allChecked = keys.every(k => permissions[k]);
     const updated = { ...permissions };
     keys.forEach(k => { updated[k] = !allChecked; });
@@ -246,7 +251,12 @@ const RoleFormModal = ({ isOpen, onClose, onSuccess, role, currentUserRoleLevel 
 
   const selectAll = () => {
     const updated = {};
-    ALL_PERMISSION_KEYS.forEach(k => { updated[k] = true; });
+    // Only select permissions the current user themselves possess
+    ALL_PERMISSION_KEYS.forEach(k => {
+      if (!currentUserPermissions || currentUserPermissions[k]) {
+        updated[k] = true;
+      }
+    });
     setPermissions(updated);
   };
 
@@ -269,11 +279,9 @@ const RoleFormModal = ({ isOpen, onClose, onSuccess, role, currentUserRoleLevel 
   };
 
   // ── Available priority levels ────────────────────────────────────────────
-  // If currentUserRoleLevel is undefined or unreasonably high (e.g. 99 fallback),
-  // treat as level 1 (super admin) so all levels 2-10 are shown.
-  const effectiveUserLevel = (currentUserRoleLevel == null || currentUserRoleLevel >= 10)
-    ? 1
-    : currentUserRoleLevel;
+  // Only levels strictly below the current user's own level are allowed.
+  // Fall back to 1 only when role_level is genuinely missing from the auth user.
+  const effectiveUserLevel = currentUserRoleLevel ?? 1;
   const availableLevels = useMemo(
     () => [2, 3, 4, 5, 6, 7, 8, 9, 10].filter(l => l > effectiveUserLevel),
     [effectiveUserLevel]
@@ -449,8 +457,6 @@ const RoleFormModal = ({ isOpen, onClose, onSuccess, role, currentUserRoleLevel 
                 {PERMISSION_GROUPS.map(group => {
                   const groupKeys = group.permissions.map(p => p.key);
                   const checkedCount = groupKeys.filter(k => permissions[k]).length;
-                  const allChecked = checkedCount === groupKeys.length;
-                  const someChecked = checkedCount > 0 && !allChecked;
                   const isExpanded = expandedGroups[group.group];
 
                   return (
@@ -465,22 +471,30 @@ const RoleFormModal = ({ isOpen, onClose, onSuccess, role, currentUserRoleLevel 
                           : <ChevronRight size={16} className="text-theme-muted shrink-0" />
                         }
 
-                        {/* Group checkbox */}
-                        <button
-                          type="button"
-                          onClick={(e) => { e.stopPropagation(); if (!isSuperAdmin) toggleGroup(group); }}
-                          disabled={isSuperAdmin}
-                          className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                            allChecked
-                              ? 'bg-accent-gold border-accent-gold'
-                              : someChecked
-                                ? 'bg-accent-gold/30 border-accent-gold'
-                                : 'border-gray-400 dark:border-gray-500'
-                          } disabled:opacity-50`}
-                        >
-                          {allChecked && <Check size={12} className="text-white" strokeWidth={3} />}
-                          {someChecked && <div className="w-2 h-0.5 bg-white rounded" />}
-                        </button>
+                        {/* Group checkbox — only counts unlocked (user-available) permissions */}
+                        {(() => {
+                          const unlockedKeys = groupKeys.filter(k => !currentUserPermissions || currentUserPermissions[k]);
+                          const allUnlockedChecked = unlockedKeys.length > 0 && unlockedKeys.every(k => permissions[k]);
+                          const someUnlockedChecked = unlockedKeys.some(k => permissions[k]) && !allUnlockedChecked;
+                          const groupAllLocked = unlockedKeys.length === 0;
+                          return (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); if (!isSuperAdmin && !groupAllLocked) toggleGroup(group); }}
+                              disabled={isSuperAdmin || groupAllLocked}
+                              className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
+                                allUnlockedChecked
+                                  ? 'bg-accent-gold border-accent-gold'
+                                  : someUnlockedChecked
+                                    ? 'bg-accent-gold/30 border-accent-gold'
+                                    : 'border-gray-400 dark:border-gray-500'
+                              } disabled:opacity-50`}
+                            >
+                              {allUnlockedChecked && <Check size={12} className="text-white" strokeWidth={3} />}
+                              {someUnlockedChecked && <div className="w-2 h-0.5 bg-white rounded" />}
+                            </button>
+                          );
+                        })()}
 
                         <span className="text-sm font-medium text-theme-primary flex-1">
                           {group.group}
@@ -493,21 +507,35 @@ const RoleFormModal = ({ isOpen, onClose, onSuccess, role, currentUserRoleLevel 
                       {/* Group permissions */}
                       {isExpanded && (
                         <div className="px-3 py-2 grid grid-cols-1 sm:grid-cols-2 gap-1 bg-theme-secondary">
-                          {group.permissions.map(perm => (
-                            <label
-                              key={perm.key}
-                              className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md cursor-pointer hover:bg-theme-primary transition-colors ${isSuperAdmin ? 'opacity-50 pointer-events-none' : ''}`}
-                            >
-                              <input
-                                type="checkbox"
-                                checked={!!permissions[perm.key]}
-                                onChange={() => togglePermission(perm.key)}
-                                disabled={isSuperAdmin}
-                                className="w-3.5 h-3.5 rounded border-gray-400 text-accent-gold focus:ring-accent-gold/30"
-                              />
-                              <span className="text-sm text-theme-secondary">{perm.label}</span>
-                            </label>
-                          ))}
+                          {group.permissions.map(perm => {
+                            // A permission is locked if the creating user doesn't have it themselves
+                            const userLacksPermission = currentUserPermissions && !currentUserPermissions[perm.key];
+                            const isLocked = isSuperAdmin || userLacksPermission;
+                            return (
+                              <label
+                                key={perm.key}
+                                className={`flex items-center gap-2.5 px-2 py-1.5 rounded-md transition-colors ${
+                                  isLocked
+                                    ? 'opacity-50 cursor-not-allowed'
+                                    : 'cursor-pointer hover:bg-theme-primary'
+                                }`}
+                                title={userLacksPermission ? 'Your role does not have this permission' : undefined}
+                              >
+                                {isLocked && !isSuperAdmin ? (
+                                  <Lock size={14} className="text-theme-muted shrink-0" />
+                                ) : (
+                                  <input
+                                    type="checkbox"
+                                    checked={!!permissions[perm.key]}
+                                    onChange={() => togglePermission(perm.key)}
+                                    disabled={isLocked}
+                                    className="w-3.5 h-3.5 rounded border-gray-400 text-accent-gold focus:ring-accent-gold/30"
+                                  />
+                                )}
+                                <span className="text-sm text-theme-secondary">{perm.label}</span>
+                              </label>
+                            );
+                          })}
                         </div>
                       )}
                     </div>

@@ -480,6 +480,7 @@ const UsersPage = () => {
         onSuccess={() => { setShowRoleForm(false); setEditRole(null); fetchRoles(); }}
         role={editRole}
         currentUserRoleLevel={currentRoleLevel}
+        currentUserPermissions={currentUser?.permissions}
       />
     </div>
   );
