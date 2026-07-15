@@ -130,14 +130,16 @@ const Navbar = ({ onMenuClick }) => {
                                     Settings
                                 </Link>
 
-                                <Link
-                                    to="/change-password"
-                                    onClick={() => setShowProfileMenu(false)}
-                                    className="flex items-center gap-2 px-4 py-2 text-sm text-theme-secondary hover:bg-theme-tertiary transition-colors"
-                                >
-                                    <Key className="w-4 h-4" />
-                                    Change Password
-                                </Link>
+                                {(user?.permissions?.change_password === true || user?.permissions?.admin === true) && (
+                                    <Link
+                                        to="/change-password"
+                                        onClick={() => setShowProfileMenu(false)}
+                                        className="flex items-center gap-2 px-4 py-2 text-sm text-theme-secondary hover:bg-theme-tertiary transition-colors"
+                                    >
+                                        <Key className="w-4 h-4" />
+                                        Change Password
+                                    </Link>
+                                )}
 
                                 <div className="border-t border-theme mt-1 pt-1">
                                     <button

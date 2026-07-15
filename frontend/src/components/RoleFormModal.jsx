@@ -196,6 +196,7 @@ const PERMISSION_GROUPS = [
       { key: 'view_audit_logs', label: 'View Audit / Activity Logs' },
       { key: 'view_recycle_bin', label: 'View Recycle Bin' },
       { key: 'manage_recycle_bin', label: 'Manage Recycle Bin' },
+      { key: 'change_password', label: 'Change Password' },
     ],
   },
 ];

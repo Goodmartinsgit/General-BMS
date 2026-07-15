@@ -74,7 +74,7 @@ const register = async (req, res) => {
                update_order_tracking: true, edit_order_notes: true, manage_change_requests: true,
                view_online_store: true, manage_online_store: true,
                view_settings: true, manage_settings: true, view_audit_logs: true,
-               view_recycle_bin: true, manage_recycle_bin: true, admin: true
+               view_recycle_bin: true, manage_recycle_bin: true, change_password: true, admin: true
              });
              const newRole = await query(
                'INSERT INTO roles (role_name, description, role_level, is_system_role, permissions) VALUES ($1, $2, 1, true, $3) RETURNING id',

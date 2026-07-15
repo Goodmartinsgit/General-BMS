@@ -539,8 +539,12 @@ function App() {
                         {/* Notifications — accessible to all authenticated users */}
                         <Route path="notifications" element={<NotificationsPage />} />
 
-                        {/* Account — accessible to all authenticated users */}
-                        <Route path="change-password" element={<ChangePassword />} />
+                        {/* Account — protected by change_password permission */}
+                        <Route path="change-password" element={
+                            <RoleProtectedRoute requiredPermission="change_password">
+                                <ChangePassword />
+                            </RoleProtectedRoute>
+                        } />
 
                         {/* Settings (Admin) — unified hub */}
                         <Route path="settings" element={
