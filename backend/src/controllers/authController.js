@@ -49,7 +49,10 @@ const register = async (req, res) => {
     if (!roleId) {
         const rolesCount = await query('SELECT COUNT(*) FROM roles');
         if (parseInt(rolesCount.rows[0].count) === 0) {
-             const newRole = await query('INSERT INTO roles (role_name, description) VALUES ($1, $2) RETURNING id', ['Super Admin', 'System Administrator']);
+             const newRole = await query(
+               'INSERT INTO roles (role_name, description, role_level, is_system_role) VALUES ($1, $2, 1, true) RETURNING id',
+               ['Super Admin', 'System Administrator']
+             );
              roleId = newRole.rows[0].id;
         } else {
              const anyRole = await query('SELECT id FROM roles LIMIT 1');

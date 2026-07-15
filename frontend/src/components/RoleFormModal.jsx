@@ -294,9 +294,6 @@ const RoleFormModal = ({ isOpen, onClose, onSuccess, role, currentUserRoleLevel,
   const parsedLevel = Number(myRoleLevel);
   const effectiveUserLevel = (!parsedLevel || isNaN(parsedLevel) || parsedLevel < 1) ? 0 : parsedLevel;
 
-  // Debug: log so we can trace what's happening in production
-  console.log('[RoleFormModal] auth.user:', authUser, '| myRoleLevel:', myRoleLevel, '| parsedLevel:', parsedLevel, '| effectiveUserLevel:', effectiveUserLevel);
-
   const availableLevels = useMemo(() => {
     const filtered = [2, 3, 4, 5, 6, 7, 8, 9, 10].filter(l => l > effectiveUserLevel);
     // Safety net: if somehow nothing passes the filter, show all levels 2-10 anyway.
