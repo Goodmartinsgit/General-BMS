@@ -1,5 +1,6 @@
 const { query } = require('../config/db');
 const crypto = require('crypto');
+const logAudit = require('../utils/auditLog');
 
 // ============================================================================
 // UTILITY FUNCTIONS
@@ -733,6 +734,13 @@ const createProduct = async (req, res) => {
 
       await query('COMMIT');
 
+      // Record audit log
+      const primaryProduct = createdProducts[0];
+      await logAudit(req, 'create', 'product', primaryProduct.id, { 
+        message: `Created product: ${primaryProduct.product_name} (${primaryProduct.product_code})`,
+        amount: primaryProduct.retail_price 
+      });
+
       if (hasListingLevel) {
         res.status(201).json({ multiple: true, products: createdProducts });
       } else {
@@ -1135,6 +1143,12 @@ const updateProduct = async (req, res) => {
       }
     }
 
+    // Record audit log
+    await logAudit(req, 'update', 'product', result.rows[0].id, { 
+      message: `Updated product: ${result.rows[0].product_name} (${result.rows[0].product_code})`,
+      amount: result.rows[0].retail_price 
+    });
+
     res.json(result.rows[0]);
   } catch (err) {
     console.error('Error updating product:', err);
@@ -1181,6 +1195,9 @@ const deleteProduct = async (req, res) => {
       `, [id, req.user?.id, reason]);
 
       await query('COMMIT');
+
+      // Record audit log
+      await logAudit(req, 'delete', 'product', id, { message: `Deleted product "${product.product_name}" (${product.product_code})` });
 
       res.json({ message: 'Product deleted successfully' });
     } catch (error) {

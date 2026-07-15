@@ -55,6 +55,7 @@ const payrollRoutes = require('./routes/payrollRoutes');
 const taskRoutes = require('./routes/taskRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
+const auditLogRoutes = require('./routes/auditLogRoutes');
 
 // Website Builder (admin-only)
 const websiteBuilderRoutes = require('./routes/websiteBuilderRoutes');
@@ -165,6 +166,7 @@ app.use('/api/payroll', payrollRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/audit-logs', auditLogRoutes);
 
 // ─── Online Store — Storefront-facing (public + customer JWT) ───────────────
 app.use('/api/store', storeConfigRoutes);           // GET /api/store/config/:slug etc.

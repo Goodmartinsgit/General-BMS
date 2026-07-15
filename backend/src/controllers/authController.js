@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { query, pool } = require('../config/db');
+const logAudit = require('../utils/auditLog');
 
 const PASSWORD_REGEX = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&#^()_\-+=])[A-Za-z\d@$!%*?&#^()_\-+=]{8,}$/;
 
@@ -196,6 +197,10 @@ const login = async (req, res) => {
       [user.id]
     );
 
+    // Record audit log
+    req.user = { id: user.id };
+    await logAudit(req, 'login', 'auth', user.id, { message: `User logged in: ${user.full_name} (${user.email})` });
+
     // Generate access token (short-lived)
     const accessToken = jwt.sign(
       {
@@ -317,6 +322,7 @@ const logout = async (req, res) => {
   try {
     const userId = req.user?.id;
     if (userId) {
+      await logAudit(req, 'logout', 'auth', userId, { message: 'User logged out' });
       // Revoke all refresh tokens for this user
       await query(
         `UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL`,

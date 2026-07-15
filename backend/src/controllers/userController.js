@@ -1,6 +1,7 @@
 const { query } = require('../config/db');
 const bcrypt = require('bcryptjs');
 const { generatePassword, validatePassword } = require('../utils/passwordPolicy');
+const logAudit = require('../utils/auditLog');
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -133,6 +134,9 @@ const createUser = async (req, res) => {
       response.temporary_password = passwordToUse;
     }
 
+    // Record audit log
+    await logAudit(req, 'create', 'user', newUser.rows[0].id, { message: `Created user ${newUser.rows[0].full_name} (${newUser.rows[0].email})` });
+
     res.status(201).json(response);
   } catch (err) {
     console.error(err);
@@ -161,6 +165,9 @@ const updateUser = async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'User not found' });
     }
+
+    // Record audit log
+    await logAudit(req, 'update', 'user', result.rows[0].id, { message: `Updated user ${result.rows[0].full_name} (${result.rows[0].email})` });
 
     res.json(result.rows[0]);
   } catch (err) {
@@ -191,6 +198,9 @@ const deleteUser = async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ message: 'User not found' });
     }
+
+    // Record audit log
+    await logAudit(req, 'delete', 'user', id, { message: `Deleted user with ID ${id}` });
 
     await revokeRefreshTokens(id);
 
@@ -478,6 +488,9 @@ const createRole = async (req, res) => {
       [role_name.trim(), description || null, targetLevel, JSON.stringify(permissions || {})]
     );
 
+    // Record audit log
+    await logAudit(req, 'create', 'role', result.rows[0].id, { message: `Created role: ${result.rows[0].role_name} (Level ${result.rows[0].role_level})` });
+
     res.status(201).json(result.rows[0]);
   } catch (err) {
     console.error(err);
@@ -566,6 +579,9 @@ const updateRole = async (req, res) => {
       [id]
     );
 
+    // Record audit log
+    await logAudit(req, 'update', 'role', result.rows[0].id, { message: `Updated role: ${result.rows[0].role_name} (Level ${result.rows[0].role_level})` });
+
     res.json(result.rows[0]);
   } catch (err) {
     console.error(err);
@@ -620,6 +636,9 @@ const deleteRole = async (req, res) => {
     }
 
     await query('DELETE FROM roles WHERE id = $1', [id]);
+
+    // Record audit log
+    await logAudit(req, 'delete', 'role', id, { message: `Deleted role "${role.role_name}" (Level ${role.role_level})` });
 
     res.json({ message: `Role "${role.role_name}" deleted successfully` });
   } catch (err) {

@@ -34,10 +34,10 @@ const ActivityLogsPage = () => {
   const fetchActivities = async () => {
     try {
       setLoading(true);
-      const params = { limit: 50 };
+      const params = { limit: 100 };
       if (dateRange?.start_date) params.start_date = dateRange.start_date;
       if (dateRange?.end_date) params.end_date = dateRange.end_date;
-      const response = await api.get('/dashboard/activity-feed', { params });
+      const response = await api.get('/audit-logs', { params });
       const data = response.data;
       setActivities(Array.isArray(data) ? data : data?.activities || data?.feed || []);
     } catch (error) {

@@ -1,4 +1,5 @@
 const { pool } = require('../config/db');
+const logAudit = require('../utils/auditLog');
 
 /**
  * Get all settings (aggregated from settings table + org info)
@@ -95,6 +96,13 @@ const updateSettings = async (req, res) => {
                 );
             }
         }
+
+        // Record audit log
+        const updatedCategories = Object.keys(data).filter(key => ['general', 'tax', 'payment', 'notifications', 'security', 'display', 'receipt'].includes(key));
+        await logAudit(req, 'update', 'settings', null, { 
+            message: `System settings updated: ${updatedCategories.join(', ')}`,
+            categories: updatedCategories
+        });
 
         res.json({ message: 'Settings updated successfully' });
     } catch (err) {
