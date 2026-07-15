@@ -444,6 +444,11 @@ const createRole = async (req, res) => {
       return res.status(400).json({ message: 'Role name is required' });
     }
 
+    // Block reserved name: no role with "super" in the name can be created
+    if (role_name.trim().toLowerCase().includes('super')) {
+      return res.status(403).json({ message: '"Super" is a reserved keyword and cannot be used in role names' });
+    }
+
     if (role_level != null && role_level <= 1) {
       return res.status(403).json({ message: 'Cannot create a role at Super Admin level' });
     }
@@ -498,6 +503,11 @@ const updateRole = async (req, res) => {
     // Cannot edit Super Admin role (level 1)
     if (role.role_level <= 1) {
       return res.status(403).json({ message: 'Cannot modify the Super Admin role' });
+    }
+
+    // Block reserved name: cannot rename a role to include "super"
+    if (role_name && role_name.trim().toLowerCase().includes('super')) {
+      return res.status(403).json({ message: '"Super" is a reserved keyword and cannot be used in role names' });
     }
 
     // Actor hierarchy check
