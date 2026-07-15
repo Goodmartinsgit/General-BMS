@@ -34,6 +34,9 @@ async function seedSuperAdmin() {
       ON CONFLICT (id) DO NOTHING
     `);
 
+    // Sync sequence to avoid duplicate key errors on custom role creation
+    await pool.query("SELECT setval('roles_id_seq', COALESCE((SELECT MAX(id) FROM roles), 1))");
+
     const hash = await bcrypt.hash(password, 10);
     await pool.query(
       'INSERT INTO users (email, password_hash, full_name, role_id) VALUES ($1, $2, $3, $4)',
