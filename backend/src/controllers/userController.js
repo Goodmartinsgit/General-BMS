@@ -70,13 +70,19 @@ const createUser = async (req, res) => {
       return res.status(400).json({ message: 'Email, full name, and role are required' });
     }
 
-    // Duplicate email check
+    // Duplicate email check (covers both active and soft-deleted users,
+    // since the DB unique constraint is on email without a partial index)
     const dup = await query(
-      'SELECT id FROM users WHERE email = $1 AND deleted_at IS NULL',
+      'SELECT id, deleted_at FROM users WHERE email = $1',
       [email]
     );
     if (dup.rows.length > 0) {
-      return res.status(409).json({ message: 'A user with this email already exists' });
+      const isSoftDeleted = dup.rows[0].deleted_at !== null;
+      return res.status(409).json({
+        message: isSoftDeleted
+          ? 'A previously deleted user with this email exists. Please use a different email or restore the deleted account.'
+          : 'A user with this email already exists'
+      });
     }
 
     // Hierarchy check: actor must outrank target role
@@ -139,6 +145,10 @@ const createUser = async (req, res) => {
 
     res.status(201).json(response);
   } catch (err) {
+    // Handle unique constraint violation (race condition safety net)
+    if (err.code === '23505' && err.constraint === 'users_email_key') {
+      return res.status(409).json({ message: 'A user with this email already exists' });
+    }
     console.error(err);
     res.status(500).json({ message: 'Server error' });
   }
