@@ -145,10 +145,18 @@ const restoreItem = async (req, res) => {
                 );
                 break;
 
+            case 'user':
+                await client.query('DELETE FROM recycle_bin WHERE id = $1', [id]);
+                await client.query(
+                    `UPDATE users SET deleted_at = NULL, is_active = true, status = 'ACTIVE', updated_at = NOW() WHERE id = $1`,
+                    [entity_id]
+                );
+                break;
+
             case 'customer':
                 await client.query('DELETE FROM recycle_bin WHERE id = $1', [id]);
                 await client.query(
-                    'UPDATE customers SET deleted_at = NULL, updated_at = NOW() WHERE id = $1',
+                    'UPDATE customers SET deleted_at = NULL, is_active = true, updated_at = NOW() WHERE id = $1',
                     [entity_id]
                 );
                 break;
@@ -157,6 +165,14 @@ const restoreItem = async (req, res) => {
                 await client.query('DELETE FROM recycle_bin WHERE id = $1', [id]);
                 await client.query(
                     'UPDATE suppliers SET deleted_at = NULL, updated_at = NOW() WHERE id = $1',
+                    [entity_id]
+                );
+                break;
+
+            case 'branch':
+                await client.query('DELETE FROM recycle_bin WHERE id = $1', [id]);
+                await client.query(
+                    'UPDATE branches SET deleted_at = NULL, is_active = true, updated_at = NOW() WHERE id = $1',
                     [entity_id]
                 );
                 break;
@@ -250,11 +266,17 @@ const purgeItem = async (req, res) => {
             case 'product':
                 await client.query('DELETE FROM products WHERE id = $1', [entity_id]);
                 break;
+            case 'user':
+                await client.query('DELETE FROM users WHERE id = $1', [entity_id]);
+                break;
             case 'customer':
                 await client.query('DELETE FROM customers WHERE id = $1', [entity_id]);
                 break;
             case 'supplier':
                 await client.query('DELETE FROM suppliers WHERE id = $1', [entity_id]);
+                break;
+            case 'branch':
+                await client.query('DELETE FROM branches WHERE id = $1', [entity_id]);
                 break;
             case 'promotion':
                 await client.query('DELETE FROM promotions WHERE id = $1', [entity_id]);

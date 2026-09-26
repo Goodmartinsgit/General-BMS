@@ -5,13 +5,15 @@ import {
     AlertTriangle,
     Package,
     Users,
+    UserX,
     ShoppingCart,
     FileText,
     Search,
     Clock,
     XCircle,
     X,
-    Truck
+    Truck,
+    Building2
 } from 'lucide-react';
 import PageHeader from '../components/common/PageHeader';
 import { toast } from 'react-toastify';
@@ -33,7 +35,7 @@ const RecycleBin = () => {
         setLoading(true);
         try {
             const params = {
-                type: selectedType !== 'all' ? selectedType : undefined,
+                entity_type: selectedType !== 'all' ? selectedType : undefined,
                 search: searchQuery || undefined
             };
             Object.keys(params).forEach(key => params[key] === undefined && delete params[key]);
@@ -138,12 +140,16 @@ const RecycleBin = () => {
         switch (type) {
             case 'product':
                 return <Package className="w-4 h-4" />;
+            case 'user':
+                return <UserX className="w-4 h-4" />;
             case 'customer':
                 return <Users className="w-4 h-4" />;
             case 'sale':
                 return <ShoppingCart className="w-4 h-4" />;
             case 'supplier':
                 return <Truck className="w-4 h-4" />;
+            case 'branch':
+                return <Building2 className="w-4 h-4" />;
             case 'purchase_order':
                 return <FileText className="w-4 h-4" />;
             default:
@@ -155,12 +161,16 @@ const RecycleBin = () => {
         switch (type) {
             case 'product':
                 return 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400';
+            case 'user':
+                return 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-400';
             case 'customer':
                 return 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400';
             case 'sale':
                 return 'bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400';
             case 'supplier':
                 return 'bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400';
+            case 'branch':
+                return 'bg-teal-100 text-teal-700 dark:bg-teal-900/20 dark:text-teal-400';
             case 'purchase_order':
                 return 'bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400';
             default:
@@ -171,9 +181,11 @@ const RecycleBin = () => {
     const getTypeLabel = (type) => {
         const labels = {
             product: 'Product',
+            user: 'User',
             customer: 'Customer',
             sale: 'Sale',
             supplier: 'Supplier',
+            branch: 'Branch',
             purchase_order: 'Purchase Order'
         };
         return labels[type] || type;
@@ -201,7 +213,9 @@ const RecycleBin = () => {
     const typeFilters = [
         { value: 'all', label: 'All Items' },
         { value: 'product', label: 'Products' },
+        { value: 'user', label: 'Users' },
         { value: 'customer', label: 'Customers' },
+        { value: 'branch', label: 'Branches' },
         { value: 'sale', label: 'Sales' },
         { value: 'supplier', label: 'Suppliers' },
         { value: 'purchase_order', label: 'Orders' }

@@ -1,4 +1,4 @@
-const { query } = require('../config/db');
+const { query, pool } = require('../config/db');
 
 // ---------------------------------------------------------------------------
 // GET /api/branches/mode  (any authenticated user)
@@ -130,21 +130,55 @@ const updateBranch = async (req, res) => {
 };
 
 const deleteBranch = async (req, res) => {
+    const client = await pool.connect();
     try {
         const { id } = req.params;
-        const result = await query(
-            'UPDATE branches SET deleted_at = NOW(), is_active = false WHERE id = $1 RETURNING id',
+        const { reason } = req.body;
+
+        await client.query('BEGIN');
+
+        // Get branch data for recycle bin snapshot
+        const branchResult = await client.query(
+            'SELECT * FROM branches WHERE id = $1 AND deleted_at IS NULL',
             [id]
         );
 
-        if (result.rows.length === 0) {
+        if (branchResult.rows.length === 0) {
+            await client.query('ROLLBACK');
             return res.status(404).json({ message: 'Branch not found' });
         }
 
+        const branch = branchResult.rows[0];
+
+        // Add to recycle bin
+        await client.query(
+            `INSERT INTO recycle_bin (entity_type, entity_id, entity_data, deleted_by, deletion_reason, restore_deadline)
+             VALUES ('branch', $1, $2, $3, $4, CURRENT_TIMESTAMP + INTERVAL '30 days')`,
+            [id, JSON.stringify(branch), req.user?.id, reason || null]
+        );
+
+        // Soft delete
+        await client.query(
+            'UPDATE branches SET deleted_at = NOW(), is_active = false WHERE id = $1',
+            [id]
+        );
+
+        // Record in deletion audit trail
+        await client.query(
+            `INSERT INTO deletion_audit_trail (entity_type, entity_id, action, performed_by, notes)
+             VALUES ('branch', $1, 'soft_delete', $2, $3)`,
+            [id, req.user?.id, reason || `Deleted branch ${branch.branch_name}`]
+        );
+
+        await client.query('COMMIT');
+
         res.json({ message: 'Branch deleted successfully' });
     } catch (err) {
+        await client.query('ROLLBACK').catch(() => {});
         console.error(err);
         res.status(500).json({ message: 'Server error' });
+    } finally {
+        client.release();
     }
 };
 

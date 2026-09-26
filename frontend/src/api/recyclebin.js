@@ -15,7 +15,7 @@ export const recyclebinAPI = {
 
     // Restore a single item
     restoreItem: async (type, id) => {
-        const response = await api.post(`/recycle-bin/${type}/${id}/restore`);
+        const response = await api.post(`/recycle-bin/${id}/restore`);
         return response.data;
     },
 
@@ -27,7 +27,7 @@ export const recyclebinAPI = {
 
     // Permanently delete a single item
     purgeItem: async (type, id) => {
-        const response = await api.delete(`/recycle-bin/${type}/${id}`);
+        const response = await api.delete(`/recycle-bin/${id}/purge`);
         return response.data;
     },
 

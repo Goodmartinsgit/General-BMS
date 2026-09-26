@@ -1,4 +1,4 @@
-const { query } = require('../config/db');
+const { query, pool } = require('../config/db');
 const bcrypt = require('bcryptjs');
 const { generatePassword, validatePassword } = require('../utils/passwordPolicy');
 const logAudit = require('../utils/auditLog');
@@ -189,35 +189,72 @@ const updateUser = async (req, res) => {
 // ── DELETE /users/:id ─────────────────────────────────────────────────────────
 
 const deleteUser = async (req, res) => {
+  const client = await pool.connect();
   try {
     const { id } = req.params;
     const actorId = req.user.id;
+    const { reason } = req.body;
 
     if (id === actorId) {
       return res.status(400).json({ message: 'Cannot delete your own account' });
     }
 
-    const result = await query(
-      `UPDATE users
-       SET deleted_at = NOW(), is_active = false, status = 'INACTIVE', updated_at = NOW()
-       WHERE id = $1 AND deleted_at IS NULL
-       RETURNING id`,
+    await client.query('BEGIN');
+
+    // Get user data for recycle bin snapshot
+    const userResult = await client.query(
+      `SELECT u.*, r.role_name
+       FROM users u LEFT JOIN roles r ON u.role_id = r.id
+       WHERE u.id = $1 AND u.deleted_at IS NULL`,
       [id]
     );
 
-    if (result.rows.length === 0) {
+    if (userResult.rows.length === 0) {
+      await client.query('ROLLBACK');
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Record audit log
-    await logAudit(req, 'delete', 'user', id, { message: `Deleted user with ID ${id}` });
+    const user = userResult.rows[0];
+    // Remove sensitive data from snapshot
+    const { password_hash, ...safeUserData } = user;
 
+    // Add to recycle bin
+    await client.query(
+      `INSERT INTO recycle_bin (entity_type, entity_id, entity_data, deleted_by, deletion_reason, restore_deadline)
+       VALUES ('user', $1, $2, $3, $4, CURRENT_TIMESTAMP + INTERVAL '30 days')`,
+      [id, JSON.stringify(safeUserData), actorId, reason || null]
+    );
+
+    // Soft delete
+    await client.query(
+      `UPDATE users
+       SET deleted_at = NOW(), is_active = false, status = 'INACTIVE', updated_at = NOW()
+       WHERE id = $1`,
+      [id]
+    );
+
+    // Record in deletion audit trail
+    await client.query(
+      `INSERT INTO deletion_audit_trail (entity_type, entity_id, action, performed_by, notes)
+       VALUES ('user', $1, 'soft_delete', $2, $3)`,
+      [id, actorId, reason || `Deleted user ${user.full_name} (${user.email})`]
+    );
+
+    await client.query('COMMIT');
+
+    // Record audit log
+    await logAudit(req, 'delete', 'user', id, { message: `Deleted user ${user.full_name} (${user.email})` });
+
+    // Revoke refresh tokens (outside transaction, non-critical)
     await revokeRefreshTokens(id);
 
     res.json({ message: 'User deleted successfully' });
   } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
     console.error(err);
     res.status(500).json({ message: 'Server error' });
+  } finally {
+    client.release();
   }
 };
 

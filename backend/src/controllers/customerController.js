@@ -220,21 +220,55 @@ const updateCustomer = async (req, res) => {
 };
 
 const deleteCustomer = async (req, res) => {
+    const client = await pool.connect();
     try {
         const { id } = req.params;
-        const result = await query(
-            'UPDATE customers SET deleted_at = NOW(), is_active = false WHERE id = $1 RETURNING id',
+        const { reason } = req.body;
+
+        await client.query('BEGIN');
+
+        // Get customer data for recycle bin snapshot
+        const customerResult = await client.query(
+            'SELECT * FROM customers WHERE id = $1 AND deleted_at IS NULL',
             [id]
         );
 
-        if (result.rows.length === 0) {
+        if (customerResult.rows.length === 0) {
+            await client.query('ROLLBACK');
             return res.status(404).json({ message: 'Customer not found' });
         }
 
+        const customer = customerResult.rows[0];
+
+        // Add to recycle bin
+        await client.query(
+            `INSERT INTO recycle_bin (entity_type, entity_id, entity_data, deleted_by, deletion_reason, restore_deadline)
+             VALUES ('customer', $1, $2, $3, $4, CURRENT_TIMESTAMP + INTERVAL '30 days')`,
+            [id, JSON.stringify(customer), req.user?.id, reason || null]
+        );
+
+        // Soft delete
+        await client.query(
+            'UPDATE customers SET deleted_at = NOW(), is_active = false WHERE id = $1',
+            [id]
+        );
+
+        // Record in deletion audit trail
+        await client.query(
+            `INSERT INTO deletion_audit_trail (entity_type, entity_id, action, performed_by, notes)
+             VALUES ('customer', $1, 'soft_delete', $2, $3)`,
+            [id, req.user?.id, reason || `Deleted customer ${customer.full_name || customer.company_name || id}`]
+        );
+
+        await client.query('COMMIT');
+
         res.json({ message: 'Customer deleted successfully' });
     } catch (err) {
+        await client.query('ROLLBACK').catch(() => {});
         console.error(err);
         res.status(500).json({ message: 'Server error' });
+    } finally {
+        client.release();
     }
 };
 
