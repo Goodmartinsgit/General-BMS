@@ -48,10 +48,17 @@ async function seedSuperAdmin() {
   }
 }
 
-autoMigrateCategories()
+const runAllMigrations = require('./src/scripts/run_all_migrations');
+
+runAllMigrations()
+  .then(() => autoMigrateCategories())
   .then(() => seedSuperAdmin())
   .then(() => {
     app.listen(PORT, () => {
       console.log(`Server running on port ${PORT}`);
     });
+  })
+  .catch(err => {
+    console.error('Startup failed:', err);
+    process.exit(1);
   });

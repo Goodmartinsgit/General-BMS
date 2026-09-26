@@ -128,11 +128,19 @@ async function runAllMigrations() {
   } catch (err) {
     console.error('\n❌ Critical migration error:', err.message);
     console.error('Full error:', err);
-    process.exit(1);
+    if (require.main === module) process.exit(1);
+    throw err;
   } finally {
     client.release();
-    await pool.end();
+    // Only close pool when run as standalone script, not when imported
+    if (require.main === module) await pool.end();
   }
 }
 
-runAllMigrations();
+// Export for use from server.js
+module.exports = runAllMigrations;
+
+// Auto-run when executed directly (node run_all_migrations.js)
+if (require.main === module) {
+  runAllMigrations();
+}
