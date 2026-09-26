@@ -501,11 +501,222 @@ const getStatistics = async (req, res) => {
     }
 };
 
+/**
+ * Bulk Purge Items
+ * Permanently delete multiple items from recycle bin
+ */
+const bulkPurge = async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const { items } = req.body; // [{ type, id }, ...]
+        const purged_by = req.user.id;
+
+        if (!items || !Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({ message: 'No items provided' });
+        }
+
+        await client.query('BEGIN');
+
+        let purged_count = 0;
+
+        for (const item of items) {
+            const recycleBinResult = await client.query(
+                'SELECT * FROM recycle_bin WHERE id = $1',
+                [item.id]
+            );
+
+            if (recycleBinResult.rows.length === 0) continue;
+
+            const rbItem = recycleBinResult.rows[0];
+            const { entity_type, entity_id, entity_data } = rbItem;
+
+            // Record in audit trail
+            await client.query(
+                `INSERT INTO deletion_audit_trail (entity_type, entity_id, action, performed_by, entity_data_snapshot)
+                 VALUES ($1, $2, 'purged', $3, $4)`,
+                [entity_type, entity_id, purged_by, entity_data]
+            );
+
+            // Log to purge logs
+            await client.query(
+                `INSERT INTO purge_logs (entity_type, entity_id, entity_data_snapshot, purged_by)
+                 VALUES ($1, $2, $3, $4)`,
+                [entity_type, entity_id, entity_data, purged_by]
+            );
+
+            // Remove from recycle bin
+            await client.query('DELETE FROM recycle_bin WHERE id = $1', [item.id]);
+
+            // Hard delete from source table
+            const deleteMap = {
+                product: 'products',
+                user: 'users',
+                customer: 'customers',
+                supplier: 'suppliers',
+                branch: 'branches',
+                promotion: 'promotions'
+            };
+            if (deleteMap[entity_type]) {
+                await client.query(`DELETE FROM ${deleteMap[entity_type]} WHERE id = $1`, [entity_id]);
+            }
+
+            purged_count++;
+        }
+
+        await client.query('COMMIT');
+
+        res.json({ message: `${purged_count} items permanently deleted`, purged_count });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error(err);
+        res.status(500).json({ message: 'Server error' });
+    } finally {
+        client.release();
+    }
+};
+
+/**
+ * Bulk Restore Items
+ * Restore multiple items from recycle bin
+ */
+const bulkRestore = async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const { items } = req.body; // [{ type, id }, ...]
+        const restored_by = req.user.id;
+
+        if (!items || !Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({ message: 'No items provided' });
+        }
+
+        await client.query('BEGIN');
+
+        let restored_count = 0;
+
+        const restoreMap = {
+            product:  { table: 'products',   extra: '' },
+            user:     { table: 'users',      extra: ", is_active = true, status = 'ACTIVE'" },
+            customer: { table: 'customers',  extra: ', is_active = true' },
+            supplier: { table: 'suppliers',  extra: '' },
+            branch:   { table: 'branches',   extra: ', is_active = true' },
+            promotion:{ table: 'promotions', extra: '' }
+        };
+
+        for (const item of items) {
+            const recycleBinResult = await client.query(
+                'SELECT * FROM recycle_bin WHERE id = $1',
+                [item.id]
+            );
+
+            if (recycleBinResult.rows.length === 0) continue;
+
+            const rbItem = recycleBinResult.rows[0];
+            const { entity_type, entity_id } = rbItem;
+            const restoreConfig = restoreMap[entity_type];
+
+            if (!restoreConfig) continue;
+
+            // Remove from recycle bin
+            await client.query('DELETE FROM recycle_bin WHERE id = $1', [item.id]);
+
+            // Restore in source table
+            await client.query(
+                `UPDATE ${restoreConfig.table} SET deleted_at = NULL${restoreConfig.extra}, updated_at = NOW() WHERE id = $1`,
+                [entity_id]
+            );
+
+            // Record in audit trail
+            await client.query(
+                `INSERT INTO deletion_audit_trail (entity_type, entity_id, action, performed_by, notes)
+                 VALUES ($1, $2, 'restored', $3, 'Bulk restored from recycle bin')`,
+                [entity_type, entity_id, restored_by]
+            );
+
+            restored_count++;
+        }
+
+        await client.query('COMMIT');
+
+        res.json({ message: `${restored_count} items restored`, restored_count });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error(err);
+        res.status(500).json({ message: 'Server error' });
+    } finally {
+        client.release();
+    }
+};
+
+/**
+ * Empty Recycle Bin
+ * Permanently delete ALL items from recycle bin
+ */
+const emptyBin = async (req, res) => {
+    const client = await pool.connect();
+    try {
+        const purged_by = req.user.id;
+
+        await client.query('BEGIN');
+
+        // Get all items
+        const allItems = await client.query('SELECT * FROM recycle_bin');
+
+        const deleteMap = {
+            product: 'products',
+            user: 'users',
+            customer: 'customers',
+            supplier: 'suppliers',
+            branch: 'branches',
+            promotion: 'promotions'
+        };
+
+        for (const item of allItems.rows) {
+            // Record in audit trail
+            await client.query(
+                `INSERT INTO deletion_audit_trail (entity_type, entity_id, action, performed_by, entity_data_snapshot)
+                 VALUES ($1, $2, 'purged', $3, $4)`,
+                [item.entity_type, item.entity_id, purged_by, item.entity_data]
+            );
+
+            // Log to purge logs
+            await client.query(
+                `INSERT INTO purge_logs (entity_type, entity_id, entity_data_snapshot, purged_by)
+                 VALUES ($1, $2, $3, $4)`,
+                [item.entity_type, item.entity_id, item.entity_data, purged_by]
+            );
+
+            // Hard delete from source table
+            if (deleteMap[item.entity_type]) {
+                await client.query(
+                    `DELETE FROM ${deleteMap[item.entity_type]} WHERE id = $1`,
+                    [item.entity_id]
+                );
+            }
+        }
+
+        // Clear recycle bin
+        await client.query('DELETE FROM recycle_bin');
+
+        await client.query('COMMIT');
+
+        res.json({ message: `Recycle bin emptied. ${allItems.rows.length} items permanently deleted.`, purged_count: allItems.rows.length });
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error(err);
+        res.status(500).json({ message: 'Server error' });
+    } finally {
+        client.release();
+    }
+};
+
 module.exports = {
     getAllDeletedItems,
     getDeletedItemsByEntity,
     restoreItem,
     purgeItem,
+    bulkPurge,
+    bulkRestore,
+    emptyBin,
     getDeletionAuditTrail,
     getPurgeLogs,
     autoPurge,

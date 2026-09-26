@@ -5,6 +5,9 @@ const {
     getDeletedItemsByEntity,
     restoreItem,
     purgeItem,
+    bulkPurge,
+    bulkRestore,
+    emptyBin,
     getDeletionAuditTrail,
     getPurgeLogs,
     autoPurge,
@@ -27,6 +30,11 @@ router.get('/statistics', authorize('view_recycle_bin'), getStatistics);
 
 // Get deleted items by entity type
 router.get('/entity/:entityType', authorize('view_recycle_bin'), getDeletedItemsByEntity);
+
+// Bulk operations (must be before /:id routes to avoid route conflicts)
+router.post('/purge-bulk', authorize('manage_recycle_bin'), bulkPurge);
+router.post('/restore-bulk', authorize('manage_recycle_bin'), bulkRestore);
+router.delete('/empty', authorize('manage_recycle_bin'), emptyBin);
 
 // Restore item from recycle bin
 router.post('/:id/restore', authorize('manage_recycle_bin'), restoreItem);

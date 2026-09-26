@@ -35,7 +35,7 @@ const PurgeManagementPage = () => {
     try {
       setLoading(true);
       const params = {};
-      if (typeFilter !== 'all') params.type = typeFilter;
+      if (typeFilter !== 'all') params.entity_type = typeFilter;
       if (searchTerm) params.search = searchTerm;
 
       const response = await api.get('/recycle-bin', { params });
@@ -67,7 +67,7 @@ const PurgeManagementPage = () => {
   const handlePurgeSingle = async (item) => {
     try {
       setPurging(true);
-      await api.delete(`/recycle-bin/${item.type}/${item.id}`);
+      await api.delete(`/recycle-bin/${item.id}/purge`);
       setItems(prev => prev.filter(i => i.id !== item.id));
       setSelectedItems(prev => prev.filter(id => id !== item.id));
     } catch (error) {
