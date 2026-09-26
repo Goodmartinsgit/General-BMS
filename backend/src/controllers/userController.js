@@ -78,13 +78,11 @@ const createUser = async (req, res) => {
     );
     if (dup.rows.length > 0) {
       const isSoftDeleted = dup.rows[0].deleted_at !== null;
-      if (!isSoftDeleted) {
-        return res.status(409).json({ message: 'A user with this email already exists' });
-      }
-      // Soft-deleted user exists — remove it to free the email for re-use
-      // Also clean up any recycle_bin entry for this user
-      await query('DELETE FROM recycle_bin WHERE entity_type = $1 AND entity_id = $2', ['user', dup.rows[0].id]);
-      await query('DELETE FROM users WHERE id = $1', [dup.rows[0].id]);
+      return res.status(409).json({
+        message: isSoftDeleted
+          ? 'A previously deleted user with this email exists. Go to Recycle Bin to restore or permanently delete the old account before creating a new one.'
+          : 'A user with this email already exists'
+      });
     }
 
     // Hierarchy check: actor must outrank target role

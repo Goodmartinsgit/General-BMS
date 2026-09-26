@@ -5,11 +5,98 @@ const { pool } = require('../config/db');
 // ============================================================================
 
 /**
+ * Backfill orphaned soft-deleted items into recycle_bin.
+ * Finds items in source tables that have deleted_at set but no corresponding
+ * recycle_bin entry, and creates one. This handles items deleted before the
+ * recycle_bin tracking was added.
+ */
+async function backfillOrphanedItems() {
+    try {
+        // Users — exclude password_hash from snapshot
+        await pool.query(`
+            INSERT INTO recycle_bin (entity_type, entity_id, entity_data, deleted_at, restore_deadline)
+            SELECT 'user',
+                   u.id::varchar,
+                   jsonb_build_object(
+                       'id', u.id, 'email', u.email, 'full_name', u.full_name,
+                       'phone_number', u.phone_number, 'role_id', u.role_id,
+                       'is_active', u.is_active, 'status', u.status,
+                       'created_at', u.created_at, 'deleted_at', u.deleted_at,
+                       'role_name', r.role_name
+                   ),
+                   u.deleted_at,
+                   u.deleted_at + INTERVAL '30 days'
+            FROM users u
+            LEFT JOIN roles r ON u.role_id = r.id
+            WHERE u.deleted_at IS NOT NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM recycle_bin rb
+                  WHERE rb.entity_type = 'user' AND rb.entity_id = u.id::varchar
+              )
+        `);
+
+        // Customers
+        await pool.query(`
+            INSERT INTO recycle_bin (entity_type, entity_id, entity_data, deleted_at, restore_deadline)
+            SELECT 'customer',
+                   c.id::varchar,
+                   to_jsonb(c),
+                   c.deleted_at,
+                   c.deleted_at + INTERVAL '30 days'
+            FROM customers c
+            WHERE c.deleted_at IS NOT NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM recycle_bin rb
+                  WHERE rb.entity_type = 'customer' AND rb.entity_id = c.id::varchar
+              )
+        `);
+
+        // Branches
+        await pool.query(`
+            INSERT INTO recycle_bin (entity_type, entity_id, entity_data, deleted_at, restore_deadline)
+            SELECT 'branch',
+                   b.id::varchar,
+                   to_jsonb(b),
+                   b.deleted_at,
+                   b.deleted_at + INTERVAL '30 days'
+            FROM branches b
+            WHERE b.deleted_at IS NOT NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM recycle_bin rb
+                  WHERE rb.entity_type = 'branch' AND rb.entity_id = b.id::varchar
+              )
+        `);
+
+        // Products (most already tracked, but catch any orphans)
+        await pool.query(`
+            INSERT INTO recycle_bin (entity_type, entity_id, entity_data, deleted_at, restore_deadline)
+            SELECT 'product',
+                   p.id::varchar,
+                   to_jsonb(p),
+                   p.deleted_at,
+                   p.deleted_at + INTERVAL '30 days'
+            FROM products p
+            WHERE p.deleted_at IS NOT NULL
+              AND NOT EXISTS (
+                  SELECT 1 FROM recycle_bin rb
+                  WHERE rb.entity_type = 'product' AND rb.entity_id = p.id::varchar
+              )
+        `);
+    } catch (err) {
+        // Non-fatal — log and continue so the recycle bin still loads
+        console.error('Backfill orphaned items warning:', err.message);
+    }
+}
+
+/**
  * Get All Deleted Items
  * Retrieves soft-deleted items from all supported tables
  */
 const getAllDeletedItems = async (req, res) => {
     try {
+        // Sync any orphaned soft-deleted records into recycle_bin first
+        await backfillOrphanedItems();
+
         const { entity_type, startDate, endDate, limit = 100, offset = 0 } = req.query;
 
         let query = `
@@ -465,6 +552,8 @@ const autoPurge = async (req, res) => {
  */
 const getStatistics = async (req, res) => {
     try {
+        // Sync orphaned items first
+        await backfillOrphanedItems();
         // Total items by entity type
         const byTypeResult = await pool.query(
             `SELECT entity_type, COUNT(*) as count
