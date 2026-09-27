@@ -13,7 +13,9 @@ import {
     XCircle,
     X,
     Truck,
-    Building2
+    Building2,
+    ChevronLeft,
+    ChevronRight
 } from 'lucide-react';
 import PageHeader from '../components/common/PageHeader';
 import { toast } from 'react-toastify';
@@ -25,10 +27,14 @@ const RecycleBin = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [selectedType, setSelectedType] = useState('all');
     const [selectedItems, setSelectedItems] = useState([]);
-    const [confirmModal, setConfirmModal] = useState(null); // { type: 'restore'|'purge'|'empty', item?: obj }
+    const [confirmModal, setConfirmModal] = useState(null);
+    const [itemsPerPage, setItemsPerPage] = useState(20);
+    const [currentPage, setCurrentPage] = useState(1);
 
     useEffect(() => {
         fetchDeletedItems();
+        setCurrentPage(1);
+        setSelectedItems([]);
     }, [selectedType, searchQuery]);
 
     const fetchDeletedItems = async () => {
@@ -36,7 +42,8 @@ const RecycleBin = () => {
         try {
             const params = {
                 entity_type: selectedType !== 'all' ? selectedType : undefined,
-                search: searchQuery || undefined
+                search: searchQuery || undefined,
+                limit: 500
             };
             Object.keys(params).forEach(key => params[key] === undefined && delete params[key]);
 
@@ -146,12 +153,21 @@ const RecycleBin = () => {
     };
 
     const toggleSelectAll = () => {
-        if (selectedItems.length === deletedItems.length) {
-            setSelectedItems([]);
+        const pageItemIds = paginatedItems.map(item => item.id);
+        const allPageSelected = pageItemIds.every(id => selectedItems.includes(id));
+        if (allPageSelected) {
+            setSelectedItems(prev => prev.filter(id => !pageItemIds.includes(id)));
         } else {
-            setSelectedItems(deletedItems.map(item => item.id));
+            setSelectedItems(prev => [...new Set([...prev, ...pageItemIds])]);
         }
     };
+
+    // Pagination
+    const totalPages = Math.ceil(deletedItems.length / itemsPerPage);
+    const paginatedItems = deletedItems.slice(
+        (currentPage - 1) * itemsPerPage,
+        currentPage * itemsPerPage
+    );
 
     const getTypeIcon = (type) => {
         switch (type) {
@@ -382,7 +398,7 @@ const RecycleBin = () => {
                                     <th className="w-12 py-3 px-5">
                                         <input
                                             type="checkbox"
-                                            checked={selectedItems.length === deletedItems.length && deletedItems.length > 0}
+                                            checked={paginatedItems.length > 0 && paginatedItems.every(item => selectedItems.includes(item.id))}
                                             onChange={toggleSelectAll}
                                             className="w-4 h-4 rounded border-theme text-red-600 focus:ring-red-500/20"
                                         />
@@ -396,7 +412,7 @@ const RecycleBin = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-theme">
-                                {deletedItems.map((item) => {
+                                {paginatedItems.map((item) => {
                                     const daysUntilExpiry = getDaysUntilExpiry(item.expires_at);
                                     return (
                                         <tr key={item.id} className="hover:bg-theme-primary transition-colors">
@@ -467,6 +483,73 @@ const RecycleBin = () => {
                                 })}
                             </tbody>
                         </table>
+                    </div>
+                </div>
+            )}
+
+            {/* Pagination */}
+            {!loading && deletedItems.length > 0 && (
+                <div className="bg-theme-secondary rounded-xl border border-theme shadow-theme-sm px-5 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 text-sm text-theme-muted">
+                        <span>Show</span>
+                        <select
+                            value={itemsPerPage}
+                            onChange={(e) => {
+                                setItemsPerPage(Number(e.target.value));
+                                setCurrentPage(1);
+                            }}
+                            className="bg-theme-tertiary border border-theme rounded-lg px-2 py-1.5 text-sm text-theme-primary focus:outline-none focus:ring-2 focus:ring-red-500/20"
+                        >
+                            <option value={20}>20</option>
+                            <option value={50}>50</option>
+                            <option value={100}>100</option>
+                        </select>
+                        <span>per page</span>
+                        <span className="mx-2 text-theme-muted">|</span>
+                        <span>
+                            {Math.min((currentPage - 1) * itemsPerPage + 1, deletedItems.length)}–{Math.min(currentPage * itemsPerPage, deletedItems.length)} of {deletedItems.length} items
+                        </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                            disabled={currentPage === 1}
+                            className="p-2 rounded-lg text-theme-muted hover:text-theme-primary hover:bg-theme-tertiary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        >
+                            <ChevronLeft size={18} />
+                        </button>
+                        {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+                            let page;
+                            if (totalPages <= 7) {
+                                page = i + 1;
+                            } else if (currentPage <= 4) {
+                                page = i + 1;
+                            } else if (currentPage >= totalPages - 3) {
+                                page = totalPages - 6 + i;
+                            } else {
+                                page = currentPage - 3 + i;
+                            }
+                            return (
+                                <button
+                                    key={page}
+                                    onClick={() => setCurrentPage(page)}
+                                    className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${
+                                        currentPage === page
+                                            ? 'bg-red-600 text-white'
+                                            : 'text-theme-muted hover:text-theme-primary hover:bg-theme-tertiary'
+                                    }`}
+                                >
+                                    {page}
+                                </button>
+                            );
+                        })}
+                        <button
+                            onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                            disabled={currentPage === totalPages}
+                            className="p-2 rounded-lg text-theme-muted hover:text-theme-primary hover:bg-theme-tertiary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                        >
+                            <ChevronRight size={18} />
+                        </button>
                     </div>
                 </div>
             )}
