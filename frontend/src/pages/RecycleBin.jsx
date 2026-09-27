@@ -106,6 +106,23 @@ const RecycleBin = () => {
             console.error('Error restoring items:', error);
             toast.error(error.response?.data?.message || 'Failed to restore items');
         }
+        setConfirmModal(null);
+    };
+
+    const handleBulkPurge = async () => {
+        try {
+            const itemsToPurge = deletedItems
+                .filter(item => selectedItems.includes(item.id))
+                .map(item => ({ type: item.type, id: item.id }));
+            await recyclebinAPI.purgeItems(itemsToPurge);
+            toast.success(`${selectedItems.length} items have been permanently deleted`);
+            setSelectedItems([]);
+            fetchDeletedItems();
+        } catch (error) {
+            console.error('Error purging items:', error);
+            toast.error(error.response?.data?.message || 'Failed to delete items');
+        }
+        setConfirmModal(null);
     };
 
     const handleEmptyBin = async () => {
@@ -224,14 +241,22 @@ const RecycleBin = () => {
     const actions = (
         <div className="flex items-center gap-3">
             {selectedItems.length > 0 && (
-                <button
-                    onClick={handleBulkRestore}
-                    className="px-4 py-2.5 text-sm font-medium text-theme-secondary bg-theme-tertiary hover:bg-theme-primary border border-theme rounded-lg transition-colors flex items-center gap-2"
-                >
-                    <RotateCcw size={16} /> Restore Selected ({selectedItems.length})
-                </button>
+                <>
+                    <button
+                        onClick={() => setConfirmModal({ type: 'bulkRestore' })}
+                        className="px-4 py-2.5 text-sm font-medium text-theme-secondary bg-theme-tertiary hover:bg-theme-primary border border-theme rounded-lg transition-colors flex items-center gap-2"
+                    >
+                        <RotateCcw size={16} /> Restore Selected ({selectedItems.length})
+                    </button>
+                    <button
+                        onClick={() => setConfirmModal({ type: 'bulkPurge' })}
+                        className="px-4 py-2.5 text-sm font-semibold bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
+                    >
+                        <Trash2 size={16} /> Delete Selected ({selectedItems.length})
+                    </button>
+                </>
             )}
-            {deletedItems.length > 0 && (
+            {deletedItems.length > 0 && selectedItems.length === 0 && (
                 <button
                     onClick={() => setConfirmModal({ type: 'empty' })}
                     className="px-4 py-2.5 text-sm font-semibold bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
@@ -465,7 +490,9 @@ const RecycleBin = () => {
                                 </div>
                                 <h2 className="text-lg font-semibold text-theme-primary">
                                     {confirmModal.type === 'restore' ? 'Restore Item' :
-                                     confirmModal.type === 'purge' ? 'Permanently Delete' : 'Empty Recycle Bin'}
+                                     confirmModal.type === 'bulkRestore' ? 'Restore Selected Items' :
+                                     confirmModal.type === 'purge' ? 'Permanently Delete' :
+                                     confirmModal.type === 'bulkPurge' ? 'Delete Selected Items' : 'Empty Recycle Bin'}
                                 </h2>
                             </div>
                             <button onClick={() => setConfirmModal(null)} className="text-theme-muted hover:text-theme-primary transition-colors p-1 rounded-lg hover:bg-theme-tertiary">
@@ -476,15 +503,19 @@ const RecycleBin = () => {
                             <p className="text-sm text-theme-secondary">
                                 {confirmModal.type === 'restore'
                                     ? `Are you sure you want to restore "${confirmModal.item?.name}"? This will make the item available again in the system.`
+                                    : confirmModal.type === 'bulkRestore'
+                                    ? `Are you sure you want to restore ${selectedItems.length} selected item(s)? They will be made available again in the system.`
                                     : confirmModal.type === 'purge'
                                     ? `Are you sure you want to permanently delete "${confirmModal.item?.name}"? This action cannot be undone.`
+                                    : confirmModal.type === 'bulkPurge'
+                                    ? `Are you sure you want to permanently delete ${selectedItems.length} selected item(s)? This action cannot be undone.`
                                     : 'Are you sure you want to permanently delete all items in the recycle bin? This action cannot be undone.'}
                             </p>
 
-                            {confirmModal.type !== 'restore' && (
+                            {confirmModal.type !== 'restore' && confirmModal.type !== 'bulkRestore' && (
                                 <div className="mt-3 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/30 rounded-lg p-3 flex items-start gap-2">
                                     <AlertTriangle className="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" />
-                                    <p className="text-xs text-red-700 dark:text-red-400">This is a destructive action and cannot be reversed.</p>
+                                    <p className="text-xs text-red-700 dark:text-red-400">This is a destructive action and cannot be reversed. All data associated with the selected item(s) will be lost forever.</p>
                                 </div>
                             )}
                         </div>
@@ -498,17 +529,21 @@ const RecycleBin = () => {
                             <button
                                 onClick={() => {
                                     if (confirmModal.type === 'restore') handleRestore(confirmModal.item);
+                                    else if (confirmModal.type === 'bulkRestore') handleBulkRestore();
                                     else if (confirmModal.type === 'purge') handlePurge(confirmModal.item);
+                                    else if (confirmModal.type === 'bulkPurge') handleBulkPurge();
                                     else handleEmptyBin();
                                 }}
                                 className={`px-4 py-2.5 text-sm font-semibold text-white rounded-lg transition-colors ${
-                                    confirmModal.type === 'restore'
+                                    confirmModal.type === 'restore' || confirmModal.type === 'bulkRestore'
                                         ? 'bg-green-600 hover:bg-green-700'
                                         : 'bg-red-600 hover:bg-red-700'
                                 }`}
                             >
                                 {confirmModal.type === 'restore' ? 'Restore' :
-                                 confirmModal.type === 'purge' ? 'Delete Forever' : 'Empty Bin'}
+                                 confirmModal.type === 'bulkRestore' ? `Restore ${selectedItems.length} Items` :
+                                 confirmModal.type === 'purge' ? 'Delete Forever' :
+                                 confirmModal.type === 'bulkPurge' ? `Delete ${selectedItems.length} Items` : 'Empty Bin'}
                             </button>
                         </div>
                     </div>
