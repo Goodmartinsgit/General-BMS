@@ -348,29 +348,25 @@ const purgeItem = async (req, res) => {
         // Remove from recycle bin
         await client.query('DELETE FROM recycle_bin WHERE id = $1', [id]);
 
-        // Permanently delete from original table (if not already deleted)
-        switch (entity_type) {
-            case 'product':
-                await client.query('DELETE FROM products WHERE id = $1', [entity_id]);
-                break;
-            case 'user':
-                await client.query('DELETE FROM users WHERE id = $1', [entity_id]);
-                break;
-            case 'customer':
-                await client.query('DELETE FROM customers WHERE id = $1', [entity_id]);
-                break;
-            case 'supplier':
-                await client.query('DELETE FROM suppliers WHERE id = $1', [entity_id]);
-                break;
-            case 'branch':
-                await client.query('DELETE FROM branches WHERE id = $1', [entity_id]);
-                break;
-            case 'promotion':
-                await client.query('DELETE FROM promotions WHERE id = $1', [entity_id]);
-                break;
-            default:
-                // For other entity types, just remove from recycle bin
-                break;
+        // Try to hard-delete from source table (may fail if FK references exist)
+        const deleteMap = {
+            product: 'products',
+            user: 'users',
+            customer: 'customers',
+            supplier: 'suppliers',
+            branch: 'branches',
+            promotion: 'promotions'
+        };
+        if (deleteMap[entity_type]) {
+            try {
+                await client.query('SAVEPOINT try_hard_delete');
+                await client.query(`DELETE FROM ${deleteMap[entity_type]} WHERE id = $1`, [entity_id]);
+                await client.query('RELEASE SAVEPOINT try_hard_delete');
+            } catch (fkErr) {
+                await client.query('ROLLBACK TO SAVEPOINT try_hard_delete');
+                // FK constraint — leave soft-deleted record, it's already invisible
+                if (fkErr.code !== '23503') throw fkErr;
+            }
         }
 
         await client.query('COMMIT');
@@ -636,7 +632,7 @@ const bulkPurge = async (req, res) => {
             // Remove from recycle bin
             await client.query('DELETE FROM recycle_bin WHERE id = $1', [item.id]);
 
-            // Hard delete from source table
+            // Try to hard-delete from source table (may fail if FK references exist)
             const deleteMap = {
                 product: 'products',
                 user: 'users',
@@ -646,7 +642,15 @@ const bulkPurge = async (req, res) => {
                 promotion: 'promotions'
             };
             if (deleteMap[entity_type]) {
-                await client.query(`DELETE FROM ${deleteMap[entity_type]} WHERE id = $1`, [entity_id]);
+                try {
+                    await client.query(`SAVEPOINT try_hard_delete_${purged_count}`);
+                    await client.query(`DELETE FROM ${deleteMap[entity_type]} WHERE id = $1`, [entity_id]);
+                    await client.query(`RELEASE SAVEPOINT try_hard_delete_${purged_count}`);
+                } catch (fkErr) {
+                    await client.query(`ROLLBACK TO SAVEPOINT try_hard_delete_${purged_count}`);
+                    // FK constraint — leave soft-deleted record, it's already invisible
+                    if (fkErr.code !== '23503') throw fkErr;
+                }
             }
 
             purged_count++;
@@ -774,12 +778,20 @@ const emptyBin = async (req, res) => {
                 [item.entity_type, item.entity_id, item.entity_data, purged_by]
             );
 
-            // Hard delete from source table
+            // Try to hard-delete from source table (may fail if FK references exist)
             if (deleteMap[item.entity_type]) {
-                await client.query(
-                    `DELETE FROM ${deleteMap[item.entity_type]} WHERE id = $1`,
-                    [item.entity_id]
-                );
+                try {
+                    await client.query(`SAVEPOINT try_empty_${item.id}`);
+                    await client.query(
+                        `DELETE FROM ${deleteMap[item.entity_type]} WHERE id = $1`,
+                        [item.entity_id]
+                    );
+                    await client.query(`RELEASE SAVEPOINT try_empty_${item.id}`);
+                } catch (fkErr) {
+                    await client.query(`ROLLBACK TO SAVEPOINT try_empty_${item.id}`);
+                    // FK constraint — leave soft-deleted record, it's already invisible
+                    if (fkErr.code !== '23503') throw fkErr;
+                }
             }
         }
 

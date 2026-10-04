@@ -8,14 +8,18 @@ import {
   Filter,
   Package,
   Users,
+  UserX,
   ShoppingCart,
   FileText,
   Truck,
+  Building2,
   XCircle,
   X,
   Loader2,
   CheckSquare,
-  Square
+  Square,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 const PurgeManagementPage = () => {
@@ -26,15 +30,19 @@ const PurgeManagementPage = () => {
   const [selectedItems, setSelectedItems] = useState([]);
   const [confirmModal, setConfirmModal] = useState(null);
   const [purging, setPurging] = useState(false);
+  const [itemsPerPage, setItemsPerPage] = useState(20);
+  const [currentPage, setCurrentPage] = useState(1);
 
   useEffect(() => {
     fetchItems();
-  }, []);
+    setCurrentPage(1);
+    setSelectedItems([]);
+  }, [typeFilter, searchTerm]);
 
   const fetchItems = async () => {
     try {
       setLoading(true);
-      const params = {};
+      const params = { limit: 500 };
       if (typeFilter !== 'all') params.entity_type = typeFilter;
       if (searchTerm) params.search = searchTerm;
 
@@ -107,20 +115,23 @@ const PurgeManagementPage = () => {
   };
 
   const toggleSelectAll = () => {
-    const filtered = getFilteredItems();
-    if (selectedItems.length === filtered.length && filtered.length > 0) {
-      setSelectedItems([]);
+    const pageIds = paginatedItems.map(item => item.id);
+    const allPageSelected = pageIds.every(id => selectedItems.includes(id));
+    if (allPageSelected) {
+      setSelectedItems(prev => prev.filter(id => !pageIds.includes(id)));
     } else {
-      setSelectedItems(filtered.map(item => item.id));
+      setSelectedItems(prev => [...new Set([...prev, ...pageIds])]);
     }
   };
 
   const getTypeIcon = (type) => {
     switch (type) {
       case 'product': return <Package className="w-4 h-4" />;
+      case 'user': return <UserX className="w-4 h-4" />;
       case 'customer': return <Users className="w-4 h-4" />;
       case 'sale': return <ShoppingCart className="w-4 h-4" />;
       case 'supplier': return <Truck className="w-4 h-4" />;
+      case 'branch': return <Building2 className="w-4 h-4" />;
       case 'purchase_order': return <FileText className="w-4 h-4" />;
       default: return <Trash2 className="w-4 h-4" />;
     }
@@ -129,9 +140,11 @@ const PurgeManagementPage = () => {
   const getTypeBadgeStyle = (type) => {
     switch (type) {
       case 'product': return 'bg-blue-100 text-blue-700 dark:bg-blue-900/20 dark:text-blue-400';
+      case 'user': return 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-400';
       case 'customer': return 'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400';
       case 'sale': return 'bg-purple-100 text-purple-700 dark:bg-purple-900/20 dark:text-purple-400';
       case 'supplier': return 'bg-amber-100 text-amber-700 dark:bg-amber-900/20 dark:text-amber-400';
+      case 'branch': return 'bg-teal-100 text-teal-700 dark:bg-teal-900/20 dark:text-teal-400';
       case 'purchase_order': return 'bg-orange-100 text-orange-700 dark:bg-orange-900/20 dark:text-orange-400';
       default: return 'bg-gray-100 text-gray-700 dark:bg-gray-900/20 dark:text-gray-400';
     }
@@ -140,9 +153,11 @@ const PurgeManagementPage = () => {
   const getTypeLabel = (type) => {
     const labels = {
       product: 'Product',
+      user: 'User',
       customer: 'Customer',
       sale: 'Sale',
       supplier: 'Supplier',
+      branch: 'Branch',
       purchase_order: 'Purchase Order'
     };
     return labels[type] || (type ? type.charAt(0).toUpperCase() + type.slice(1) : 'Unknown');
@@ -171,10 +186,19 @@ const PurgeManagementPage = () => {
 
   const filteredItems = getFilteredItems();
 
+  // Pagination
+  const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
+  const paginatedItems = filteredItems.slice(
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
+  );
+
   const typeFilters = [
     { value: 'all', label: 'All Items' },
     { value: 'product', label: 'Products' },
+    { value: 'user', label: 'Users' },
     { value: 'customer', label: 'Customers' },
+    { value: 'branch', label: 'Branches' },
     { value: 'sale', label: 'Sales' },
     { value: 'supplier', label: 'Suppliers' },
     { value: 'purchase_order', label: 'Orders' }
@@ -309,7 +333,7 @@ const PurgeManagementPage = () => {
                   <th className="w-12 py-3 px-5">
                     <input
                       type="checkbox"
-                      checked={selectedItems.length === filteredItems.length && filteredItems.length > 0}
+                      checked={paginatedItems.length > 0 && paginatedItems.every(item => selectedItems.includes(item.id))}
                       onChange={toggleSelectAll}
                       className="w-4 h-4 rounded border-theme text-red-600 focus:ring-red-500/20"
                     />
@@ -322,7 +346,7 @@ const PurgeManagementPage = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-theme">
-                {filteredItems.map((item) => (
+                {paginatedItems.map((item) => (
                   <tr key={item.id} className="hover:bg-theme-primary transition-colors">
                     <td className="py-3 px-5">
                       <input
@@ -363,6 +387,73 @@ const PurgeManagementPage = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+        </div>
+      )}
+
+      {/* Pagination */}
+      {!loading && filteredItems.length > 0 && (
+        <div className="bg-theme-secondary rounded-xl border border-theme shadow-theme-sm px-5 py-3 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div className="flex items-center gap-3 text-sm text-theme-muted">
+            <span>Show</span>
+            <select
+              value={itemsPerPage}
+              onChange={(e) => {
+                setItemsPerPage(Number(e.target.value));
+                setCurrentPage(1);
+              }}
+              className="bg-theme-tertiary border border-theme rounded-lg px-2 py-1.5 text-sm text-theme-primary focus:outline-none focus:ring-2 focus:ring-red-500/20"
+            >
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+            </select>
+            <span>per page</span>
+            <span className="mx-2 text-theme-muted">|</span>
+            <span>
+              {Math.min((currentPage - 1) * itemsPerPage + 1, filteredItems.length)}–{Math.min(currentPage * itemsPerPage, filteredItems.length)} of {filteredItems.length} items
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+              disabled={currentPage === 1}
+              className="p-2 rounded-lg text-theme-muted hover:text-theme-primary hover:bg-theme-tertiary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft size={18} />
+            </button>
+            {Array.from({ length: Math.min(totalPages, 7) }, (_, i) => {
+              let page;
+              if (totalPages <= 7) {
+                page = i + 1;
+              } else if (currentPage <= 4) {
+                page = i + 1;
+              } else if (currentPage >= totalPages - 3) {
+                page = totalPages - 6 + i;
+              } else {
+                page = currentPage - 3 + i;
+              }
+              return (
+                <button
+                  key={page}
+                  onClick={() => setCurrentPage(page)}
+                  className={`w-9 h-9 rounded-lg text-sm font-medium transition-colors ${
+                    currentPage === page
+                      ? 'bg-red-600 text-white'
+                      : 'text-theme-muted hover:text-theme-primary hover:bg-theme-tertiary'
+                  }`}
+                >
+                  {page}
+                </button>
+              );
+            })}
+            <button
+              onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+              disabled={currentPage === totalPages}
+              className="p-2 rounded-lg text-theme-muted hover:text-theme-primary hover:bg-theme-tertiary disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronRight size={18} />
+            </button>
           </div>
         </div>
       )}
